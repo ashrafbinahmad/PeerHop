@@ -28,7 +28,9 @@ jobs:
 
       - name: Install NSIS
         shell: pwsh
-        run: choco install nsis --yes --no-progress
+        run: |
+          choco install nsis --yes --no-progress
+          echo "C:\Program Files (x86)\NSIS" >> $env:GITHUB_PATH
 
       - name: Build Windows GUI (Wails)
         working-directory: ./ui
@@ -45,7 +47,7 @@ jobs:
           if ($setup) {
             $tag = "${{ github.ref_name }}"
             $version = $tag -replace '^v',''
-            Move-Item -Path $setup.FullName -Destination "..\transend_v${version}_setup.exe"
+            Move-Item -Path $setup.FullName -Destination "..\transend_setup.exe"
           } else {
             Write-Error "Installer not found in build/bin"
           }
@@ -68,7 +70,7 @@ jobs:
         with:
           files: |
             transend.exe
-            transend_*_setup.exe
+            transend_setup.exe
             transend-cli.exe
             transend-linux
           draft: false
