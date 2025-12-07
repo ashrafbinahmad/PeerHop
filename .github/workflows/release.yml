@@ -19,19 +19,31 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.23' # Use recent go version
+          go-version: '1.23'
 
-      - name: Build Windows Binary
-        run: GOOS=windows GOARCH=amd64 go build -o transend.exe cmd/transend/main.go
+      - name: Install Wails
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
 
-      - name: Build Linux Binary
-        run: GOOS=linux GOARCH=amd64 go build -o transend-linux cmd/transend/main.go
+      - name: Install Linux Dependencies (for Wails deps if needed, though we cross-compile Win)
+        run: sudo apt-get update && sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev
+
+      - name: Build Windows GUI (Wails)
+        working-directory: ./ui
+        run: |
+          wails build -platform windows/amd64 -o transend.exe
+          mv build/bin/transend.exe ../transend.exe
+
+      - name: Build CLI binaries
+        run: |
+          GOOS=windows GOARCH=amd64 go build -o transend-cli.exe cmd/transend/main.go
+          GOOS=linux GOARCH=amd64 go build -o transend-linux cmd/transend/main.go
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
           files: |
             transend.exe
+            transend-cli.exe
             transend-linux
           draft: false
           prerelease: false

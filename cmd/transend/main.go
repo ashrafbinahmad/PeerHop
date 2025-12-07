@@ -10,10 +10,10 @@ import (
 	"path/filepath"
 	"strconv"
 
-	"transend/internal/network"
-	"transend/internal/server"
-	"transend/internal/ui"
-	"transend/internal/utils"
+	"transend/pkg/network"
+	"transend/pkg/server"
+	"transend/pkg/ui"
+	"transend/pkg/utils"
 
 	"github.com/schollz/progressbar/v3"
 )
