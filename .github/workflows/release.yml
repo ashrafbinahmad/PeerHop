@@ -26,15 +26,9 @@ jobs:
         shell: pwsh
         run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
 
-      - name: Install WiX Toolset
+      - name: Install NSIS
         shell: pwsh
-        run: choco install wixtoolset --yes --no-progress
-
-      # If your Wails project uses npm/yarn/pnpm inside ui/, add that here
-      # - name: Install UI dependencies
-      #   working-directory: ./ui
-      #   shell: pwsh
-      #   run: npm install
+        run: choco install nsis --yes --no-progress
 
       - name: Build Windows GUI (Wails)
         working-directory: ./ui
@@ -43,10 +37,17 @@ jobs:
           wails build -platform windows/amd64 -nsis -o transend.exe
           Move-Item -Path "build\bin\transend.exe" -Destination "..\transend.exe"
           
+          # List build bin for debugging (visible in actions log)
+          Get-ChildItem -Path "build\bin"
+
           # Find installer and rename with version
           $setup = Get-ChildItem -Path "build\bin\*installer.exe" | Select-Object -First 1
           if ($setup) {
-            Move-Item -Path $setup.FullName -Destination "..\transend_setup.exe"
+            $tag = "${{ github.ref_name }}"
+            $version = $tag -replace '^v',''
+            Move-Item -Path $setup.FullName -Destination "..\transend_v${version}_setup.exe"
+          } else {
+            Write-Error "Installer not found in build/bin"
           }
 
       - name: Build CLI binaries
@@ -57,7 +58,7 @@ jobs:
           $env:GOARCH = "amd64"
           go build -o transend-cli.exe cmd/transend/main.go
 
-          # Linux CLI (optional – remove if not needed or if cross-compile fails)
+          # Linux CLI
           $env:GOOS = "linux"
           $env:GOARCH = "amd64"
           go build -o transend-linux cmd/transend/main.go
@@ -67,7 +68,7 @@ jobs:
         with:
           files: |
             transend.exe
-            transend_setup.exe
+            transend_*_setup.exe
             transend-cli.exe
             transend-linux
           draft: false
