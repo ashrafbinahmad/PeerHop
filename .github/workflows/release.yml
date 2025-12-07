@@ -40,25 +40,14 @@ jobs:
         working-directory: ./ui
         shell: pwsh
         run: |
-          wails build -platform windows/amd64 -o transend.exe
+          wails build -platform windows/amd64 -nsis -o transend.exe
           Move-Item -Path "build\bin\transend.exe" -Destination "..\transend.exe"
-
-      - name: Build MSI Installer (WiX)
-        shell: pwsh
-        run: |
-          # Get Version from tag (remove refs/tags/ and leading v)
-          $tag = "$env:GITHUB_REF" -replace 'refs/tags/',''
-          $version = $tag -replace '^v',''
-
-          # Update Version in WXS file
-          $wxsPath = "ui/build/windows/msi/transend.wxs"
-          (Get-Content $wxsPath) `
-            -replace 'Version="1.3.3"', "Version=""$version""" |
-            Set-Content $wxsPath
-
-          # Build MSI using WiX
-          candle $wxsPath -o transend.wixobj
-          light transend.wixobj -o "transend_setup.msi"
+          
+          # Find installer and rename with version
+          $setup = Get-ChildItem -Path "build\bin\*installer.exe" | Select-Object -First 1
+          if ($setup) {
+            Move-Item -Path $setup.FullName -Destination "..\transend_setup.exe"
+          }
 
       - name: Build CLI binaries
         shell: pwsh
@@ -78,7 +67,7 @@ jobs:
         with:
           files: |
             transend.exe
-            transend_setup.msi
+            transend_setup.exe
             transend-cli.exe
             transend-linux
           draft: false
