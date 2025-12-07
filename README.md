@@ -1,17 +1,21 @@
 # Transend - Local File Transfer
 
+![Transend Header](assets/header.png)
+
 Transend is a lightning-fast tool to share files between devices on your local network. No cloud, no internet required—just direct peer-to-peer transfer via WiFi.
 
 [![NPM Version](https://img.shields.io/npm/v/transend)](https://www.npmjs.com/package/transend)
 
 ## 📥 Downloads
 
+![Download Guide](assets/download.png)
+
 | OS | Download Link |
 |----|---------------|
 | **Windows** (x64) | [**transend.exe**](https://github.com/ashrafbinahmad/transend/releases/latest/download/transend.exe) |
 | **Linux** (x64) | [**transend-linux**](https://github.com/ashrafbinahmad/transend/releases/latest/download/transend-linux) |
 
-*(Note: Replace links with your actual GitHub Release URLs once published)*
+
 
 ## 🚀 Quick Start (No Install)
 
@@ -49,6 +53,8 @@ npm install -g transend
 
 ## 🛠 Usage
 
+![Usage Guide](assets/usage.png)
+
 ### Sending Files
 ```bash
 # Send a single file
@@ -67,11 +73,10 @@ transend -r
 3. Select files on the phone to upload.
 
 ## 📱 Desktop GUI
-A modern Electron-based GUI is included in the `ui/` folder.
+A native, lightweight GUI (Wails) is included.
 ```bash
-cd ui
-npm install
-npm run dev
+# Run the standalone executable
+transend.exe
 ```
 
 ## 🧠 How it Works
