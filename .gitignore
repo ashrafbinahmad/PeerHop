@@ -1,2 +1,28 @@
-/test.txt
-/transfer.exe~
+# Binaries
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+bin/
+dist/
+release/
+transfer-linux
+
+# Temporary files
+test.txt
+*.zip
+*.log
+
+# Node.js
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Electron Build Output
+ui/dist/
+ui/release/
+ui/dist-electron/
+
+# Go
+vendor/
