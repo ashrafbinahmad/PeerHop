@@ -1,4 +1,4 @@
-module transfer
+module transend
 
 go 1.25.1
 
