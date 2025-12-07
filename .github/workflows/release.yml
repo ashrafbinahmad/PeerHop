@@ -30,16 +30,16 @@ jobs:
       - name: Build Windows GUI (Wails)
         working-directory: ./ui
         run: |
-          wails build -platform windows/amd64 -nsis -o transend.exe
+          wails build -platform windows/amd64 -msi -o transend.exe
           # Move binary
           mv build/bin/transend.exe ../transend.exe
           # Find and move installer (setup)
-          mv build/bin/*installer.exe ../transend_setup.exe
+          mv build/bin/*.msi ../transend_setup.msi
 
       - name: Rename Installer with Version
         run: |
           VERSION=${GITHUB_REF#refs/tags/}
-          mv transend_setup.exe transend_${VERSION}_setup.exe
+          mv transend_setup.msi transend_${VERSION}_setup.msi
 
       - name: Build CLI binaries
         run: |
@@ -51,7 +51,7 @@ jobs:
         with:
           files: |
             transend.exe
-            transend_*_setup.exe
+            transend_*_setup.msi
             transend-cli.exe
             transend-linux
           draft: false

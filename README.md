@@ -12,7 +12,7 @@ Transend is a lightning-fast tool to share files between devices on your local n
 
 | OS | Download Link |
 |----|---------------|
-| **Windows** (x64) | [**transend.exe**](https://github.com/ashrafbinahmad/transend/releases/latest/download/transend.exe) |
+| **Windows** (x64) | [**transend_setup.msi**](https://github.com/ashrafbinahmad/transend/releases/latest/download/transend_setup.msi) |
 | **Linux** (x64) | [**transend-linux**](https://github.com/ashrafbinahmad/transend/releases/latest/download/transend-linux) |
 
 
