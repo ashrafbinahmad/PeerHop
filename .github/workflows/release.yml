@@ -58,7 +58,7 @@ jobs:
 
           # Build MSI using WiX
           candle $wxsPath -o transend.wixobj
-          light transend.wixobj -o "transend_${tag}_setup.msi"
+          light transend.wixobj -o "transend_setup.msi"
 
       - name: Build CLI binaries
         shell: pwsh
@@ -78,7 +78,7 @@ jobs:
         with:
           files: |
             transend.exe
-            transend_*_setup.msi
+            transend_setup.msi
             transend-cli.exe
             transend-linux
           draft: false
