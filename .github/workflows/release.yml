@@ -66,8 +66,18 @@ jobs:
       - name: Create Release in transender-releases repo
         uses: softprops/action-gh-release@v2
         with:
-          repository: yourusername/transender-releases
+          repository: ashrafbinahmad/transender-releases
           token: ${{ secrets.RELEASE_PAT }}
+          body: |
+            ## Download Binaries
+            
+            Please download the pre-built binaries below:
+            - **transend.exe** - Windows GUI application
+            - **transend_setup.exe** - Windows installer
+            - **transend-cli.exe** - Windows CLI tool
+            - **transend-linux** - Linux CLI tool
+            
+            > **Note:** Ignore the "Source code" archives - they are automatically added by GitHub and are not needed.
           files: |
             transend.exe
             transend_setup.exe
@@ -75,4 +85,5 @@ jobs:
             transend-linux
           draft: false
           prerelease: false
-          generate_release_notes: true
+          generate_release_notes: false
+
