@@ -1,59 +1,37 @@
-import {useState} from 'react';
-import QRCode from "react-qr-code";
+import { useEffect, useState } from 'react';
 import './App.css';
-import {SelectFiles, StartTransfer} from "../wailsjs/go/main/App";
-import {main} from "../wailsjs/go/models";
+import { getMetaData, MetaData } from './api';
+import { DesktopView } from './views/DesktopView';
+import { MobileDownload } from './views/MobileDownload';
+import { MobileUpload } from './views/MobileUpload';
 
 function App() {
-    const [filePaths, setFilePaths] = useState<string[]>([]);
-    const [serverInfo, setServerInfo] = useState<main.ServerInfo | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [mobileState, setMobileState] = useState<MetaData | null>(null);
 
-    const handleSelectFiles = async () => {
-        try {
-            const files = await SelectFiles();
-            if (files && files.length > 0) {
-                setFilePaths(files);
-                const info = await StartTransfer(files);
-                setServerInfo(info);
+    useEffect(() => {
+        const checkMode = async () => {
+            // Check if we are in environment where /api/meta works
+            const meta = await getMetaData();
+            if (meta) {
+                setMobileState(meta);
             }
-        } catch (err) {
-            console.error(err);
+            setLoading(false);
+        };
+        checkMode();
+    }, []);
+
+    if (loading) return <div className="loading-screen"><div className="spinner"></div></div>;
+
+    if (mobileState) {
+        if (mobileState.mode === 'download') {
+            return <MobileDownload filename={mobileState.filename!} size={mobileState.size} />;
+        } else if (mobileState.mode === 'upload') {
+            return <MobileUpload />;
         }
-    };
+    }
 
-    return (
-        <div id="App">
-            <div style={{padding: '2rem'}}>
-                <h1>Transend</h1>
-                <p>Fast Local File Transfer</p>
-
-                <div className="card">
-                    <button className="btn" onClick={handleSelectFiles}>
-                        {filePaths.length > 0 ? 'Change Files' : 'Select Files to Share'}
-                    </button>
-                    
-                    {filePaths.length > 0 && (
-                        <div style={{marginTop: '1rem', textAlign: 'left'}}>
-                            <p><strong>Selected:</strong> {filePaths.length} files</p>
-                            <ul style={{maxHeight:'100px', overflowY:'auto', fontSize: '0.8rem'}}>
-                                {filePaths.map((f,i) => <li key={i}>{f}</li>)}
-                            </ul>
-                        </div>
-                    )}
-
-                    {serverInfo && (
-                        <div style={{marginTop: '2rem', padding: '1rem', background: 'white', borderRadius: '8px', color: 'black'}}>
-                            <div style={{background: 'white', padding: '16px'}}>
-                                <QRCode value={serverInfo.url} />
-                            </div>
-                            <p style={{marginTop: '1rem', fontWeight: 'bold'}}>{serverInfo.url}</p>
-                            <p>Scan to download <strong>{serverInfo.filename}</strong></p>
-                        </div>
-                    )}
-                </div>
-            </div>
-        </div>
-    )
+    return <DesktopView />;
 }
 
-export default App
+export default App;

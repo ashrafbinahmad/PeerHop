@@ -1,11 +1,14 @@
 package server
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
+	"io/fs"
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -13,47 +16,49 @@ import (
 type UploadHandler struct{}
 
 func (h *UploadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if r.Method == http.MethodGet {
-		h.serveUploadForm(w)
+	// API: Metadata
+	if r.URL.Path == "/api/meta" {
+		json.NewEncoder(w).Encode(map[string]string{
+			"mode": "upload",
+		})
 		return
 	}
-	if r.Method == http.MethodPost {
+
+	// API: Upload
+	if r.URL.Path == "/api/upload" && r.Method == http.MethodPost {
 		h.handleUpload(w, r)
 		return
 	}
-	http.NotFound(w, r)
-}
 
-func (h *UploadHandler) serveUploadForm(w http.ResponseWriter) {
-	html := `
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Send File to Host</title>
-    <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; background-color: #f0f2f5; margin: 0; }
-        .card { background: white; padding: 2rem; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); text-align: center; max-width: 90%; width: 400px; }
-        .icon { font-size: 48px; margin-bottom: 1rem; }
-        .btn { display: inline-block; background-color: #007bff; color: white; padding: 12px 24px; text-decoration: none; border: none; border-radius: 6px; font-weight: 600; margin-top: 1rem; cursor: pointer; font-size: 1rem; transition: background 0.2s; width: 100%; }
-        .btn:active { transform: scale(0.98); }
-        input[type="file"] { margin: 1rem 0; width: 100%; }
-    </style>
-</head>
-<body>
-    <div class="card">
-        <div class="icon">📤</div>
-        <h2>Send File to Computer</h2>
-        <form action="/upload" method="post" enctype="multipart/form-data">
-            <input type="file" name="file" multiple required>
-            <button type="submit" class="btn">Send</button>
-        </form>
-    </div>
-</body>
-</html>`
-	w.Header().Set("Content-Type", "text/html")
-	w.Write([]byte(html))
+	// Legacy
+	if r.URL.Path == "/upload" && r.Method == http.MethodPost {
+		h.handleUpload(w, r)
+		return
+	}
+
+	// Serve Static Assets or Index
+	fsys, _ := fs.Sub(distFS, "dist")
+
+	// If path starts with /assets/, serve from fs
+	if strings.HasPrefix(r.URL.Path, "/assets/") {
+		http.FileServer(http.FS(fsys)).ServeHTTP(w, r)
+		return
+	}
+
+	// Serve Index
+	index, err := fsys.Open("index.html")
+	if err != nil {
+		http.Error(w, "UI not found", http.StatusInternalServerError)
+		return
+	}
+	defer index.Close()
+	stat, _ := index.Stat()
+
+	if seeker, ok := index.(io.ReadSeeker); ok {
+		http.ServeContent(w, r, "index.html", stat.ModTime(), seeker)
+	} else {
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+	}
 }
 
 func (h *UploadHandler) handleUpload(w http.ResponseWriter, r *http.Request) {

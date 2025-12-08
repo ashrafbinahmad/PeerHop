@@ -1,14 +1,22 @@
 package server
 
 import (
+	"embed"
+	"encoding/json"
 	"fmt"
+	"io"
+	"io/fs"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 
 	"github.com/schollz/progressbar/v3"
 )
+
+//go:embed dist
+var distFS embed.FS
 
 // ProgressResponseWriter wraps http.ResponseWriter to track bytes written
 type ProgressResponseWriter struct {
@@ -33,50 +41,56 @@ type DownloadHandler struct {
 func (h *DownloadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	fileName := filepath.Base(h.FilePath)
 
-	// Serve file if requested path matches filename
-	// Serve file if requested path matches filename
+	// API: Metadata
+	if r.URL.Path == "/api/meta" {
+		stat, err := os.Stat(h.FilePath)
+		size := int64(0)
+		if err == nil {
+			size = stat.Size()
+		}
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"mode":     "download",
+			"filename": fileName,
+			"size":     size,
+		})
+		return
+	}
+
+	// API: Download
+	if r.URL.Path == "/api/download" {
+		h.serveFile(w, r)
+		return
+	}
+
+	// Legacy/Direct Download link (if someone accesses /filename directly)
 	if r.URL.Path == "/"+fileName {
 		h.serveFile(w, r)
 		return
 	}
 
-	// Serve Landing Page otherwise (e.g. at root)
-	if r.URL.Path == "/" {
-		h.serveLandingPage(w, r, fileName)
+	// Serve Static Assets or Index
+	fsys, _ := fs.Sub(distFS, "dist")
+
+	// If path starts with /assets/, serve from fs
+	if strings.HasPrefix(r.URL.Path, "/assets/") {
+		http.FileServer(http.FS(fsys)).ServeHTTP(w, r)
 		return
 	}
 
-	http.NotFound(w, r)
-}
+	// Otherwise serve index.html (SPA)
+	index, err := fsys.Open("index.html")
+	if err != nil {
+		http.Error(w, "UI not found", http.StatusInternalServerError)
+		return
+	}
+	defer index.Close()
+	stat, _ := index.Stat()
 
-func (h *DownloadHandler) serveLandingPage(w http.ResponseWriter, r *http.Request, fileName string) {
-	html := fmt.Sprintf(`
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Download %s</title>
-    <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; background-color: #f0f2f5; margin: 0; }
-        .card { background: white; padding: 2rem; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); text-align: center; max-width: 90%%; width: 400px; }
-        .file-icon { font-size: 48px; margin-bottom: 1rem; }
-        .file-name { font-weight: bold; margin-bottom: 0.5rem; word-break: break-all; }
-        .btn { display: inline-block; background-color: #007bff; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 600; margin-top: 1rem; transition: background 0.2s; }
-        .btn:active { transform: scale(0.98); }
-    </style>
-</head>
-<body>
-    <div class="card">
-        <div class="file-icon">📄</div>
-        <div class="file-name">%s</div>
-        <a href="/%s" class="btn" download>Download File</a>
-    </div>
-</body>
-</html>`, fileName, fileName, fileName)
-
-	w.Header().Set("Content-Type", "text/html")
-	w.Write([]byte(html))
+	if seeker, ok := index.(io.ReadSeeker); ok {
+		http.ServeContent(w, r, "index.html", stat.ModTime(), seeker)
+	} else {
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+	}
 }
 
 func (h *DownloadHandler) serveFile(w http.ResponseWriter, r *http.Request) {
@@ -101,13 +115,6 @@ func (h *DownloadHandler) serveFile(w http.ResponseWriter, r *http.Request) {
 		ResponseWriter: w,
 		ProgressBar:    h.Bar,
 	}
-
-	// Use io.Copy instead of http.ServeContent to ensure we trigger the write wrapper
-	// AND to allow explicit control.
-	// Note: This bypasses Range requests support which is fine for basic transfer.
-	// However, for mobile browsers resuming support, ServeContent is better.
-	// If we want ServeContent AND Progress, we need to wrap the response writer properly.
-	// Our ProgressResponseWriter already does that.
 
 	http.ServeContent(pw, r, stat.Name(), stat.ModTime(), f)
 }
