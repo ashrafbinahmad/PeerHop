@@ -20,7 +20,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.23' # or your actual Go version
+          go-version: '1.23'
 
       - name: Install Wails
         shell: pwsh
@@ -38,15 +38,13 @@ jobs:
         run: |
           wails build -platform windows/amd64 -nsis -o transend.exe
           Move-Item -Path "build\bin\transend.exe" -Destination "..\transend.exe"
-          
-          # List build bin for debugging (visible in actions log)
+
+          # Debug listing
           Get-ChildItem -Path "build\bin"
 
-          # Find installer and rename with version
+          # Find installer
           $setup = Get-ChildItem -Path "build\bin\*installer.exe" | Select-Object -First 1
           if ($setup) {
-            $tag = "${{ github.ref_name }}"
-            $version = $tag -replace '^v',''
             Move-Item -Path $setup.FullName -Destination "..\transend_setup.exe"
           } else {
             Write-Error "Installer not found in build/bin"
@@ -65,9 +63,11 @@ jobs:
           $env:GOARCH = "amd64"
           go build -o transend-linux cmd/transend/main.go
 
-      - name: Create Release
+      - name: Create Release in transender-releases repo
         uses: softprops/action-gh-release@v2
         with:
+          repository: yourusername/transender-releases
+          token: ${{ secrets.RELEASE_PAT }}
           files: |
             transend.exe
             transend_setup.exe
