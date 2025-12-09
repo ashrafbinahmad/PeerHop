@@ -17,32 +17,30 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Verify build files exist
+      - name: List available build files
         shell: pwsh
         run: |
-          $requiredFiles = @(
+          $possibleFiles = @(
             "builds/transend_win.exe",
             "builds/transend_setup.exe",
+            "builds/transend_setup.msi",
             "builds/transend_linux",
             "builds/transend_cli_win.exe",
             "builds/transend_cli_linux"
           )
           
-          $missingFiles = @()
-          foreach ($file in $requiredFiles) {
-            if (-not (Test-Path $file)) {
-              $missingFiles += $file
+          Write-Host "Available build files:"
+          $foundCount = 0
+          foreach ($file in $possibleFiles) {
+            if (Test-Path $file) {
+              Write-Host "  ✓ $file"
+              $foundCount++
             } else {
-              Write-Host "✓ Found: $file"
+              Write-Host "  - $file (not found)" -ForegroundColor Yellow
             }
           }
           
-          if ($missingFiles.Count -gt 0) {
-            Write-Error "Missing required build files:`n$($missingFiles -join "`n")"
-            exit 1
-          }
-          
-          Write-Host "`n✓ All required build files are present!"
+          Write-Host "`nFound $foundCount file(s) to upload"
 
       - name: Create Release in transender-releases repo
         uses: softprops/action-gh-release@v2

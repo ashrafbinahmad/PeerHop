@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-const { execSync, spawn } = require('child_process');
+const { execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 
@@ -43,13 +43,21 @@ function exec(command, description) {
     }
 }
 
-// Get version from command line
-const version = process.argv[2];
+// Get version from command line (optional - can read from version file)
+let version = process.argv[2];
 
+// If no version provided, try to read from version file
 if (!version) {
-    error('Version is required!');
-    log('Usage: npm run publish 1.4.0', 'yellow');
-    process.exit(1);
+    const versionFilePath = path.join(__dirname, '..', 'version');
+    if (fs.existsSync(versionFilePath)) {
+        version = fs.readFileSync(versionFilePath, 'utf8').trim();
+        info(`Using version from version file: ${version}`);
+    } else {
+        error('Version is required!');
+        log('Usage: npm run publish [version]', 'yellow');
+        log('Or run prepublish first to create version file', 'yellow');
+        process.exit(1);
+    }
 }
 
 // Validate version format (X.Y.Z)
@@ -61,91 +69,7 @@ if (!/^\d+\.\d+\.\d+$/.test(version)) {
 log(`\nPublishing Transend v${version}`, 'cyan');
 log('================================\n', 'cyan');
 
-const buildsDir = path.join(__dirname, '..', 'builds');
-const backupDir = path.join(__dirname, '..', 'builds_backup');
-
-// Step 1: Clean existing builds (or backup if locked)
-step(1, 10, 'Cleaning existing builds...');
-if (fs.existsSync(buildsDir)) {
-    try {
-        fs.rmSync(buildsDir, { recursive: true, force: true, maxRetries: 3 });
-        success('Removed old builds');
-    } catch (err) {
-        // If deletion fails (file locked), copy to backup instead
-        info('Folder is locked, copying to builds_backup...');
-        try {
-            if (fs.existsSync(backupDir)) {
-                fs.rmSync(backupDir, { recursive: true, force: true, maxRetries: 3 });
-            }
-            fs.cpSync(buildsDir, backupDir, { recursive: true });
-            success('Copied builds to builds_backup');
-            info('Will overwrite files in builds folder');
-        } catch (copyErr) {
-            error('Could not backup builds folder');
-            log(`  Error: ${copyErr.message}`, 'red');
-            log('  Please close all programs accessing the builds folder', 'yellow');
-            process.exit(1);
-        }
-    }
-} else {
-    info('No existing builds to clean');
-}
-
-// Create builds directory if it doesn't exist
-if (!fs.existsSync(buildsDir)) {
-    fs.mkdirSync(buildsDir, { recursive: true });
-}
-log('');
-
-// Step 2: Build CLI binaries
-step(2, 10, 'Building CLI binaries...');
-log('  Building Windows CLI...', 'white');
-if (!exec('npm run build:cli:win', 'Windows CLI build')) {
-    process.exit(1);
-}
-success('Built Windows CLI');
-
-log('  Building Linux CLI...', 'white');
-if (!exec('npm run build:cli:linux', 'Linux CLI build')) {
-    process.exit(1);
-}
-success('Built Linux CLI\n');
-
-// Step 3: Install frontend dependencies
-step(3, 10, 'Installing frontend dependencies...');
-process.chdir(path.join(__dirname, '..', 'ui', 'frontend'));
-if (!exec('npm install', 'Frontend npm install')) {
-    error('Failed to install frontend dependencies');
-    process.exit(1);
-}
-process.chdir(path.join(__dirname, '..'));
-success('Frontend dependencies installed\n');
-
-// Step 4: Build GUI applications (Windows only - Linux requires WSL)
-step(4, 10, 'Building GUI applications...');
-log('  Building Windows GUI NSIS installer...', 'white');
-if (!exec('npm run build:win:nsis', 'Windows GUI NSIS build')) {
-    process.exit(1);
-}
-success('Built Windows GUI NSIS installer');
-
-log('  Building Windows GUI MSI installer...', 'white');
-if (!exec('npm run build:win:msi', 'Windows GUI MSI build')) {
-    process.exit(1);
-}
-success('Built Windows GUI MSI installer');
-
-log('  Building Windows GUI executable...', 'white');
-if (!exec('npm run build:win', 'Windows GUI build')) {
-    process.exit(1);
-}
-success('Built Windows GUI\n');
-
-info('Skipping Linux GUI build (requires WSL - build manually if needed)');
-log('');
-
-// Step 5: Verify all builds
-step(5, 10, 'Verifying builds...');
+// Verify builds exist
 const requiredFiles = [
     'builds/transend_win.exe',
     'builds/transend_setup.exe',
@@ -154,49 +78,37 @@ const requiredFiles = [
     'builds/transend_cli_linux'
 ];
 
-const optionalFiles = [
-    'builds/transend_linux'
-];
-
+log('Checking for build files...', 'yellow');
 let allPresent = true;
 for (const file of requiredFiles) {
-    if (fs.existsSync(file)) {
-        success(`Found: ${file}`);
-    } else {
+    if (!fs.existsSync(file)) {
         error(`Missing: ${file}`);
         allPresent = false;
     }
 }
 
-for (const file of optionalFiles) {
-    if (fs.existsSync(file)) {
-        success(`Found (optional): ${file}`);
-    } else {
-        info(`Optional: ${file} (build in WSL if needed)`);
-    }
-}
-
 if (!allPresent) {
-    error('Some build files are missing!');
+    error('\nBuild files are missing!');
+    log('Please run: npm run prepublish <version>', 'yellow');
     process.exit(1);
 }
-log('');
+success('All build files present\n');
 
-// Step 6: Update version file
-step(6, 10, 'Updating version file...');
+// Step 1: Update version file
+step(1, 5, 'Updating version file...');
 fs.writeFileSync('version', version);
 success(`Updated version to ${version}\n`);
 
-// Step 7: Update npm package
-step(7, 10, 'Updating npm package...');
+// Step 2: Update npm package
+step(2, 5, 'Updating npm package...');
 const npmPackageJsonPath = path.join(__dirname, '..', 'npm-package', 'package.json');
 const npmPackageJson = JSON.parse(fs.readFileSync(npmPackageJsonPath, 'utf8'));
 npmPackageJson.version = version;
 fs.writeFileSync(npmPackageJsonPath, JSON.stringify(npmPackageJson, null, 2) + '\n');
 success(`Updated npm-package/package.json to ${version}\n`);
 
-// Step 8: Copy binaries to npm-package
-step(8, 10, 'Copying binaries to npm package...');
+// Step 3: Copy binaries to npm-package
+step(3, 5, 'Copying binaries to npm package...');
 const npmBinDir = path.join(__dirname, '..', 'npm-package', 'bin');
 if (!fs.existsSync(npmBinDir)) {
     fs.mkdirSync(npmBinDir, { recursive: true });
@@ -205,8 +117,8 @@ fs.copyFileSync('builds/transend_cli_win.exe', path.join(npmBinDir, 'transend-wi
 fs.copyFileSync('builds/transend_cli_linux', path.join(npmBinDir, 'transend-linux'));
 success('Copied CLI binaries to npm-package/bin\n');
 
-// Step 9: Git commit and tag
-step(9, 10, 'Creating git tag...');
+// Step 4: Git commit and tag
+step(4, 5, 'Creating git tag...');
 exec('git add .', 'Git add');
 try {
     execSync(`git commit -m "Release v${version}"`, { stdio: 'inherit' });
@@ -229,8 +141,8 @@ if (!exec(`git push origin v${version}`, 'Git push tag')) {
 }
 success('Pushed to git\n');
 
-// Step 10: Publish to npm
-step(10, 10, 'Publishing to npm...');
+// Step 5: Publish to npm
+step(5, 5, 'Publishing to npm...');
 process.chdir(path.join(__dirname, '..', 'npm-package'));
 if (!exec('npm publish', 'NPM publish')) {
     error('Failed to publish to npm');
