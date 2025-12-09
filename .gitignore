@@ -1,5 +1,4 @@
 # Binaries
-*.exe
 *.exe~
 *.dll
 *.so
@@ -8,6 +7,7 @@ bin/
 dist/
 release/
 transfer-linux
+builds_backup/
 
 # Temporary files
 test.txt
