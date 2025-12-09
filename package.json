@@ -5,10 +5,11 @@
   "scripts": {
     "build:win": "cd ui && wails build -platform windows/amd64 -o ../../../builds/transend_win.exe",
     "build:win:nsis": "cd ui && wails build -platform windows/amd64 -nsis -o ../../../builds/transend_setup.exe",
+    "build:win:msi": "cd ui && wails build -platform windows/amd64 && cd build/windows/msi && wix build product.wxs -o ../../../../builds/transend_setup.msi",
     "build:linux": "cd ui && wails build -platform linux/amd64 -o ../../../builds/transend_linux",
     "build:cli:win": "go build -o builds/transend_cli_win.exe ./cmd/transend",
     "build:cli:linux": "set GOOS=linux&& go build -o builds/transend_cli_linux ./cmd/transend",
-    "check:release": "powershell -Command \"$files = @('builds/transend_win.exe', 'builds/transend_setup.exe', 'builds/transend_linux', 'builds/transend_cli_win.exe', 'builds/transend_cli_linux'); $missing = @(); foreach ($f in $files) { if (Test-Path $f) { Write-Host \\\"✓ Found: $f\\\" -ForegroundColor Green } else { $missing += $f; Write-Host \\\"✗ Missing: $f\\\" -ForegroundColor Red } }; if ($missing.Count -gt 0) { Write-Host \\\"`n✗ Missing $($missing.Count) file(s)!\\\" -ForegroundColor Red; exit 1 } else { Write-Host \\\"`n✓ All build files are present!\\\" -ForegroundColor Green }\"",
+    "check:release": "powershell -Command \"$files = @('builds/transend_win.exe', 'builds/transend_setup.msi', 'builds/transend_linux', 'builds/transend_cli_win.exe', 'builds/transend_cli_linux'); $missing = @(); foreach ($f in $files) { if (Test-Path $f) { Write-Host \\\"✓ Found: $f\\\" -ForegroundColor Green } else { $missing += $f; Write-Host \\\"✗ Missing: $f\\\" -ForegroundColor Red } }; if ($missing.Count -gt 0) { Write-Host \\\"`n✗ Missing $($missing.Count) file(s)!\\\" -ForegroundColor Red; exit 1 } else { Write-Host \\\"`n✓ All build files are present!\\\" -ForegroundColor Green }\"",
     "publish": "node ./scripts/publish.js",
     "dev:cli": "go run ./cmd/transend",
     "dev:ui": "cd ui && wails dev",

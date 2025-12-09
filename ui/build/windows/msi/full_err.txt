@@ -1,0 +1,1 @@
+F:\transender\ui\build\windows\msi\product.wxs(31) : error WIX0094: The identifier 'WixUI:WixUI_InstallDir' could not be found. Ensure you have typed the reference correctly and that all the necessary inputs are provided to the linker.

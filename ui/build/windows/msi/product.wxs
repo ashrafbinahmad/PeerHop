@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs" 
+     xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
+  
+  <Package Name="Transend"
+           Version="1.0.0"
+           Manufacturer="Muhammed Asraf"
+           UpgradeCode="12345678-1234-1234-1234-123456789ABC"
+           Language="1033"
+           InstallerVersion="200"
+           Compressed="yes"
+           Scope="perMachine">
+    
+    <SummaryInformation Description="Transend Installer"
+                        Comments="Fast and secure file transfer application"
+                        Manufacturer="Muhammed Asraf" />
+
+    <MajorUpgrade DowngradeErrorMessage="A newer version of [ProductName] is already installed." />
+    <MediaTemplate EmbedCab="yes" />
+
+    <!-- TODO: Add WebView2 Runtime Check for WIX v4 -->
+
+    <!-- Feature definition -->
+    <Feature Id="ProductFeature" Title="Transend" Level="1">
+      <ComponentGroupRef Id="ProductComponents" />
+      <ComponentRef Id="ApplicationShortcut" />
+      <ComponentRef Id="DesktopShortcut" />
+    </Feature>
+
+    <!-- TODO: Add WixUI support - requires WixToolset.UI.wixext extension in WiX v4 -->
+    
+    <!-- Icon for Add/Remove Programs -->
+    <Icon Id="icon.ico" SourceFile="..\icon.ico" />
+    <Property Id="ARPPRODUCTICON" Value="icon.ico" />
+    <Property Id="ARPHELPLINK" Value="https://github.com/ashrafbinahmad/transend" />
+  </Package>
+
+  <Fragment>
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="INSTALLFOLDER" Name="Transend" />
+    </StandardDirectory>
+    
+    <!-- Start Menu -->
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Directory Id="ApplicationProgramsFolder" Name="Transend" />
+    </StandardDirectory>
+  </Fragment>
+
+  <Fragment>
+    <ComponentGroup Id="ProductComponents" Directory="INSTALLFOLDER">
+      <Component Id="ProductComponent" Guid="87654321-4321-4321-4321-CBA987654321">
+        <File Id="TransendEXE" 
+              Source="..\..\bin\ui.exe" 
+              KeyPath="yes" 
+              Checksum="yes">
+          <Shortcut Id="StartMenuShortcut"
+                    Directory="ApplicationProgramsFolder"
+                    Name="Transend"
+                    Description="Fast and secure file transfer"
+                    WorkingDirectory="INSTALLFOLDER"
+                    Icon="icon.ico"
+                    IconIndex="0"
+                    Advertise="yes" />
+        </File>
+      </Component>
+    </ComponentGroup>
+
+    <!-- Start Menu Folder Component -->
+    <DirectoryRef Id="ApplicationProgramsFolder">
+      <Component Id="ApplicationShortcut" Guid="11111111-1111-1111-1111-111111111111">
+        <RemoveFolder Id="CleanUpShortCut" On="uninstall" />
+        <RegistryValue Root="HKCU" 
+                       Key="Software\Transend" 
+                       Name="installed" 
+                       Type="integer" 
+                       Value="1" 
+                       KeyPath="yes" />
+      </Component>
+    </DirectoryRef>
+
+    <!-- Desktop Shortcut Component -->
+    <StandardDirectory Id="DesktopFolder">
+      <Component Id="DesktopShortcut" Guid="22222222-2222-2222-2222-222222222222">
+        <Shortcut Id="DesktopShortcutId"
+                  Name="Transend"
+                  Description="Fast and secure file transfer"
+                  Target="[INSTALLFOLDER]ui.exe"
+                  WorkingDirectory="INSTALLFOLDER"
+                  Icon="icon.ico"
+                  IconIndex="0" />
+        <RemoveFolder Id="CleanUpDesktopShortcut" On="uninstall" />
+        <RegistryValue Root="HKCU" 
+                       Key="Software\Transend" 
+                       Name="desktop_shortcut" 
+                       Type="integer" 
+                       Value="1" 
+                       KeyPath="yes" />
+      </Component>
+    </StandardDirectory>
+  </Fragment>
+</Wix>

@@ -100,19 +100,15 @@ log('');
 // Step 2: Build CLI binaries
 step(2, 10, 'Building CLI binaries...');
 log('  Building Windows CLI...', 'white');
-if (!exec('go build -o builds/transend_cli_win.exe ./cmd/transend', 'Windows CLI build')) {
+if (!exec('npm run build:cli:win', 'Windows CLI build')) {
     process.exit(1);
 }
 success('Built Windows CLI');
 
 log('  Building Linux CLI...', 'white');
-process.env.GOOS = 'linux';
-process.env.GOARCH = 'amd64';
-if (!exec('go build -o builds/transend_cli_linux ./cmd/transend', 'Linux CLI build')) {
+if (!exec('npm run build:cli:linux', 'Linux CLI build')) {
     process.exit(1);
 }
-delete process.env.GOOS;
-delete process.env.GOARCH;
 success('Built Linux CLI\n');
 
 // Step 3: Install frontend dependencies
@@ -127,14 +123,20 @@ success('Frontend dependencies installed\n');
 
 // Step 4: Build GUI applications (Windows only - Linux requires WSL)
 step(4, 10, 'Building GUI applications...');
-log('  Building Windows GUI installer...', 'white');
-if (!exec('cd ui && wails build -platform windows/amd64 -nsis -o ../builds/transend_setup.exe', 'Windows GUI build')) {
+log('  Building Windows GUI NSIS installer...', 'white');
+if (!exec('npm run build:win:nsis', 'Windows GUI NSIS build')) {
     process.exit(1);
 }
-success('Built Windows GUI installer');
+success('Built Windows GUI NSIS installer');
+
+log('  Building Windows GUI MSI installer...', 'white');
+if (!exec('npm run build:win:msi', 'Windows GUI MSI build')) {
+    process.exit(1);
+}
+success('Built Windows GUI MSI installer');
 
 log('  Building Windows GUI executable...', 'white');
-if (!exec('cd ui && wails build -platform windows/amd64 -o ../builds/transend_win.exe', 'Windows GUI build')) {
+if (!exec('npm run build:win', 'Windows GUI build')) {
     process.exit(1);
 }
 success('Built Windows GUI\n');
@@ -147,6 +149,7 @@ step(5, 10, 'Verifying builds...');
 const requiredFiles = [
     'builds/transend_win.exe',
     'builds/transend_setup.exe',
+    'builds/transend_setup.msi',
     'builds/transend_cli_win.exe',
     'builds/transend_cli_linux'
 ];

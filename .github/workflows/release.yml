@@ -62,7 +62,7 @@ jobs:
             > **Note:** Ignore the "Source code" archives - they are automatically added by GitHub and are not needed.
           files: |
             builds/transend_win.exe
-            builds/transend_setup.exe
+            builds/transend_setup.msi
             builds/transend_cli_win.exe
             builds/transend_cli_linux
             builds/transend_linux
