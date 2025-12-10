@@ -201,8 +201,39 @@ if (!exec(`wails build -platform windows/amd64 ${buildFlags} -o ../../../builds/
 process.chdir(path.join(__dirname, '..'));
 success('Built Windows GUI\n');
 
-info('Skipping Linux GUI build (requires WSL - build manually if needed)');
-log('');
+// Attempt to build Linux GUI in WSL
+log('  Building Linux GUI in WSL...', 'white');
+try {
+    // Check if WSL is available
+    execSync('wsl --status', { stdio: 'pipe' });
+
+    // Use the shell script which properly sets up the environment
+    const buildScriptPath = path.join(__dirname, '..', 'build-linux-wsl.sh');
+
+    if (!fs.existsSync(buildScriptPath)) {
+        throw new Error('build-linux-wsl.sh not found');
+    }
+
+    // Convert Windows path to WSL path for the script
+    const winPath = buildScriptPath.replace(/\\/g, '/');
+    const driveLetter = winPath.charAt(0).toLowerCase();
+    const wslScriptPath = `/mnt/${driveLetter}${winPath.substring(2)}`;
+
+    info('Building Linux binary in WSL (this may take a few minutes)...');
+    execSync(`wsl bash ${wslScriptPath}`, { stdio: 'inherit' });
+    process.chdir(path.join(__dirname, '..'));
+    success('Built Linux GUI in WSL\n');
+} catch (err) {
+    process.chdir(path.join(__dirname, '..'));
+    error('Failed to build Linux GUI in WSL');
+    if (err.message.includes('not found')) {
+        info('Make sure build-linux-wsl.sh exists and WSL is properly configured');
+    } else {
+        info(`Error: ${err.message}`);
+    }
+    info('Linux build is optional - continuing without it\n');
+}
+
 
 // Step 5: Verify all builds
 step(5, 5, 'Verifying builds...');
@@ -218,13 +249,16 @@ const optionalFiles = [
     'builds/transend_linux'
 ];
 
-let allPresent = true;
+let missingFiles = [];
+const copiedFromBackup = [];
+
+// Check which files are present
 for (const file of requiredFiles) {
     if (fs.existsSync(file)) {
         success(`Found: ${file}`);
     } else {
         error(`Missing: ${file}`);
-        allPresent = false;
+        missingFiles.push(file);
     }
 }
 
@@ -236,8 +270,29 @@ for (const file of optionalFiles) {
     }
 }
 
-if (!allPresent) {
-    error('Some build files are missing!');
+// Try to copy missing files from backup
+if (missingFiles.length > 0 && fs.existsSync(backupDir)) {
+    log('\n  Attempting to copy missing files from builds_backup...', 'yellow');
+
+    for (const file of missingFiles) {
+        const backupFile = path.join(backupDir, path.basename(file));
+        if (fs.existsSync(backupFile)) {
+            try {
+                fs.copyFileSync(backupFile, file);
+                success(`Copied from backup: ${path.basename(file)}`);
+                copiedFromBackup.push(path.basename(file));
+                // Remove from missing files list
+                missingFiles = missingFiles.filter(f => f !== file);
+            } catch (err) {
+                error(`Failed to copy ${path.basename(file)} from backup: ${err.message}`);
+            }
+        }
+    }
+}
+
+// Check if there are still missing files after attempting backup copy
+if (missingFiles.length > 0) {
+    error('\nSome required build files are still missing and not found in backup!');
     process.exit(1);
 }
 log('');
@@ -246,6 +301,17 @@ log('================================', 'cyan');
 log(`✓ Successfully built v${version}!`, 'green');
 log('  - All binaries created', 'white');
 log('  - Installers ready', 'white');
+
+// Show warning if files were copied from backup
+if (copiedFromBackup.length > 0) {
+    log('\n⚠️  WARNING:', 'red');
+    log('The following files were copied from builds_backup:', 'red');
+    copiedFromBackup.forEach(file => {
+        log(`  - ${file}`, 'red');
+    });
+    log('These files were NOT rebuilt and may be outdated!', 'red');
+}
+
 log('\nNext steps:', 'cyan');
 log('  Run: npm run publish', 'white');
 log('  Or manually test the builds in ./builds/', 'white');
