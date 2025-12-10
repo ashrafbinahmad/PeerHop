@@ -66,6 +66,32 @@ if (!/^\d+\.\d+\.\d+$/.test(version)) {
     process.exit(1);
 }
 
+// Check current version in package.json
+const rootPackageJsonPath = path.join(__dirname, '..', 'package.json');
+const rootPackageJson = JSON.parse(fs.readFileSync(rootPackageJsonPath, 'utf8'));
+const currentVersion = rootPackageJson.version;
+
+// Compare versions
+function compareVersions(v1, v2) {
+    const parts1 = v1.split('.').map(Number);
+    const parts2 = v2.split('.').map(Number);
+
+    for (let i = 0; i < 3; i++) {
+        if (parts1[i] > parts2[i]) return 1;
+        if (parts1[i] < parts2[i]) return -1;
+    }
+    return 0;
+}
+
+const versionComparison = compareVersions(version, currentVersion);
+if (versionComparison <= 0) {
+    error(`New version (${version}) must be greater than current version (${currentVersion})`);
+    log('Please provide a higher version number', 'yellow');
+    process.exit(1);
+}
+
+info(`Version check passed: ${currentVersion} → ${version}`);
+
 log(`\nPublishing Transend v${version}`, 'cyan');
 log('================================\n', 'cyan');
 
@@ -94,21 +120,27 @@ if (!allPresent) {
 }
 success('All build files present\n');
 
-// Step 1: Update version file
-step(1, 5, 'Updating version file...');
+// Step 1: Update root package.json
+step(1, 6, 'Updating root package.json...');
+rootPackageJson.version = version;
+fs.writeFileSync(rootPackageJsonPath, JSON.stringify(rootPackageJson, null, 2) + '\n');
+success(`Updated root package.json to ${version}\n`);
+
+// Step 2: Update version file
+step(2, 6, 'Updating version file...');
 fs.writeFileSync('version', version);
 success(`Updated version to ${version}\n`);
 
-// Step 2: Update npm package
-step(2, 5, 'Updating npm package...');
+// Step 3: Update npm package
+step(3, 6, 'Updating npm package...');
 const npmPackageJsonPath = path.join(__dirname, '..', 'npm-package', 'package.json');
 const npmPackageJson = JSON.parse(fs.readFileSync(npmPackageJsonPath, 'utf8'));
 npmPackageJson.version = version;
 fs.writeFileSync(npmPackageJsonPath, JSON.stringify(npmPackageJson, null, 2) + '\n');
 success(`Updated npm-package/package.json to ${version}\n`);
 
-// Step 3: Copy binaries to npm-package
-step(3, 5, 'Copying binaries to npm package...');
+// Step 4: Copy binaries to npm-package
+step(4, 6, 'Copying binaries to npm package...');
 const npmBinDir = path.join(__dirname, '..', 'npm-package', 'bin');
 if (!fs.existsSync(npmBinDir)) {
     fs.mkdirSync(npmBinDir, { recursive: true });
@@ -117,8 +149,8 @@ fs.copyFileSync('builds/transend_cli_win.exe', path.join(npmBinDir, 'transend-wi
 fs.copyFileSync('builds/transend_cli_linux', path.join(npmBinDir, 'transend-linux'));
 success('Copied CLI binaries to npm-package/bin\n');
 
-// Step 4: Git commit and tag
-step(4, 5, 'Creating git tag...');
+// Step 5: Git commit and tag
+step(5, 6, 'Creating git tag...');
 exec('git add .', 'Git add');
 try {
     execSync(`git commit -m "Release v${version}"`, { stdio: 'inherit' });
@@ -141,8 +173,8 @@ if (!exec(`git push origin v${version}`, 'Git push tag')) {
 }
 success('Pushed to git\n');
 
-// Step 5: Publish to npm
-step(5, 5, 'Publishing to npm...');
+// Step 6: Publish to npm
+step(6, 6, 'Publishing to npm...');
 process.chdir(path.join(__dirname, '..', 'npm-package'));
 if (!exec('npm publish', 'NPM publish')) {
     error('Failed to publish to npm');
