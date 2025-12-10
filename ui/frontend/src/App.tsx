@@ -2,8 +2,7 @@ import { useEffect, useState } from 'react';
 import './App.css';
 import { getMetaData, MetaData } from './api';
 import { DesktopView } from './views/DesktopView';
-import { MobileDownload } from './views/MobileDownload';
-import { MobileUpload } from './views/MobileUpload';
+import { MobileUnified } from './views/MobileUnified';
 
 function App() {
     const [loading, setLoading] = useState(true);
@@ -23,14 +22,15 @@ function App() {
 
     if (loading) return <div className="loading-screen"><div className="spinner"></div></div>;
 
+    // Mobile view - unified for both upload and download
     if (mobileState) {
-        if (mobileState.mode === 'download') {
-            return <MobileDownload filename={mobileState.filename!} size={mobileState.size} />;
-        } else if (mobileState.mode === 'upload') {
-            return <MobileUpload />;
-        }
+        return <MobileUnified
+            downloadFilename={mobileState.filename}
+            downloadSize={mobileState.size}
+        />;
     }
 
+    // Desktop view
     return <DesktopView />;
 }
 

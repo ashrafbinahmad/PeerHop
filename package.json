@@ -1,6 +1,6 @@
 {
   "name": "transend-root",
-  "version": "1.7.1",
+  "version": "2.0.0",
   "description": "Root package for Transend build scripts",
   "scripts": {
     "build:win": "cd ui && wails build -platform windows/amd64 -o ../../../builds/transend_win.exe",
