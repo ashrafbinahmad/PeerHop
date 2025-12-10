@@ -36,15 +36,25 @@ log(`\nStarting release process for v${version}`, 'cyan');
 log('================================\n', 'cyan');
 
 try {
-    // Step 1: Run prepublish
-    log('Running prepublish...', 'cyan');
-    execSync(`node ./scripts/prepublish.js ${version}`, { stdio: 'inherit' });
+    // Step 1: Build all binaries and installers
+    log('Step 1: Building all binaries and installers...', 'cyan');
+    log('================================\n', 'cyan');
+    execSync(`node ./scripts/build-all.js ${version}`, { stdio: 'inherit' });
 
-    // Step 2: Run publish
-    log('\nRunning publish...', 'cyan');
+    // Step 2: Publish to git and npm
+    log('\n\nStep 2: Publishing to git and npm...', 'cyan');
+    log('================================\n', 'cyan');
     execSync(`node ./scripts/publish.js ${version}`, { stdio: 'inherit' });
 
+    log('\n================================', 'cyan');
+    log('✓ Release complete!', 'cyan');
+    log(`  Version ${version} has been:`, 'white');
+    log('  - Built for all platforms', 'white');
+    log('  - Tagged in git', 'white');
+    log('  - Published to npm', 'white');
+    log('  - GitHub release will be created automatically', 'white');
+
 } catch (err) {
-    error('Release process failed!');
+    error('\nRelease process failed!');
     process.exit(1);
 }
