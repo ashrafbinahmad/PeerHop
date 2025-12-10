@@ -1,6 +1,6 @@
 {
   "name": "transend",
-  "version": "1.6.0",
+  "version": "1.6.2",
   "description": "Fast local network file transfer CLI",
   "bin": {
     "transend": "index.js"
