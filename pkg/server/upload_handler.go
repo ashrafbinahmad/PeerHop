@@ -20,6 +20,7 @@ func (h *UploadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path == "/api/meta" {
 		json.NewEncoder(w).Encode(map[string]string{
 			"mode": "upload",
+			"app":  "cli",
 		})
 		return
 	}
@@ -62,29 +63,38 @@ func (h *UploadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *UploadHandler) handleUpload(w http.ResponseWriter, r *http.Request) {
-	// 10 GB limit max
-	r.Body = http.MaxBytesReader(w, r.Body, 10<<30)
-	if err := r.ParseMultipartForm(10 << 30); err != nil {
-		http.Error(w, "File too big", http.StatusBadRequest)
+	// 50 GB limit max
+	r.Body = http.MaxBytesReader(w, r.Body, 50<<30)
+
+	reader, err := r.MultipartReader()
+	if err != nil {
+		http.Error(w, "Invalid multipart data", http.StatusBadRequest)
 		return
 	}
 
-	files := r.MultipartForm.File["file"]
-	if len(files) == 0 {
-		http.Error(w, "No files received", http.StatusBadRequest)
-		return
-	}
-
-	var saved []string
-	for _, header := range files {
-		file, err := header.Open()
+	for {
+		part, err := reader.NextPart()
+		if err == io.EOF {
+			break
+		}
 		if err != nil {
+			fmt.Printf("Error reading part: %v\n", err)
 			continue
 		}
-		defer file.Close()
+
+		if part.FormName() != "file" {
+			// Important: Must read the part to allow NextPart() to proceed
+			io.Copy(io.Discard, part)
+			continue
+		}
+
+		filename := part.FileName()
+		if filename == "" {
+			continue
+		}
 
 		// Handle filename collision
-		filename := filepath.Base(header.Filename)
+		filename = filepath.Base(filename)
 		if _, err := os.Stat(filename); err == nil {
 			filename = fmt.Sprintf("%d_%s", time.Now().Unix(), filename)
 		}
@@ -94,14 +104,18 @@ func (h *UploadHandler) handleUpload(w http.ResponseWriter, r *http.Request) {
 			fmt.Printf("Error creating file %s: %v\n", filename, err)
 			continue
 		}
-		defer dst.Close()
 
-		if _, err := io.Copy(dst, file); err != nil {
+		// Use 1MB buffer for faster copy
+		buf := make([]byte, 1024*1024)
+		written, err := io.CopyBuffer(dst, part, buf)
+		dst.Close()
+
+		if err != nil {
 			fmt.Printf("Error saving file %s: %v\n", filename, err)
 			continue
 		}
-		saved = append(saved, filename)
-		fmt.Printf("\nReceived file: %s (%d bytes)\n", filename, header.Size)
+
+		fmt.Printf("\nReceived file: %s (%d bytes)\n", filename, written)
 	}
 
 	// Success Page

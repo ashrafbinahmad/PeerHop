@@ -16,8 +16,7 @@
     "publish": "node ./scripts/publish.js",
     "build-and-publish": "node ./scripts/build-and-publish.js",
     "dev:cli": "go run ./cmd/transend",
-    "dev:ui": "cd ui && wails dev",
-    "dev:receiver": "go run ./cmd/transend -r"
+    "dev": "cd ui && wails dev"
   },
   "keywords": [],
   "author": "",

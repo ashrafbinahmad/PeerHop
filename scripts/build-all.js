@@ -60,12 +60,19 @@ if (!/^\d+\.\d+\.\d+$/.test(version)) {
 
 log(`\nBuilding Transend v${version}`, 'cyan');
 log('================================\n', 'cyan');
+log('Build Process Overview:', 'cyan');
+log('  1. Clean old builds', 'white');
+log('  2. Install frontend dependencies', 'white');
+log('  3. Build frontend (embedded)', 'white');
+log('  4. Build CLI binaries', 'white');
+log('  5. Build GUI applications', 'white');
+log('  6. Verify all builds\n', 'white');
 
 const buildsDir = path.join(__dirname, '..', 'builds');
 const backupDir = path.join(__dirname, '..', 'builds_backup');
 
 // Step 1: Clean existing builds (or backup if locked)
-step(1, 5, 'Cleaning existing builds...');
+step(1, 6, 'Cleaning existing builds...');
 if (fs.existsSync(buildsDir)) {
     try {
         fs.rmSync(buildsDir, { recursive: true, force: true, maxRetries: 3 });
@@ -97,22 +104,10 @@ if (!fs.existsSync(buildsDir)) {
 }
 log('');
 
-// Step 2: Build CLI binaries
-step(2, 5, 'Building CLI binaries...');
-log('  Building Windows CLI...', 'white');
-if (!exec('npm run build:cli:win', 'Windows CLI build')) {
-    process.exit(1);
-}
-success('Built Windows CLI');
 
-log('  Building Linux CLI...', 'white');
-if (!exec('npm run build:cli:linux', 'Linux CLI build')) {
-    process.exit(1);
-}
-success('Built Linux CLI\n');
 
-// Step 3: Install frontend dependencies
-step(3, 5, 'Installing frontend dependencies...');
+// Step 2: Install frontend dependencies
+step(2, 6, 'Installing frontend dependencies...');
 process.chdir(path.join(__dirname, '..', 'ui', 'frontend'));
 if (!exec('npm install', 'Frontend npm install')) {
     error('Failed to install frontend dependencies');
@@ -121,8 +116,8 @@ if (!exec('npm install', 'Frontend npm install')) {
 process.chdir(path.join(__dirname, '..'));
 success('Frontend dependencies installed\n');
 
-// Step 3.5: Update version in MSI product.wxs
-step('3.5', 5, 'Updating MSI installer version...');
+// Step 2.5: Update version in MSI product.wxs
+step('2.5', 6, 'Updating MSI installer version...');
 const productWxsPath = path.join(__dirname, '..', 'ui', 'build', 'windows', 'msi', 'product.wxs');
 try {
     let productWxs = fs.readFileSync(productWxsPath, 'utf8');
@@ -140,8 +135,8 @@ try {
     process.exit(1);
 }
 
-// Step 3.6: Clean cached icon files to force regeneration
-step('3.6', 5, 'Cleaning cached icon files...');
+// Step 2.6: Clean cached icon files to force regeneration
+step('2.6', 6, 'Cleaning cached icon files...');
 const iconsToClean = [
     path.join(__dirname, '..', 'ui', 'build', 'windows', 'icon.ico'),
     path.join(__dirname, '..', 'ui', 'build', 'windows', '_icon.ico'),
@@ -166,8 +161,65 @@ if (iconsRemoved > 0) {
     info('No cached icon files found to clean\n');
 }
 
+// Step 3: Build frontend (CRITICAL: Must be done before Wails/CLI build)
+// Wails and CLI use Go's embed directive to bundle frontend assets at compile time.
+// If we don't rebuild the frontend here, the binaries will contain stale/old UI code.
+step(3, 6, 'Building frontend...');
+const frontendDir = path.join(__dirname, '..', 'ui', 'frontend');
+process.chdir(frontendDir);
+log('  Running npm run build...', 'white');
+if (!exec('npm run build', 'Frontend build')) {
+    error('Failed to build frontend');
+    process.exit(1);
+}
+process.chdir(path.join(__dirname, '..'));
+success('Frontend built successfully\n');
+
+// Verify frontend dist exists
+const distDir = path.join(frontendDir, 'dist');
+if (!fs.existsSync(distDir)) {
+    error('Frontend dist directory not found after build!');
+    process.exit(1);
+}
+const distFiles = fs.readdirSync(distDir);
+if (distFiles.length === 0) {
+    error('Frontend dist directory is empty!');
+    process.exit(1);
+}
+info(`Frontend dist contains ${distFiles.length} items`);
+
+// Copy dist to pkg/server/dist (CRITICAL for Mobile UI)
+log('  Copying frontend build to pkg/server/dist...', 'white');
+const serverDistDir = path.join(__dirname, '..', 'pkg', 'server', 'dist');
+
+// Clear existing server dist
+if (fs.existsSync(serverDistDir)) {
+    fs.rmSync(serverDistDir, { recursive: true, force: true });
+}
+fs.mkdirSync(serverDistDir, { recursive: true });
+
+// Copy all files
+fs.cpSync(distDir, serverDistDir, { recursive: true });
+success('Copied frontend to pkg/server/dist\n');
+
+log('');
+
+// Step 4: Build CLI binaries (Must be done after frontend copy)
+step(4, 6, 'Building CLI binaries...');
+log('  Building Windows CLI...', 'white');
+if (!exec('npm run build:cli:win', 'Windows CLI build')) {
+    process.exit(1);
+}
+success('Built Windows CLI');
+
+log('  Building Linux CLI...', 'white');
+if (!exec('npm run build:cli:linux', 'Linux CLI build')) {
+    process.exit(1);
+}
+success('Built Linux CLI\n');
+
 // Step 4: Build GUI applications (Windows only - Linux requires WSL)
-step(4, 5, 'Building GUI applications...');
+step(5, 6, 'Building GUI applications...');
 
 // Build flags with version info
 const buildFlags = `-ldflags "-X main.version=${version}"`;
@@ -195,11 +247,38 @@ success('Built Windows GUI MSI installer');
 
 log('  Building Windows GUI executable...', 'white');
 process.chdir(uiDir);
-if (!exec(`wails build -platform windows/amd64 ${buildFlags} -o ../../../builds/transend_win.exe`, 'Windows GUI build')) {
+// Build to default location (ui/build/bin/ui.exe) - this ensures proper frontend embedding
+if (!exec(`wails build -platform windows/amd64 ${buildFlags}`, 'Windows GUI build')) {
     process.exit(1);
 }
 process.chdir(path.join(__dirname, '..'));
-success('Built Windows GUI\n');
+
+// Copy the built binary to builds directory
+const sourceBinary = path.join(uiDir, 'build', 'bin', 'ui.exe');
+const targetBinary = path.join(__dirname, '..', 'builds', 'transend_win.exe');
+
+if (!fs.existsSync(sourceBinary)) {
+    error(`Built binary not found at: ${sourceBinary}`);
+    process.exit(1);
+}
+
+// Get source binary size for verification
+const sourceSize = fs.statSync(sourceBinary).size;
+info(`Source binary size: ${(sourceSize / 1024 / 1024).toFixed(2)} MB`);
+
+// Copy to builds directory
+try {
+    fs.copyFileSync(sourceBinary, targetBinary);
+    const targetSize = fs.statSync(targetBinary).size;
+    if (targetSize !== sourceSize) {
+        error('Binary copy size mismatch!');
+        process.exit(1);
+    }
+    success(`Built Windows GUI (${(targetSize / 1024 / 1024).toFixed(2)} MB)\n`);
+} catch (err) {
+    error(`Failed to copy binary: ${err.message}`);
+    process.exit(1);
+}
 
 // Attempt to build Linux GUI in WSL
 log('  Building Linux GUI in WSL...', 'white');
@@ -236,7 +315,7 @@ try {
 
 
 // Step 5: Verify all builds
-step(5, 5, 'Verifying builds...');
+step(6, 6, 'Verifying builds...');
 const requiredFiles = [
     'builds/transend_win.exe',
     'builds/transend_setup.exe',
@@ -301,6 +380,7 @@ log('================================', 'cyan');
 log(`✓ Successfully built v${version}!`, 'green');
 log('  - All binaries created', 'white');
 log('  - Installers ready', 'white');
+log('  - Frontend embedded in GUI binaries', 'white');
 
 // Show warning if files were copied from backup
 if (copiedFromBackup.length > 0) {
@@ -312,6 +392,11 @@ if (copiedFromBackup.length > 0) {
     log('These files were NOT rebuilt and may be outdated!', 'red');
 }
 
+log('\n📝 Note:', 'cyan');
+log('  The GUI binaries contain embedded frontend assets.', 'white');
+log('  Any UI changes require rebuilding the entire application.', 'white');
+
 log('\nNext steps:', 'cyan');
 log('  Run: npm run publish', 'white');
 log('  Or manually test the builds in ./builds/', 'white');
+

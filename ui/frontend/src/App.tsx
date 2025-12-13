@@ -4,6 +4,9 @@ import { getMetaData, MetaData } from './api';
 import { DesktopView } from './views/DesktopView';
 import { MobileUnified } from './views/MobileUnified';
 
+import { MobileUpload } from './views/MobileUpload';
+import { MobileDownload } from './views/MobileDownload';
+
 function App() {
     const [loading, setLoading] = useState(true);
     const [mobileState, setMobileState] = useState<MetaData | null>(null);
@@ -22,12 +25,25 @@ function App() {
 
     if (loading) return <div className="loading-screen"><div className="spinner"></div></div>;
 
-    // Mobile view - unified for both upload and download
+    // Mobile/Web view
     if (mobileState) {
-        return <MobileUnified
-            downloadFilename={mobileState.filename}
-            downloadSize={mobileState.size}
-        />;
+        // UI App (Unified View)
+        if (mobileState.app === 'ui') {
+            return <MobileUnified
+                downloadFilename={mobileState.filename}
+                downloadSize={mobileState.size}
+            />;
+        }
+
+        // CLI App (Split Views)
+        if (mobileState.mode === 'upload') {
+            return <MobileUpload />;
+        } else {
+            return <MobileDownload
+                filename={mobileState.filename || 'file'}
+                size={mobileState.size || 0}
+            />;
+        }
     }
 
     // Desktop view

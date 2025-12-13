@@ -6,8 +6,24 @@ export function ClearTransfer() {
   return window['go']['main']['App']['ClearTransfer']();
 }
 
+export function GetOpenableApps(arg1) {
+  return window['go']['main']['App']['GetOpenableApps'](arg1);
+}
+
 export function GetServerInfo() {
   return window['go']['main']['App']['GetServerInfo']();
+}
+
+export function OpenFileWith(arg1, arg2) {
+  return window['go']['main']['App']['OpenFileWith'](arg1, arg2);
+}
+
+export function OpenSourceFile(arg1) {
+  return window['go']['main']['App']['OpenSourceFile'](arg1);
+}
+
+export function RestartServer() {
+  return window['go']['main']['App']['RestartServer']();
 }
 
 export function SelectFiles() {

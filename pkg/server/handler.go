@@ -52,6 +52,7 @@ func (h *DownloadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			"mode":     "download",
 			"filename": fileName,
 			"size":     size,
+			"app":      "cli",
 		})
 		return
 	}
