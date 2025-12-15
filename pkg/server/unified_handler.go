@@ -45,6 +45,12 @@ type transactionProgressWriter struct {
 }
 
 func (w *transactionProgressWriter) Write(p []byte) (int, error) {
+	// Check if transaction has been cancelled
+	if w.TxStore != nil && w.TxnID > 0 && w.TxStore.IsCancelled(w.TxnID) {
+		// Return error to stop the transfer
+		return 0, fmt.Errorf("transfer cancelled by user")
+	}
+
 	n, err := w.ResponseWriter.Write(p)
 	if n > 0 {
 		w.BytesWritten += int64(n)
@@ -76,6 +82,7 @@ type UnifiedHandler struct {
 	UploadedFiles []string          // Track files uploaded from mobile
 	TxStore       *TransactionStore // Transaction store for tracking all transfers
 	ClientStore   *ClientStore      // Client store for tracking connected devices
+	WSHub         *WebSocketHub     // WebSocket hub for real-time updates
 }
 
 func (h *UnifiedHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -195,6 +202,16 @@ func (h *UnifiedHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// API: WebSocket connection
+	if r.URL.Path == "/api/ws" {
+		if h.WSHub != nil {
+			h.WSHub.HandleWebSocket(w, r)
+		} else {
+			http.Error(w, "WebSocket not available", http.StatusServiceUnavailable)
+		}
+		return
+	}
+
 	// API: Get all transactions
 	if r.URL.Path == "/api/transactions" {
 		if h.TxStore == nil {
@@ -257,6 +274,43 @@ func (h *UnifiedHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"success": true,
 			"id":      id,
+		})
+		return
+	}
+
+	// API: Cancel download
+	if strings.HasPrefix(r.URL.Path, "/api/cancel-download/") && r.Method == http.MethodPost {
+		idStr := strings.TrimPrefix(r.URL.Path, "/api/cancel-download/")
+		id, err := strconv.Atoi(idStr)
+		if err != nil {
+			http.Error(w, "Invalid transaction ID", http.StatusBadRequest)
+			return
+		}
+
+		if h.TxStore == nil {
+			http.Error(w, "Transaction store not initialized", http.StatusInternalServerError)
+			return
+		}
+
+		success := h.TxStore.CancelTransaction(id)
+		if !success {
+			http.Error(w, "Transaction not found", http.StatusNotFound)
+			return
+		}
+
+		fmt.Printf("[API] Cancelled and reset transaction %d (progress reset to 0%%)\n", id)
+
+		// Broadcast the reset transaction state via WebSocket
+		if h.WSHub != nil {
+			txn, exists := h.TxStore.GetTransaction(id)
+			if exists {
+				h.WSHub.BroadcastTransactionUpdate(txn)
+			}
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": true,
 		})
 		return
 	}
@@ -595,9 +649,17 @@ func (h *UnifiedHandler) ClearFilePath() {
 // NewUnifiedHandler creates a new unified handler
 // devServerURL: optional URL to proxy frontend requests in development (e.g., "http://localhost:5173")
 func NewUnifiedHandler(devServerURL string) *UnifiedHandler {
+	txStore := NewTransactionStore()
+	clientStore := NewClientStore()
+	wsHub := NewWebSocketHub(txStore, clientStore)
+
+	// Start WebSocket monitoring in background
+	wsHub.StartMonitoring()
+
 	return &UnifiedHandler{
 		DevServerURL: devServerURL,
-		TxStore:      NewTransactionStore(),
-		ClientStore:  NewClientStore(),
+		TxStore:      txStore,
+		ClientStore:  clientStore,
+		WSHub:        wsHub,
 	}
 }

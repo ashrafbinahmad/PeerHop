@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import axios from "axios";
 
 export interface Transaction {
@@ -30,13 +30,15 @@ interface UseTransactionsResult {
 }
 
 export const useTransactions = (
-  pollingInterval: number = 2000,
+  _pollingInterval: number = 2000, // Kept for backwards compatibility but not used
   baseURL?: string,
   isSample = false
 ): UseTransactionsResult => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const wsRef = useRef<WebSocket | null>(null);
+  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   if (isSample) {
     return {
@@ -80,7 +82,6 @@ export const useTransactions = (
       const url = baseURL ? `${baseURL}/api/transactions` : "/api/transactions";
       const response = await axios.get(url);
       const txns = response.data.transactions || [];
-      // console.log('[useTransactions] Fetched transactions:', txns.length);
       setTransactions(txns);
       setError(null);
     } catch (err) {
@@ -99,29 +100,114 @@ export const useTransactions = (
           text,
           senderId,
         });
-        // Immediately refresh transactions after sending text
-        await fetchTransactions();
+        // No need to manually refresh - WebSocket will push update
       } catch (err) {
         console.error("Failed to send text:", err);
         throw err;
       }
     },
-    [baseURL, fetchTransactions]
+    [baseURL]
   );
 
-  // Initial fetch
+  // WebSocket connection
   useEffect(() => {
+    const connectWebSocket = () => {
+      // Determine WebSocket URL
+      let wsURL: string;
+      if (baseURL) {
+        // Convert http://host:port to ws://host:port
+        wsURL = baseURL.replace(/^http/, "ws") + "/api/ws";
+      } else {
+        // Use current location
+        const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+        wsURL = `${protocol}//${window.location.host}/api/ws`;
+      }
+
+      console.log("[useTransactions] Connecting to WebSocket:", wsURL);
+
+      const ws = new WebSocket(wsURL);
+      wsRef.current = ws;
+
+      ws.onopen = () => {
+        console.log("[useTransactions] WebSocket connected");
+        setError(null);
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const message = JSON.parse(event.data);
+          console.log("[useTransactions] WebSocket message:", message);
+
+          switch (message.type) {
+            case "transactions_init":
+              // Initial data
+              setTransactions(message.data.transactions || []);
+              setLoading(false);
+              break;
+
+            case "transaction_update":
+              // Update or add single transaction
+              setTransactions((prevTransactions) => {
+                const updatedTxn = message.data as Transaction;
+                console.log(`[useTransactions] Update: txn ${updatedTxn.id} - ${updatedTxn.filename} ${updatedTxn.transactionPercent.toFixed(0)}% (${updatedTxn.status})`);
+                
+                const existingIndex = prevTransactions.findIndex(
+                  (t) => t.id === updatedTxn.id
+                );
+
+                if (existingIndex >= 0) {
+                  // Update existing transaction
+                  const newTransactions = [...prevTransactions];
+                  newTransactions[existingIndex] = updatedTxn;
+                  return newTransactions;
+                } else {
+                  // Add new transaction
+                  return [...prevTransactions, updatedTxn];
+                }
+              });
+              break;
+
+            default:
+              console.log("[useTransactions] Unknown message type:", message.type);
+          }
+        } catch (err) {
+          console.error("[useTransactions] Error processing WebSocket message:", err);
+        }
+      };
+
+      ws.onerror = (error) => {
+        console.error("[useTransactions] WebSocket error:", error);
+        setError("WebSocket connection error");
+      };
+
+      ws.onclose = () => {
+        console.log("[useTransactions] WebSocket closed, reconnecting in 3s...");
+        wsRef.current = null;
+
+        // Attempt to reconnect after 3 seconds
+        reconnectTimeoutRef.current = setTimeout(() => {
+          connectWebSocket();
+        }, 3000);
+      };
+    };
+
+    // Initial fetch for fallback
     fetchTransactions();
-  }, [fetchTransactions]);
 
-  // Polling
-  useEffect(() => {
-    const interval = setInterval(() => {
-      fetchTransactions();
-    }, pollingInterval);
+    // Connect WebSocket
+    connectWebSocket();
 
-    return () => clearInterval(interval);
-  }, [pollingInterval, fetchTransactions]);
+    // Cleanup
+    return () => {
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+      }
+      if (wsRef.current) {
+        wsRef.current.close();
+        wsRef.current = null;
+      }
+    };
+  }, [baseURL, fetchTransactions]);
 
   return {
     transactions,

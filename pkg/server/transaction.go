@@ -43,6 +43,7 @@ type TransactionStore struct {
 	mu           sync.RWMutex
 	transactions map[int]*Transaction
 	nextID       int
+	cancelled    map[int]bool // Track cancelled transactions
 }
 
 // NewTransactionStore creates a new transaction store
@@ -50,6 +51,7 @@ func NewTransactionStore() *TransactionStore {
 	return &TransactionStore{
 		transactions: make(map[int]*Transaction),
 		nextID:       1,
+		cancelled:    make(map[int]bool),
 	}
 }
 
@@ -213,4 +215,39 @@ func (ts *TransactionStore) FindTransactionByDownloadLink(downloadLink string) (
 	}
 
 	return nil, false
+}
+
+// CancelTransaction cancels a transaction and resets it for retry
+func (ts *TransactionStore) CancelTransaction(id int) bool {
+	ts.mu.Lock()
+	defer ts.mu.Unlock()
+
+	if txn, exists := ts.transactions[id]; exists {
+		// First mark as cancelled to stop current transfer
+		ts.cancelled[id] = true
+
+		// Reset transaction state for retry
+		txn.TransactionPercent = 0
+		txn.BytesTransferred = 0
+		txn.Status = "pending"
+
+		// Remove from cancelled map after a brief moment to allow new download
+		// The current transfer will already be stopped by the cancelled flag
+		go func() {
+			time.Sleep(100 * time.Millisecond)
+			ts.mu.Lock()
+			delete(ts.cancelled, id)
+			ts.mu.Unlock()
+		}()
+
+		return true
+	}
+	return false
+}
+
+// IsCancelled checks if a transaction has been cancelled
+func (ts *TransactionStore) IsCancelled(id int) bool {
+	ts.mu.RLock()
+	defer ts.mu.RUnlock()
+	return ts.cancelled[id]
 }

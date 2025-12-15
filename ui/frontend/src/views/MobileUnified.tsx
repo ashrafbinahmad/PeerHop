@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import axios from "axios";
 import { useTransactions } from "../hooks/useTransactions";
+import { ConfirmDialog } from "../components/ConfirmDialog";
 import {
   X,
   MessageSquare,
@@ -32,6 +33,13 @@ export const MobileUnified: React.FC<Props> = ({
   const [isUploading, setIsUploading] = useState(false);
   const [showScrollButton, setShowScrollButton] = useState(false);
   const [myClientId, setMyClientId] = useState<string>("");
+
+  // Confirmation dialog state
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  const [transactionToCancel, setTransactionToCancel] = useState<any>(null);
+
+  // Track which transaction is being downloaded (for instant feedback)
+  const [downloadingTransactionId, setDownloadingTransactionId] = useState<number | null>(null);
 
   const abortControllerRef = useRef<AbortController | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -76,6 +84,16 @@ export const MobileUnified: React.FC<Props> = ({
   useEffect(() => {
     if (isUserAtBottomRef.current) scrollToBottom();
   }, [transactions, isUploading, showTextInput]);
+
+  // Clear downloading state when transaction status updates to in_progress or completed
+  useEffect(() => {
+    if (downloadingTransactionId !== null) {
+      const transaction = transactions.find(t => t.id === downloadingTransactionId);
+      if (transaction && (transaction.status === 'in_progress' || transaction.status === 'completed')) {
+        setDownloadingTransactionId(null);
+      }
+    }
+  }, [transactions, downloadingTransactionId]);
 
   const formatSize = (bytes?: number) => {
     if (bytes === undefined || bytes === null) return "Unknown size";
@@ -153,6 +171,10 @@ export const MobileUnified: React.FC<Props> = ({
 
   const handleDownload = (e: React.MouseEvent, transaction: any) => {
     e.stopPropagation();
+
+    // Set downloading state immediately for instant feedback
+    setDownloadingTransactionId(transaction.id);
+
     if (transaction.downloadLink) {
       const link = document.createElement("a");
       link.href = transaction.downloadLink;
@@ -162,6 +184,35 @@ export const MobileUnified: React.FC<Props> = ({
       document.body.removeChild(link);
     }
   };
+
+
+  const handleCancelDownload = (e: React.MouseEvent, transaction: any) => {
+    e.stopPropagation();
+    setTransactionToCancel(transaction);
+    setShowCancelConfirm(true);
+  };
+
+  const confirmCancelDownload = async () => {
+    if (!transactionToCancel) return;
+
+    try {
+      await axios.post(`/api/cancel-download/${transactionToCancel.id}`);
+      console.log(`Cancelled download for transaction ${transactionToCancel.id}`);
+      setShowCancelConfirm(false);
+      setTransactionToCancel(null);
+    } catch (err) {
+      console.error("Failed to cancel download:", err);
+      alert("Failed to cancel download");
+      setShowCancelConfirm(false);
+      setTransactionToCancel(null);
+    }
+  };
+
+  const cancelCancelDownload = () => {
+    setShowCancelConfirm(false);
+    setTransactionToCancel(null);
+  };
+
 
   const handleCopyText = (text: string) => {
     navigator.clipboard.writeText(text).catch(console.error);
@@ -276,6 +327,9 @@ export const MobileUnified: React.FC<Props> = ({
                           </div>
                           <div className="text-xs opacity-70">
                             {formatSize(transaction.fileSize)}
+                            {!isMe && (transaction.status === 'in_progress' || downloadingTransactionId === transaction.id) && (
+                              <span className="ml-1 text-[#007AFF] font-medium">• Downloading...</span>
+                            )}
                           </div>
 
                           {/* Progress Bar for UPLOADS (Me) */}
@@ -289,15 +343,32 @@ export const MobileUnified: React.FC<Props> = ({
                           )}
                         </div>
 
-                        {/* Download button only if NOT me */}
+                        {/* Download/Cancel button only if NOT me */}
                         {!isMe && transaction.downloadLink && (
                           <>
-                            <button
-                              onClick={(e) => handleDownload(e, transaction)}
-                              className="p-2 bg-gray-100 text-[#007AFF] rounded-full shrink-0 relative z-10"
-                            >
-                              <Download size={18} />
-                            </button>
+                            {transaction.status === "in_progress" ? (
+                              // Cancel button during download
+                              <button
+                                onClick={(e) => handleCancelDownload(e, transaction)}
+                                className="p-2 bg-red-100 text-red-600 rounded-full shrink-0 relative z-10 hover:bg-red-200 transition-colors"
+                                title="Cancel download"
+                              >
+                                <X size={18} />
+                              </button>
+                            ) : (
+                              // Download button when not downloading
+                              <button
+                                onClick={(e) => handleDownload(e, transaction)}
+                                disabled={downloadingTransactionId === transaction.id}
+                                className={`p-2 rounded-full shrink-0 relative z-10 transition-colors ${downloadingTransactionId === transaction.id
+                                  ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                                  : 'bg-gray-100 text-[#007AFF] hover:bg-gray-200'
+                                  }`}
+                                title={downloadingTransactionId === transaction.id ? 'Starting...' : 'Download'}
+                              >
+                                <Download size={18} />
+                              </button>
+                            )}
                             {/* percent progress overlay for downloads */}
                             <div
                               className={`absolute top-0 left-0 h-full bg-[#007bff50] pointer-events-none transition-all duration-300`}
@@ -396,6 +467,18 @@ export const MobileUnified: React.FC<Props> = ({
           </div>
         </div>
       </div>
+
+      {/* Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={showCancelConfirm}
+        title="Cancel Download"
+        message={`Stop downloading "${transactionToCancel?.filename}"?\n\nThis will end the file transfer.`}
+        confirmText="Stop"
+        cancelText="Continue"
+        onConfirm={confirmCancelDownload}
+        onCancel={cancelCancelDownload}
+        destructive={true}
+      />
     </div>
   );
 };

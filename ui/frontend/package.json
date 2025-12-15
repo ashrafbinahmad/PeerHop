@@ -16,6 +16,7 @@
     "react-qr-code": "^2.0.18"
   },
   "devDependencies": {
+    "@types/node": "^25.0.2",
     "@types/react": "^18.0.17",
     "@types/react-dom": "^18.0.6",
     "@vitejs/plugin-react": "^2.0.1",

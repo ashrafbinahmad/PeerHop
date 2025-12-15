@@ -18,6 +18,7 @@ import {
 } from "../../wailsjs/runtime/runtime";
 import logo from "../assets/images/logo-universal.png";
 import { useTransactions } from "../hooks/useTransactions";
+import { useDevices, type Client } from "../hooks/useDevices";
 import {
   X,
   MessageSquare,
@@ -44,13 +45,6 @@ import {
 } from "lucide-react";
 import { PlatformIcon } from "../components/PlatformIcon";
 
-interface Client {
-  id: string;
-  userAgent: string;
-  ip: string;
-  lastSeen: string;
-  platform: "android" | "ios" | "windows" | "linux" | "unknown";
-}
 
 // Helper function to get app icon based on app name
 const getAppIcon = (appName: string, appCommand: string) => {
@@ -242,31 +236,13 @@ export const DesktopView = () => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
-  // Hook: Polling for transactions
+
+  // Hook: WebSocket for transactions
   const { transactions, sendText } = useTransactions(2000, serverInfo?.url);
 
-  const [clients, setClients] = useState<Client[]>([]);
+  // Hook: WebSocket for devices/clients
+  const { clients } = useDevices(serverInfo?.url);
 
-  // Poll for clients
-  useEffect(() => {
-    if (!serverInfo?.url) return;
-
-    const fetchClients = async () => {
-      try {
-        const res = await fetch(`${serverInfo.url}/api/clients`);
-        if (res.ok) {
-          const data = await res.json();
-          setClients(data.clients || []);
-        }
-      } catch (err) {
-        console.error("Failed to fetch clients", err);
-      }
-    };
-
-    fetchClients();
-    const interval = setInterval(fetchClients, 3000);
-    return () => clearInterval(interval);
-  }, [serverInfo?.url]);
 
   // Auto-hide QR panel on mobile when a client connects
   useEffect(() => {
