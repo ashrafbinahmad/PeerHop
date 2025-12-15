@@ -200,3 +200,17 @@ func (ts *TransactionStore) FindLatestTransactionByFilename(filename string) (in
 
 	return latestID, found
 }
+
+// FindTransactionByDownloadLink finds a transaction by its download link
+func (ts *TransactionStore) FindTransactionByDownloadLink(downloadLink string) (*Transaction, bool) {
+	ts.mu.RLock()
+	defer ts.mu.RUnlock()
+
+	for _, txn := range ts.transactions {
+		if txn.DownloadLink == downloadLink {
+			return txn, true
+		}
+	}
+
+	return nil, false
+}

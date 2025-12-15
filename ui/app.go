@@ -136,48 +136,91 @@ func (a *App) StartTransfer(paths []string) (*ServerInfo, error) {
 		return nil, fmt.Errorf("no files selected")
 	}
 
-	// 1. Prepare file/zip
-	var filePath string
-	if len(paths) > 1 || utils.IsDirectory(paths[0]) {
+	// Check if any path is a directory - if so, zip everything
+	hasDirectory := false
+	for _, p := range paths {
+		if utils.IsDirectory(p) {
+			hasDirectory = true
+			break
+		}
+	}
+
+	// If there's a directory, create a zip
+	if hasDirectory {
 		zipPath, err := utils.CreateZip(paths)
 		if err != nil {
 			return nil, err
 		}
-		filePath = zipPath
-	} else {
-		filePath = paths[0]
+
+		stat, err := os.Stat(zipPath)
+		if err != nil {
+			return nil, err
+		}
+
+		// Create transaction for zip file
+		if a.unifiedHandler != nil && a.unifiedHandler.TxStore != nil {
+			txn := &server.Transaction{
+				Type:               server.TransactionTypeFile,
+				SenderID:           server.SenderServer,
+				Filename:           filepath.Base(zipPath),
+				FileSize:           stat.Size(),
+				DownloadLink:       "/api/download",
+				ServerFilePath:     zipPath,
+				TransactionPercent: 0,
+				Status:             "pending",
+			}
+			txnID := a.unifiedHandler.TxStore.AddTransaction(txn)
+			fmt.Printf("[Desktop] Created download transaction ID=%d for zip: %s\n", txnID, filepath.Base(zipPath))
+		}
+
+		// Update server info
+		if a.serverInfo != nil {
+			a.serverInfo.Filename = filepath.Base(zipPath)
+			a.serverInfo.Size = stat.Size()
+		}
+
+		// Set the first file for legacy download endpoint
+		if a.unifiedHandler != nil {
+			a.unifiedHandler.SetFilePath(zipPath)
+		}
+
+		return a.serverInfo, nil
 	}
 
-	stat, err := os.Stat(filePath)
-	if err != nil {
-		return nil, err
-	}
+	// Multiple files (no directories) - send each individually
+	for i, filePath := range paths {
+		stat, err := os.Stat(filePath)
+		if err != nil {
+			fmt.Printf("[Desktop] Error stating file %s: %v\n", filePath, err)
+			continue
+		}
 
-	// 2. Update the unified handler with the new file
-	if a.unifiedHandler != nil {
-		a.unifiedHandler.SetFilePath(filePath)
-
-		// Create transaction for this download
-		if a.unifiedHandler.TxStore != nil {
+		// Create transaction for each file
+		if a.unifiedHandler != nil && a.unifiedHandler.TxStore != nil {
 			txn := &server.Transaction{
 				Type:               server.TransactionTypeFile,
 				SenderID:           server.SenderServer,
 				Filename:           filepath.Base(filePath),
 				FileSize:           stat.Size(),
-				DownloadLink:       "/api/download",
-				ServerFilePath:     filePath, // Populate this
+				DownloadLink:       fmt.Sprintf("/api/download-file/%d", i),
+				ServerFilePath:     filePath,
 				TransactionPercent: 0,
 				Status:             "pending",
 			}
 			txnID := a.unifiedHandler.TxStore.AddTransaction(txn)
 			fmt.Printf("[Desktop] Created download transaction ID=%d for file: %s\n", txnID, filepath.Base(filePath))
 		}
-	}
 
-	// 3. Update server info
-	if a.serverInfo != nil {
-		a.serverInfo.Filename = filepath.Base(filePath)
-		a.serverInfo.Size = stat.Size()
+		// Set the first file for legacy download endpoint
+		if i == 0 && a.unifiedHandler != nil {
+			a.unifiedHandler.SetFilePath(filePath)
+
+			// Update server info with first file
+			if a.serverInfo != nil {
+				a.serverInfo.Filename = filepath.Base(filePath)
+				a.serverInfo.Size = stat.Size()
+			}
+		}
 	}
 
 	return a.serverInfo, nil

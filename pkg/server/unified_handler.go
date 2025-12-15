@@ -145,6 +145,23 @@ func (h *UnifiedHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// API: Download individual file by index (for multi-file transfers)
+	if strings.HasPrefix(r.URL.Path, "/api/download-file/") {
+		// Find the transaction by its download link
+		downloadLink := r.URL.Path
+		if h.TxStore != nil {
+			// Find transaction with this download link
+			txn, found := h.TxStore.FindTransactionByDownloadLink(downloadLink)
+			if found && txn.ServerFilePath != "" {
+				h.serveFile(w, r, txn.ServerFilePath, false)
+				return
+			}
+		}
+
+		http.Error(w, "File not found", http.StatusNotFound)
+		return
+	}
+
 	// API: Upload
 	if r.URL.Path == "/api/upload" && r.Method == http.MethodPost {
 		h.handleUpload(w, r)
