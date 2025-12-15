@@ -102,6 +102,7 @@ type UnifiedHandler struct {
 	TxStore       *TransactionStore // Transaction store for tracking all transfers
 	ClientStore   *ClientStore      // Client store for tracking connected devices
 	WSHub         *WebSocketHub     // WebSocket hub for real-time updates
+	IsDarkMode    bool              // Track current theme
 }
 
 func (h *UnifiedHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -221,6 +222,43 @@ func (h *UnifiedHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// API: Theme
+	if r.URL.Path == "/api/theme" {
+		if r.Method == http.MethodPost {
+			var req struct {
+				IsDarkMode bool `json:"isDarkMode"`
+			}
+			if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+				http.Error(w, "Invalid body", http.StatusBadRequest)
+				return
+			}
+
+			h.mu.Lock()
+			h.IsDarkMode = req.IsDarkMode
+			h.mu.Unlock()
+
+			// Broadcast
+			if h.WSHub != nil {
+				h.WSHub.Broadcast("theme_update", map[string]interface{}{
+					"isDarkMode": req.IsDarkMode,
+				})
+			}
+
+			json.NewEncoder(w).Encode(map[string]bool{"success": true})
+			return
+		}
+
+		// GET
+		h.mu.RLock()
+		isDark := h.IsDarkMode
+		h.mu.RUnlock()
+
+		json.NewEncoder(w).Encode(map[string]bool{
+			"isDarkMode": isDark,
+		})
+		return
+	}
+
 	// API: WebSocket connection
 	if r.URL.Path == "/api/ws" {
 		if h.WSHub != nil {
@@ -327,6 +365,44 @@ func (h *UnifiedHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		fmt.Printf("[API] Cancelled download for client %s on transaction %d (progress reset to 0%%)\n", clientID, id)
 
 		// Broadcast the reset transaction state via WebSocket
+		if h.WSHub != nil {
+			txn, exists := h.TxStore.GetTransactionCopy(id)
+			if exists {
+				h.WSHub.BroadcastTransactionUpdate(txn)
+			}
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": true,
+		})
+		return
+	}
+
+	// API: Cancel transaction (generic, e.g. stopping an incoming upload)
+	if strings.HasPrefix(r.URL.Path, "/api/cancel-transaction/") && r.Method == http.MethodPost {
+		idStr := strings.TrimPrefix(r.URL.Path, "/api/cancel-transaction/")
+		id, err := strconv.Atoi(idStr)
+		if err != nil {
+			http.Error(w, "Invalid transaction ID", http.StatusBadRequest)
+			return
+		}
+
+		if h.TxStore == nil {
+			http.Error(w, "Transaction store not initialized", http.StatusInternalServerError)
+			return
+		}
+
+		// Cancel the transaction globally
+		success := h.TxStore.CancelTransaction(id)
+		if !success {
+			http.Error(w, "Transaction not found", http.StatusNotFound)
+			return
+		}
+
+		fmt.Printf("[API] Cancelled transaction %d\n", id)
+
+		// Broadcast update
 		if h.WSHub != nil {
 			txn, exists := h.TxStore.GetTransactionCopy(id)
 			if exists {
@@ -531,6 +607,7 @@ func (h *UnifiedHandler) handleUpload(w http.ResponseWriter, r *http.Request) {
 
 	var saved []string
 	var transactionIDs []int
+	var currentFileSize int64
 	downloadsDir := getDownloadsDir()
 
 	for {
@@ -541,6 +618,15 @@ func (h *UnifiedHandler) handleUpload(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			fmt.Printf("Error reading part: %v\n", err)
 			break
+		}
+
+		// Check for file_size field
+		if part.FormName() == "file_size" {
+			data, _ := io.ReadAll(part)
+			if size, err := strconv.ParseInt(string(data), 10, 64); err == nil {
+				currentFileSize = size
+			}
+			continue
 		}
 
 		// Only process "file" field
@@ -575,7 +661,7 @@ func (h *UnifiedHandler) handleUpload(w http.ResponseWriter, r *http.Request) {
 				Type:               TransactionTypeFile,
 				SenderID:           r.Header.Get("X-Client-ID"),
 				Filename:           filename,
-				FileSize:           0, // Unknown size when streaming
+				FileSize:           currentFileSize, // Use strict file size from client
 				UploadLink:         "/api/upload",
 				SavedInLocation:    absPath,
 				ServerFilePath:     absPath, // NEW
@@ -595,7 +681,8 @@ func (h *UnifiedHandler) handleUpload(w http.ResponseWriter, r *http.Request) {
 			if h.TxStore != nil && txnID > 0 {
 				h.TxStore.UpdateStatus(txnID, "failed")
 			}
-			continue
+			http.Error(w, fmt.Sprintf("Error creating file: %v", err), http.StatusInternalServerError)
+			return
 		}
 
 		// Copy with progress tracking
@@ -614,7 +701,26 @@ func (h *UnifiedHandler) handleUpload(w http.ResponseWriter, r *http.Request) {
 					// Update max 5 times per second (200ms)
 					if h.TxStore != nil && txnID > 0 {
 						if time.Since(lastUpdate) > 200*time.Millisecond {
-							h.TxStore.UpdateProgress(txnID, written, 0)
+							// Check for cancellation
+							if h.TxStore.IsCancelled(txnID) {
+								if h.TxStore != nil && txnID > 0 {
+									h.TxStore.UpdateStatus(txnID, "cancelled")
+									// Force broadcast
+									if txn, exists := h.TxStore.GetTransactionCopy(txnID); exists {
+										h.WSHub.BroadcastTransactionUpdate(txn)
+									}
+								}
+								// Remove partial file
+								dst.Close()
+								os.Remove(fullPath)
+
+								// Error 499 Client Closed Request
+								http.Error(w, "Upload cancelled", 499)
+								return
+							}
+
+							h.TxStore.UpdateProgress(txnID, written, currentFileSize)
+							// Broadcast update locally? The WebSocketHub handles it via UpdateProgress -> BroadcastTransactionUpdate
 							lastUpdate = time.Now()
 						}
 					}
@@ -641,8 +747,13 @@ func (h *UnifiedHandler) handleUpload(w http.ResponseWriter, r *http.Request) {
 			fmt.Printf("Error saving file %s: %v\n", fullPath, err)
 			if h.TxStore != nil && txnID > 0 {
 				h.TxStore.UpdateStatus(txnID, "failed")
+				// Force broadcast of failed status so UI updates
+				if txn, exists := h.TxStore.GetTransactionCopy(txnID); exists {
+					h.WSHub.BroadcastTransactionUpdate(txn)
+				}
 			}
-			continue
+			http.Error(w, fmt.Sprintf("Error saving file: %v", err), http.StatusInternalServerError)
+			return
 		}
 
 		saved = append(saved, filename)
@@ -654,6 +765,9 @@ func (h *UnifiedHandler) handleUpload(w http.ResponseWriter, r *http.Request) {
 			h.TxStore.SetFileSize(txnID, written)             // Update final size
 			h.TxStore.UpdateStatus(txnID, "completed")
 		}
+
+		// Reset file size for next file
+		currentFileSize = 0
 	}
 
 	// Return JSON success response
@@ -700,5 +814,6 @@ func NewUnifiedHandler(devServerURL string) *UnifiedHandler {
 		TxStore:      txStore,
 		ClientStore:  clientStore,
 		WSHub:        wsHub,
+		IsDarkMode:   true, // Default to Dark Mode
 	}
 }

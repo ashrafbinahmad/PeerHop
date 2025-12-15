@@ -302,15 +302,12 @@ func (ts *TransactionStore) CancelTransaction(id int) bool {
 		// First mark as cancelled to stop current transfer
 		ts.cancelled[id] = true
 
-		// Reset transaction state for retry
-		txn.TransactionPercent = 0
-		txn.BytesTransferred = 0
-		txn.Status = "pending"
+		// Reset transaction state for cancellation
+		txn.Status = "cancelled"
 
-		// Remove from cancelled map after a brief moment to allow new download
-		// The current transfer will already be stopped by the cancelled flag
+		// Remove from cancelled map after a brief moment to allow cleanup
 		go func() {
-			time.Sleep(100 * time.Millisecond)
+			time.Sleep(1 * time.Second)
 			ts.mu.Lock()
 			delete(ts.cancelled, id)
 			ts.mu.Unlock()

@@ -47,7 +47,7 @@ export const MobileUnified: React.FC<Props> = ({
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const isUserAtBottomRef = useRef(true);
 
-  const { transactions, sendText } = useTransactions(2000);
+  const { transactions, sendText, isDarkMode } = useTransactions(2000);
 
   // SCROLL
   const handleScroll = () => {
@@ -129,6 +129,7 @@ export const MobileUnified: React.FC<Props> = ({
 
     // Add files to formData and initialize progress
     filesArray.forEach((file) => {
+      formData.append("file_size", file.size.toString());
       formData.append("file", file);
       setUploadProgress(prev => ({ ...prev, [file.name]: 0 }));
     });
@@ -247,12 +248,26 @@ export const MobileUnified: React.FC<Props> = ({
   // Show all transactions (including uploads)
   const visibleTransactions = transactions;
 
+  const theme = {
+    bg: isDarkMode ? "bg-[#0f172a]" : "bg-[#F2F2F7]",
+    text: isDarkMode ? "text-slate-100" : "text-gray-900",
+    headerBg: isDarkMode ? "bg-[#0f172a]/95 border-slate-800" : "bg-[#F2F2F7]/95 border-gray-200/50",
+    headerText: isDarkMode ? "text-slate-100" : "text-gray-900",
+    bubbleMe: "bg-[#007AFF] text-white",
+    bubbleOther: isDarkMode ? "bg-[#1e293b] border-slate-700 text-slate-100" : "bg-white text-gray-900 border border-gray-200",
+    avatarBg: isDarkMode ? "bg-slate-800 text-slate-400" : "bg-gray-200 text-gray-500",
+    inputArea: isDarkMode ? "bg-[#0f172a] border-slate-800" : "bg-white border-gray-200",
+    inputField: isDarkMode ? "bg-slate-800 text-white placeholder-slate-400 border-none" : "bg-gray-100 text-black border-transparent",
+    iconBtn: isDarkMode ? "bg-slate-800 text-slate-300" : "bg-gray-100",
+    selectBtn: isDarkMode ? "bg-slate-800 border-slate-700 text-slate-200 hover:bg-slate-700" : "bg-white border-gray-300 text-[#007AFF] hover:bg-gray-50",
+  };
+
   return (
-    <div className="flex flex-col h-screen bg-[#F2F2F7] font-sans text-gray-900 overflow-hidden relative">
+    <div className={`flex flex-col h-screen font-sans overflow-hidden relative transition-colors duration-300 ${theme.bg} ${theme.text}`}>
       {/* HEADER */}
-      <div className="shrink-0 pt-safe-top bg-[#F2F2F7]/95 backdrop-blur-xl border-b border-gray-200/50 z-20">
+      <div className={`shrink-0 pt-safe-top backdrop-blur-xl border-b z-20 transition-colors duration-300 ${theme.headerBg}`}>
         <div className="flex items-center justify-center py-3 px-4 h-[44px]">
-          <h2 className="text-[17px] font-semibold text-gray-900">Transend</h2>
+          <h2 className={`text-[17px] font-semibold ${theme.headerText}`}>Transend</h2>
         </div>
       </div>
 
@@ -274,8 +289,8 @@ export const MobileUnified: React.FC<Props> = ({
             const isRightSide = isMe;
             const isFile = transaction.type === "file";
             const bubbleClass = isRightSide
-              ? "bg-[#007AFF] text-white"
-              : "bg-white text-gray-900 border border-gray-200";
+              ? theme.bubbleMe
+              : theme.bubbleOther;
             const widthClass = isFile
               ? "w-[calc(95vw-90px)]"
               : "w-fit max-w-[75%]";
@@ -309,7 +324,7 @@ export const MobileUnified: React.FC<Props> = ({
               >
                 {/* Avatar for LEFT side */}
                 {!isRightSide && (
-                  <div className="shrink-0 w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-gray-500 overflow-hidden mb-1">
+                  <div className={`shrink-0 w-8 h-8 rounded-full flex items-center justify-center overflow-hidden mb-1 ${theme.avatarBg}`}>
                     {transaction.senderId === "server" ? (
                       <Monitor size={16} />
                     ) : (
@@ -319,9 +334,19 @@ export const MobileUnified: React.FC<Props> = ({
                 )}
 
                 <div
-                  className={`relative rounded-2xl overflow-hidden shadow-sm ${widthClass} ${bubbleClass}`}
+                  className={`relative rounded-2xl overflow-hidden shadow-sm ${widthClass} ${bubbleClass} transition-all duration-300 ${transaction.status === 'cancelled' ? 'opacity-60 grayscale-[0.5]' : ''
+                    }`}
                 >
-                  <div className="p-3">
+                  {/* Background Progress Fill */}
+                  {(effectiveStatus === 'in_progress' || (isMe && transaction.status === 'in_progress')) && (
+                    <div
+                      className={`absolute top-0 left-0 h-full pointer-events-none transition-all duration-300 ${isMe ? 'bg-white/20' : 'bg-[#007AFF]/10'
+                        }`}
+                      style={{ width: `${displayPercent}%` }}
+                    />
+                  )}
+
+                  <div className="p-3 relative z-10">
                     {/* TEXT */}
                     {transaction.type === "text" && (
                       <div className="flex items-start gap-2">
@@ -340,29 +365,100 @@ export const MobileUnified: React.FC<Props> = ({
                     {/* FILE */}
                     {isFile && (
                       <div className="flex items-center gap-3 text-left">
-                        <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center shrink-0">
-                          <File size={20} />
-                        </div>
+                        {(() => {
+                          // Extract extension and determine media type
+                          const ext = transaction.filename?.split('.').pop()?.toLowerCase();
+                          const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'heic'].includes(ext || '');
+                          const isVideo = ['mp4', 'webm', 'ogg', 'mov'].includes(ext || '');
+
+                          // Construct media URL (absolute for mobile client)
+                          const protocol = window.location.protocol;
+                          const host = window.location.host;
+                          const mediaUrl = transaction.downloadLink
+                            ? `${protocol}//${host}${transaction.downloadLink}`
+                            : '';
+
+                          if (isImage && mediaUrl) {
+                            return (
+                              <div className="w-12 h-12 rounded-lg bg-black/5 overflow-hidden shrink-0 border border-black/5">
+                                <img
+                                  src={mediaUrl}
+                                  alt="preview"
+                                  className="w-full h-full object-cover"
+                                  onError={(e) => {
+                                    // Fallback on error (e.g., auth issue or 404)
+                                    (e.target as HTMLImageElement).style.display = 'none';
+                                    (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden');
+                                  }}
+                                />
+                                <div className="hidden w-full h-full flex items-center justify-center bg-gray-100 dark:bg-slate-700">
+                                  <File size={20} />
+                                </div>
+                              </div>
+                            );
+                          }
+
+                          if (isVideo && mediaUrl) {
+                            return (
+                              <div className="w-12 h-12 rounded-lg bg-black/10 overflow-hidden shrink-0 relative flex items-center justify-center border border-black/5">
+                                <video src={mediaUrl} className="w-full h-full object-cover absolute inset-0 pointer-events-none" />
+                                <div className="w-6 h-6 rounded-full bg-black/40 flex items-center justify-center z-10 backdrop-blur-sm">
+                                  {/* Play icon small */}
+                                  <svg width="10" height="10" viewBox="0 0 24 24" fill="white" className="ml-0.5">
+                                    <path d="M8 5v14l11-7z" />
+                                  </svg>
+                                </div>
+                              </div>
+                            );
+                          }
+
+                          // Default Icon
+                          return (
+                            <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center shrink-0">
+                              <File size={20} />
+                            </div>
+                          );
+                        })()}
 
                         <div className="flex-1 min-w-0">
                           <div className="font-semibold truncate">
                             {transaction.filename}
                           </div>
-                          <div className="text-xs opacity-70">
-                            {formatSize(transaction.fileSize)}
+                          <div className="text-xs opacity-70 flex items-center gap-2">
+                            <span>{formatSize(transaction.fileSize)}</span>
+
+                            {/* Progress % Text */}
+                            {(effectiveStatus === 'in_progress' || (isMe && transaction.status === 'in_progress')) && (
+                              <span className="font-mono font-medium">
+                                {Math.round(displayPercent)}%
+                              </span>
+                            )}
+
+                            {/* Cancelled Status */}
+                            {transaction.status === 'cancelled' && (
+                              <span className="font-medium text-red-500/70">Cancelled</span>
+                            )}
+
                             {!isMe && (effectiveStatus === 'in_progress' || downloadingTransactionId === transaction.id) && (
-                              <span className="ml-1 text-[#007AFF] font-medium">• Downloading...</span>
+                              <span className="text-[#007AFF] font-medium">• Downloading...</span>
                             )}
                           </div>
 
-                          {/* Progress Bar for UPLOADS (Me) */}
+                          {/* Upload Cancel Button - Compact */}
                           {isMe && transaction.status === 'in_progress' && (
-                            <div className="mt-1 h-1 w-full bg-gray-200 rounded-full overflow-hidden">
-                              <div
-                                className="h-full bg-[#007AFF] transition-all duration-300"
-                                style={{ width: `${displayPercent}%` }}
-                              />
-                            </div>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleCancelUpload();
+                              }}
+                              className={`p-1 -mr-1 rounded-full shrink-0 transition-colors ${isDarkMode
+                                ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
+                                : 'bg-red-100 text-red-600 hover:bg-red-200'
+                                }`}
+                              title="Cancel upload"
+                            >
+                              <X size={14} />
+                            </button>
                           )}
                         </div>
 
@@ -373,7 +469,9 @@ export const MobileUnified: React.FC<Props> = ({
                               // Cancel button during download
                               <button
                                 onClick={(e) => handleCancelDownload(e, transaction)}
-                                className="p-2 bg-red-100 text-red-600 rounded-full shrink-0 relative z-10 hover:bg-red-200 transition-colors"
+                                className={`p-2 rounded-full shrink-0 relative z-10 transition-colors ${isDarkMode
+                                  ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
+                                  : 'bg-red-100 text-red-600 hover:bg-red-200'}`}
                                 title="Cancel download"
                               >
                                 <X size={18} />
@@ -384,21 +482,14 @@ export const MobileUnified: React.FC<Props> = ({
                                 onClick={(e) => handleDownload(e, transaction)}
                                 disabled={downloadingTransactionId === transaction.id}
                                 className={`p-2 rounded-full shrink-0 relative z-10 transition-colors ${downloadingTransactionId === transaction.id
-                                  ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                                  : 'bg-gray-100 text-[#007AFF] hover:bg-gray-200'
+                                  ? (isDarkMode ? 'bg-slate-800 text-slate-600 cursor-not-allowed' : 'bg-gray-200 text-gray-400 cursor-not-allowed')
+                                  : (isDarkMode ? 'bg-slate-700 text-[#0A84FF] hover:bg-slate-600' : 'bg-gray-100 text-[#007AFF] hover:bg-gray-200')
                                   }`}
                                 title={downloadingTransactionId === transaction.id ? 'Starting...' : 'Download'}
                               >
                                 <Download size={18} />
                               </button>
                             )}
-                            {/* percent progress overlay for downloads */}
-                            <div
-                              className={`absolute top-0 left-0 h-full bg-[#007bff50] pointer-events-none transition-all duration-300`}
-                              style={{
-                                width: `${displayPercent}%`,
-                              }}
-                            ></div>
                           </>
                         )}
                       </div>
@@ -433,7 +524,7 @@ export const MobileUnified: React.FC<Props> = ({
       </div>
 
       {/* INPUT AREA */}
-      <div className="shrink-0 bg-white border-t border-gray-200 z-30 pb-safe-bottom">
+      <div className={`shrink-0 border-t z-30 pb-safe-bottom transition-colors duration-300 ${theme.inputArea}`}>
         <div className="px-3 py-[6px]">
           {showTextInput && (
             <div className="flex gap-2 mb-2">
@@ -443,7 +534,7 @@ export const MobileUnified: React.FC<Props> = ({
                 onChange={(e) => setTextInput(e.target.value)}
                 onKeyPress={(e) => e.key === "Enter" && handleSendText()}
                 placeholder="Message"
-                className="flex-1 px-4 py-2 bg-gray-100 rounded-full text-[16px]"
+                className={`flex-1 px-4 py-2 rounded-full text-[16px] outline-none ${theme.inputField}`}
                 autoFocus
               />
               <button
@@ -457,7 +548,7 @@ export const MobileUnified: React.FC<Props> = ({
                   setShowTextInput(false);
                   setTextInput("");
                 }}
-                className="p-2 bg-gray-200 rounded-full"
+                className={`p-2 rounded-full ${theme.iconBtn}`}
               >
                 <X size={20} />
               </button>
@@ -476,14 +567,14 @@ export const MobileUnified: React.FC<Props> = ({
             <button
               onClick={() => setShowTextInput(!showTextInput)}
               disabled={isUploading}
-              className="p-2.5 bg-gray-100 rounded-full"
+              className={`p-2.5 rounded-full ${theme.iconBtn}`}
             >
               <MessageSquare size={24} />
             </button>
 
             <button
               onClick={handleSelectFiles}
-              className={`flex-1 h-12 rounded-full font-semibold flex items-center justify-center gap-2 bg-white border border-gray-300 text-[#007AFF] hover:bg-gray-50 transition-colors`}
+              className={`flex-1 h-12 rounded-full font-semibold flex items-center justify-center gap-2 transition-colors border ${theme.selectBtn}`}
             >
               <File size={18} /> Select Files
             </button>
@@ -501,6 +592,7 @@ export const MobileUnified: React.FC<Props> = ({
         onConfirm={confirmCancelDownload}
         onCancel={cancelCancelDownload}
         destructive={true}
+        isDarkMode={isDarkMode}
       />
     </div>
   );

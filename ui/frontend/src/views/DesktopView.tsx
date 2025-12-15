@@ -103,7 +103,7 @@ const getAppIcon = (appName: string, appCommand: string) => {
   return <ExternalLink size={14} />;
 };
 
-const TransactionActions = ({ transaction, isDarkMode }: { transaction: any, isDarkMode: boolean }) => {
+const TransactionActions = ({ transaction, isDarkMode, compact = false }: { transaction: any, isDarkMode: boolean, compact?: boolean }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [apps, setApps] = useState<utils.AppInfo[]>([]);
   const [loading, setLoading] = useState(false);
@@ -162,10 +162,12 @@ const TransactionActions = ({ transaction, isDarkMode }: { transaction: any, isD
   return (
     <div className="relative" ref={dropdownRef}>
       <div className="flex items-center gap-2">
-        <div className={`text-[10px] ${isDarkMode ? "text-slate-500" : "text-gray-400"}`}>
-          {new Date(transaction.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-          <Check size={12} className="ml-1 inline" />
-        </div>
+        {!compact && (
+          <div className={`text-[10px] ${isDarkMode ? "text-slate-500" : "text-gray-400"}`}>
+            {new Date(transaction.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+            <Check size={12} className="ml-1 inline" />
+          </div>
+        )}
 
         <button
           onClick={handleShowInFolder}
@@ -230,7 +232,7 @@ export const DesktopView = () => {
   const [showTextInput, setShowTextInput] = useState(false);
 
   // UI States
-  const [isDarkMode, setIsDarkMode] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(true);
   const [showQRPanel, setShowQRPanel] = useState(true);
   const [urlCopied, setUrlCopied] = useState(false);
 
@@ -282,6 +284,11 @@ export const DesktopView = () => {
     };
     fetchServerInfo();
   }, []);
+
+  // Sync theme with server
+  useEffect(() => {
+    axios.post('/api/theme', { isDarkMode }).catch(e => console.error("Failed to sync theme:", e));
+  }, [isDarkMode]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -509,165 +516,204 @@ export const DesktopView = () => {
                     )}
 
                     <div
-                      className={`relative rounded-2xl p-3 max-w-[85%] md:max-w-[70%] shadow-sm ${bubbleClass} transition-colors duration-300`}
+                      className={`relative rounded-2xl p-3 max-w-[85%] md:max-w-[70%] shadow-sm ${bubbleClass} transition-all duration-300 overflow-hidden ${transaction.status === 'cancelled' ? 'opacity-60 grayscale-[0.5]' : ''
+                        }`}
                     >
-                      {transaction.type === "text" && (
-                        <div className="flex items-start gap-2 min-w-[120px]">
-                          <div className="text-[15px] leading-relaxed break-words flex-1">
-                            {transaction.textContent}
-                          </div>
-                          <button
-                            onClick={() =>
-                              handleCopyText(transaction.textContent || "")
-                            }
-                            className={`p-1 rounded-full transition-colors ${isMe
-                              ? "hover:bg-white/20 text-white/70"
-                              : isDarkMode
-                                ? "hover:bg-slate-700 text-slate-400"
-                                : "hover:bg-gray-100 text-gray-400"
-                              }`}
-                          >
-                            <Copy size={12} />
-                          </button>
-                        </div>
+                      {/* Background Progress Fill (Both Incoming and Outgoing) */}
+                      {transaction.status === "in_progress" && (
+                        <div
+                          className={`absolute top-0 left-0 h-full ${isMe ? "bg-white/20" : "bg-[#007AFF]/10"} pointer-events-none transition-all duration-300`}
+                          style={{ width: `${transaction.transactionPercent}%` }}
+                        />
                       )}
 
-                      {isFile && (
-                        <div className="flex items-center gap-3 pr-2">
-                          {(() => {
-                            const ext = transaction.filename?.split('.').pop()?.toLowerCase();
-                            const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'].includes(ext || '');
-                            const isVideo = ['mp4', 'webm', 'ogg', 'mov'].includes(ext || '');
-                            const mediaUrl = serverInfo?.url && transaction.downloadLink ? `${serverInfo.url}${transaction.downloadLink}` : '';
-
-                            if (isImage && mediaUrl) {
-                              return (
-                                <div
-                                  className="w-12 h-12 rounded-lg bg-black/5 overflow-hidden shrink-0 cursor-pointer hover:opacity-80 transition-opacity relative group"
-                                  onClick={() => OpenSourceFile(transaction.filename || "")}
-                                  title="Open Image"
-                                >
-                                  <img src={mediaUrl} alt="preview" className="w-full h-full object-cover" />
-                                </div>
-                              );
-                            }
-
-                            if (isVideo && mediaUrl) {
-                              return (
-                                <div
-                                  className="w-12 h-12 rounded-lg bg-black/10 overflow-hidden shrink-0 cursor-pointer hover:opacity-80 transition-opacity relative group flex items-center justify-center"
-                                  onClick={() => OpenSourceFile(transaction.filename || "")}
-                                  title="Open Video"
-                                >
-                                  <video src={mediaUrl} className="w-full h-full object-cover absolute inset-0 pointer-events-none" />
-                                  <div className="w-6 h-6 rounded-full bg-black/40 flex items-center justify-center z-10 backdrop-blur-sm">
-                                    <Play size={10} className="text-white ml-0.5" />
-                                  </div>
-                                </div>
-                              );
-                            }
-
-                            return (
-                              <div
-                                className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${isMe
-                                  ? "bg-white/20"
-                                  : isDarkMode
-                                    ? "bg-slate-700"
-                                    : "bg-gray-100"
-                                  }`}
-                              >
-                                <File size={20} />
-                              </div>
-                            );
-                          })()}
-
-                          <div className="min-w-[140px] text-left">
-                            <div
-                              className="font-semibold text-sm truncate max-w-[200px]"
-                              title={transaction.filename}
-                            >
-                              {transaction.filename}
+                      <div className="relative z-10">
+                        {transaction.type === "text" && (
+                          <div className="flex items-start gap-2 min-w-[120px]">
+                            <div className="text-[15px] leading-relaxed break-words flex-1">
+                              {transaction.textContent}
                             </div>
-                            <div
-                              className={`text-xs mt-0.5 ${isMe
-                                ? "text-white/80"
+                            <button
+                              onClick={() =>
+                                handleCopyText(transaction.textContent || "")
+                              }
+                              className={`p-1 rounded-full transition-colors ${isMe
+                                ? "hover:bg-white/20 text-white/70"
                                 : isDarkMode
-                                  ? "text-slate-400"
-                                  : "text-gray-500"
+                                  ? "hover:bg-slate-700 text-slate-400"
+                                  : "hover:bg-gray-100 text-gray-400"
                                 }`}
                             >
-                              {formatSize(transaction.fileSize)}
-                            </div>
-
-                            {/* Multiple progress bars for client downloads */}
-                            {!isMe && transaction.clientProgress && Object.keys(transaction.clientProgress).length > 0 && (
-                              <div className="mt-2 space-y-1.5">
-                                {Object.entries(transaction.clientProgress).map(([clientId, progress]) => {
-                                  const clientSt = transaction.clientStatus?.[clientId];
-                                  const client = clients.find(c => c.id === clientId);
-
-                                  // Only show if in progress
-                                  if (clientSt !== 'in_progress') return null;
-
-                                  return (
-                                    <div key={clientId} className="flex items-center gap-2">
-                                      <div className={`w-4 h-4 rounded-full flex items-center justify-center shrink-0 ${isDarkMode ? "bg-slate-700 text-slate-400" : "bg-gray-100 text-gray-500"}`}>
-                                        <PlatformIcon platform={client?.platform || "unknown"} size={10} />
-                                      </div>
-                                      <div className="flex-1 h-1 bg-gray-200/30 rounded-full overflow-hidden">
-                                        <div
-                                          className="h-full bg-[#007AFF] transition-all duration-300"
-                                          style={{ width: `${progress}%` }}
-                                        />
-                                      </div>
-                                      <span className={`text-[10px] w-8 text-right ${isDarkMode ? "text-slate-400" : "text-gray-500"}`}>
-                                        {Math.round(progress)}%
-                                      </span>
-                                      <button
-                                        onClick={async () => {
-                                          try {
-                                            await axios.post(`/api/cancel-download/${transaction.id}`, {}, {
-                                              headers: { 'X-Client-ID': clientId }
-                                            });
-                                          } catch (err) {
-                                            console.error('Failed to cancel:', err);
-                                          }
-                                        }}
-                                        className={`p-0.5 rounded hover:bg-red-100 text-red-500 transition-colors ${isDarkMode ? "hover:bg-red-900/20" : ""}`}
-                                        title={`Cancel download for ${client?.platform || 'client'}`}
-                                      >
-                                        <X size={12} />
-                                      </button>
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            )}
-
-                            {/* Single progress bar for uploads (server sending) */}
-                            {isMe && transaction.status === "in_progress" && (
-                              <div className="w-full h-1 bg-gray-200/30 rounded-full mt-2 overflow-hidden">
-                                <div
-                                  className="h-full bg-white"
-                                  style={{
-                                    width: `${transaction.transactionPercent}%`,
-                                  }}
-                                />
-                              </div>
-                            )}
+                              <Copy size={12} />
+                            </button>
                           </div>
-                        </div>
-                      )}
-                      {/* Actions inside bubble */}
-                      {/* Completed File Actions: Open With */}
-                      {isFile && transaction.status === "completed" && !isMe && (
-                        <div className="mt-2 flex justify-end relative pt-2 border-t border-gray-100/10">
-                          <TransactionActions
-                            transaction={transaction}
-                            isDarkMode={isDarkMode}
-                          />
-                        </div>
-                      )}
+                        )}
+
+                        {isFile && (
+                          <div className="flex items-center gap-3 pr-2">
+                            {(() => {
+                              const ext = transaction.filename?.split('.').pop()?.toLowerCase();
+                              const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'].includes(ext || '');
+                              const isVideo = ['mp4', 'webm', 'ogg', 'mov'].includes(ext || '');
+                              const mediaUrl = serverInfo?.url && transaction.downloadLink ? `${serverInfo.url}${transaction.downloadLink}` : '';
+
+                              if (isImage && mediaUrl) {
+                                return (
+                                  <div
+                                    className="w-12 h-12 rounded-lg bg-black/5 overflow-hidden shrink-0 cursor-pointer hover:opacity-80 transition-opacity relative group"
+                                    onClick={() => OpenSourceFile(transaction.filename || "")}
+                                    title="Open Image"
+                                  >
+                                    <img src={mediaUrl} alt="preview" className="w-full h-full object-cover" />
+                                  </div>
+                                );
+                              }
+
+                              if (isVideo && mediaUrl) {
+                                return (
+                                  <div
+                                    className="w-12 h-12 rounded-lg bg-black/10 overflow-hidden shrink-0 cursor-pointer hover:opacity-80 transition-opacity relative group flex items-center justify-center"
+                                    onClick={() => OpenSourceFile(transaction.filename || "")}
+                                    title="Open Video"
+                                  >
+                                    <video src={mediaUrl} className="w-full h-full object-cover absolute inset-0 pointer-events-none" />
+                                    <div className="w-6 h-6 rounded-full bg-black/40 flex items-center justify-center z-10 backdrop-blur-sm">
+                                      <Play size={10} className="text-white ml-0.5" />
+                                    </div>
+                                  </div>
+                                );
+                              }
+
+                              return (
+                                <div
+                                  className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${isMe
+                                    ? "bg-white/20"
+                                    : isDarkMode
+                                      ? "bg-slate-700"
+                                      : "bg-gray-100"
+                                    }`}
+                                >
+                                  <File size={20} />
+                                </div>
+                              );
+                            })()}
+
+                            <div className="min-w-[140px] text-left">
+                              <div
+                                className="font-semibold text-sm truncate max-w-[200px]"
+                                title={transaction.filename}
+                              >
+                                {transaction.filename}
+                              </div>
+                              <div
+                                className={`text-xs mt-0.5 ${isMe
+                                  ? "text-white/80"
+                                  : isDarkMode
+                                    ? "text-slate-400"
+                                    : "text-gray-500"
+                                  }`}
+                              >
+                                {formatSize(transaction.fileSize)}
+                                {transaction.status === "in_progress" && (
+                                  <span className={`ml-2 font-mono font-medium ${isMe ? "text-white/90" : "text-[#007AFF]"}`}>
+                                    {Math.round(transaction.transactionPercent)}%
+                                  </span>
+                                )}
+                                {transaction.status === 'cancelled' && (
+                                  <span className="ml-2 font-medium text-red-500/70">Cancelled</span>
+                                )}
+                              </div>
+
+                              {/* Divider and Actions for Completed Received Files */}
+                              {isFile && !isMe && transaction.status === 'completed' && (
+                                <div className="mt-3 pt-2 border-t border-gray-100/10 flex items-center justify-between w-full">
+                                  <div className={`text-[11px] ${isDarkMode ? "text-slate-500" : "text-gray-400"}`}>
+                                    {new Date(transaction.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }).toLowerCase()}
+                                    <span className="ml-1 inline-block">✓</span>
+                                  </div>
+                                  <TransactionActions
+                                    transaction={transaction}
+                                    isDarkMode={isDarkMode}
+                                    compact={true}
+                                  />
+                                </div>
+                              )}
+
+                              {/* Multiple progress bars for client downloads */}
+                              {!isMe && transaction.clientProgress && Object.keys(transaction.clientProgress).length > 0 && (
+                                <div className="mt-2 space-y-1.5">
+                                  {Object.entries(transaction.clientProgress).map(([clientId, progress]) => {
+                                    const clientSt = transaction.clientStatus?.[clientId];
+                                    const client = clients.find(c => c.id === clientId);
+
+                                    // Only show if in progress
+                                    if (clientSt !== 'in_progress') return null;
+
+                                    return (
+                                      <div key={clientId} className="flex items-center gap-2">
+                                        <div className={`w-4 h-4 rounded-full flex items-center justify-center shrink-0 ${isDarkMode ? "bg-slate-700 text-slate-400" : "bg-gray-100 text-gray-500"}`}>
+                                          <PlatformIcon platform={client?.platform || "unknown"} size={10} />
+                                        </div>
+                                        <div className="flex-1 h-1 bg-gray-200/30 rounded-full overflow-hidden">
+                                          <div
+                                            className="h-full bg-[#007AFF] transition-all duration-300"
+                                            style={{ width: `${progress}%` }}
+                                          />
+                                        </div>
+                                        <span className={`text-[10px] w-8 text-right ${isDarkMode ? "text-slate-400" : "text-gray-500"}`}>
+                                          {Math.round(progress)}%
+                                        </span>
+                                        {transaction.status !== 'cancelled' && (
+                                          <button
+                                            onClick={async () => {
+                                              try {
+                                                await axios.post(`/api/cancel-download/${transaction.id}`, {}, {
+                                                  headers: { 'X-Client-ID': clientId }
+                                                });
+                                              } catch (err) {
+                                                console.error('Failed to cancel:', err);
+                                              }
+                                            }}
+                                            className={`p-0.5 rounded hover:bg-red-100 text-red-500 transition-colors ${isDarkMode ? "hover:bg-red-900/20" : ""}`}
+                                            title={`Cancel download for ${client?.platform || 'client'}`}
+                                          >
+                                            <X size={12} />
+                                          </button>
+                                        )}
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              )}
+
+                              {/* Single progress bar for uploads (server sending) - REMOVED */}{/* REMOVED */}
+
+                              {/* Incoming Upload Cancel Button */}
+                              {!isMe && transaction.status === "in_progress" && (!transaction.clientProgress || Object.keys(transaction.clientProgress).length === 0) && (
+                                <div className="flex justify-end mt-1">
+                                  <button
+                                    onClick={async (e) => {
+                                      e.stopPropagation();
+                                      try {
+                                        await axios.post(`/api/cancel-transaction/${transaction.id}`);
+                                      } catch (err) {
+                                        console.error("Failed to cancel transaction:", err);
+                                      }
+                                    }}
+                                    className={`p-1 rounded cursor-pointer relative z-20 hover:bg-red-100 text-red-500 transition-colors ${isDarkMode ? "hover:bg-red-900/20" : ""}`}
+                                    title="Cancel upload"
+                                  >
+                                    <X size={14} />
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                        {/* Actions inside bubble */}
+                        {/* Completed File Actions: Open With */}
+                        {/* Actions Removed from here, moved inside the card content above */}{/* REMOVED */}
+                      </div>
                     </div>
 
                     {/* Avatar for Server (Right Side) */}

@@ -15,7 +15,7 @@ export interface Transaction {
   textContent?: string;
   timestamp: string;
   bytesTransferred?: number;
-  status: "pending" | "in_progress" | "completed" | "failed";
+  status: "pending" | "in_progress" | "completed" | "failed" | "cancelled";
   
   // Client-specific tracking
   clientProgress?: Record<string, number>; // clientId -> progress %
@@ -27,6 +27,7 @@ interface UseTransactionsResult {
   transactions: Transaction[];
   loading: boolean;
   error: string | null;
+  isDarkMode: boolean;
   sendText: (
     text: string,
     senderId: string
@@ -42,6 +43,7 @@ export const useTransactions = (
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isDarkMode, setIsDarkMode] = useState(true); // Default Dark
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -73,6 +75,7 @@ export const useTransactions = (
       ],
       loading: false,
       error: null,
+      isDarkMode: true,
       sendText: async () => {
         /* no-op */
       },
@@ -96,6 +99,37 @@ export const useTransactions = (
       setLoading(false);
     }
   }, [baseURL]);
+
+  // Fetch initial theme
+  useEffect(() => {
+    const fetchTheme = async () => {
+      try {
+        const url = baseURL ? `${baseURL}/api/theme` : "/api/theme";
+        const response = await axios.get(url);
+        if (response.data && typeof response.data.isDarkMode === 'boolean') {
+          setIsDarkMode(response.data.isDarkMode);
+        }
+      } catch (err) {
+        // console.error("[useTransactions] Failed to fetch theme:", err);
+      }
+    };
+    fetchTheme();
+  }, [baseURL]);
+
+  // Update theme-color meta tag and body background for mobile browsers
+  useEffect(() => {
+    const color = isDarkMode ? "#0f172a" : "#F2F2F7";
+    
+    // Update meta tag
+    const metaThemeColor = document.querySelector('meta[name="theme-color"]');
+    if (metaThemeColor) {
+      metaThemeColor.setAttribute("content", color);
+    }
+
+    // Update body and html background (crucial for iOS Safari bottom bar matching)
+    document.body.style.backgroundColor = color;
+    document.documentElement.style.backgroundColor = color;
+  }, [isDarkMode]);
 
   const sendText = useCallback(
     async (text: string, senderId: string) => {
@@ -141,7 +175,7 @@ export const useTransactions = (
       ws.onmessage = (event) => {
         try {
           const message = JSON.parse(event.data);
-          console.log("[useTransactions] WebSocket message:", message);
+          // console.log("[useTransactions] WebSocket message:", message);
 
           switch (message.type) {
             case "transactions_init":
@@ -150,11 +184,16 @@ export const useTransactions = (
               setLoading(false);
               break;
 
+            case "theme_update":
+              // Global theme update
+              setIsDarkMode(!!message.data.isDarkMode);
+              break;
+
             case "transaction_update":
               // Update or add single transaction
               setTransactions((prevTransactions) => {
                 const updatedTxn = message.data as Transaction;
-                console.log(`[useTransactions] Update: txn ${updatedTxn.id} - ${updatedTxn.filename} ${updatedTxn.transactionPercent.toFixed(0)}% (${updatedTxn.status})`);
+                // console.log(`[useTransactions] Update: txn ${updatedTxn.id} - ${updatedTxn.filename} ${updatedTxn.transactionPercent.toFixed(0)}% (${updatedTxn.status})`);
                 
                 const existingIndex = prevTransactions.findIndex(
                   (t) => t.id === updatedTxn.id
@@ -173,11 +212,12 @@ export const useTransactions = (
               break;
 
             default:
-              console.log("[useTransactions] Unknown message type:", message.type);
+                // console.log("[useTransactions] Unknown message type:", message.type);
           }
         } catch (err) {
           console.error("[useTransactions] Error processing WebSocket message:", err);
         }
+
       };
 
       ws.onerror = (error) => {
@@ -218,6 +258,7 @@ export const useTransactions = (
     transactions,
     loading,
     error,
+    isDarkMode,
     sendText,
     refreshTransactions: fetchTransactions,
   };

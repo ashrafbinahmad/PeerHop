@@ -23,10 +23,43 @@ type WSMessage struct {
 	Data interface{} `json:"data"`
 }
 
+// SafeConn wraps websocket.Conn to ensure thread-safe writes
+type SafeConn struct {
+	conn *websocket.Conn
+	mu   sync.Mutex
+}
+
+// WriteMessage sends a message to the connection in a thread-safe manner
+func (sc *SafeConn) WriteMessage(messageType int, data []byte) error {
+	sc.mu.Lock()
+	defer sc.mu.Unlock()
+	return sc.conn.WriteMessage(messageType, data)
+}
+
+// Close closes the underlying connection
+func (sc *SafeConn) Close() error {
+	return sc.conn.Close()
+}
+
+// ReadMessage reads a message from the underlying connection (not mutex protected as we only have one reader)
+func (sc *SafeConn) ReadMessage() (int, []byte, error) {
+	return sc.conn.ReadMessage()
+}
+
+// SetReadDeadline sets the read deadline
+func (sc *SafeConn) SetReadDeadline(t time.Time) error {
+	return sc.conn.SetReadDeadline(t)
+}
+
+// SetPongHandler sets the pong handler
+func (sc *SafeConn) SetPongHandler(h func(appData string) error) {
+	sc.conn.SetPongHandler(h)
+}
+
 // WebSocketHub manages all active WebSocket connections
 type WebSocketHub struct {
 	mu          sync.RWMutex
-	connections map[*websocket.Conn]bool
+	connections map[*SafeConn]bool
 	txStore     *TransactionStore
 	clientStore *ClientStore
 
@@ -37,7 +70,7 @@ type WebSocketHub struct {
 // NewWebSocketHub creates a new WebSocket hub
 func NewWebSocketHub(txStore *TransactionStore, clientStore *ClientStore) *WebSocketHub {
 	return &WebSocketHub{
-		connections:     make(map[*websocket.Conn]bool),
+		connections:     make(map[*SafeConn]bool),
 		txStore:         txStore,
 		clientStore:     clientStore,
 		lastSentPercent: make(map[int]int),
@@ -45,7 +78,7 @@ func NewWebSocketHub(txStore *TransactionStore, clientStore *ClientStore) *WebSo
 }
 
 // AddConnection adds a new WebSocket connection
-func (hub *WebSocketHub) AddConnection(conn *websocket.Conn) {
+func (hub *WebSocketHub) AddConnection(conn *SafeConn) {
 	hub.mu.Lock()
 	defer hub.mu.Unlock()
 	hub.connections[conn] = true
@@ -53,12 +86,14 @@ func (hub *WebSocketHub) AddConnection(conn *websocket.Conn) {
 }
 
 // RemoveConnection removes a WebSocket connection
-func (hub *WebSocketHub) RemoveConnection(conn *websocket.Conn) {
+func (hub *WebSocketHub) RemoveConnection(conn *SafeConn) {
 	hub.mu.Lock()
 	defer hub.mu.Unlock()
-	delete(hub.connections, conn)
-	conn.Close()
-	log.Printf("[WebSocket] Connection removed. Total connections: %d", len(hub.connections))
+	if _, ok := hub.connections[conn]; ok {
+		delete(hub.connections, conn)
+		conn.Close()
+		log.Printf("[WebSocket] Connection removed. Total connections: %d", len(hub.connections))
+	}
 }
 
 // Broadcast sends a message to all connected clients
@@ -81,7 +116,7 @@ func (hub *WebSocketHub) Broadcast(msgType string, data interface{}) {
 		err := conn.WriteMessage(websocket.TextMessage, jsonData)
 		if err != nil {
 			log.Printf("[WebSocket] Error writing to connection: %v", err)
-			// Connection will be cleaned up by the read loop
+			// Connection will be cleaned up by the read loop or keep-alive
 		}
 	}
 }
@@ -98,17 +133,21 @@ func (hub *WebSocketHub) BroadcastTransactionUpdate(txn *Transaction) {
 	// 1. First time sending for this transaction (!exists)
 	// 2. Percentage increased to next whole number
 	// 3. Percentage decreased (reset to 0 after cancellation)
-	// 4. Status changed to completed, pending, or in_progress
+	// 4. Status changed to completed, pending, or in_progress, or cancelled
 	shouldBroadcast := !exists ||
 		currentPercent > lastPercent ||
 		currentPercent < lastPercent || // Reset to 0
 		txn.Status == "completed" ||
-		txn.Status == "pending" // Allow retry after cancel
+		txn.Status == "pending" ||
+		txn.Status == "cancelled"
 
 	if shouldBroadcast {
 		hub.lastSentPercent[txn.ID] = currentPercent
-		log.Printf("[WebSocket] Broadcasting txn %d: %s %.0f%% (status: %s)",
-			txn.ID, txn.Filename, txn.TransactionPercent, txn.Status)
+		// Reduce log noise for frequent progress updates, log only status changes or 100%
+		if txn.Status == "completed" || txn.Status == "pending" || txn.Status == "cancelled" || currentPercent%10 == 0 {
+			log.Printf("[WebSocket] Broadcasting txn %d: %s %.0f%% (status: %s)",
+				txn.ID, txn.Filename, txn.TransactionPercent, txn.Status)
+		}
 	}
 	hub.mu.Unlock()
 
@@ -132,7 +171,7 @@ func (hub *WebSocketHub) BroadcastDevicesUpdate() {
 func (hub *WebSocketHub) StartMonitoring() {
 	// Start transaction monitoring
 	go func() {
-		ticker := time.NewTicker(500 * time.Millisecond)
+		ticker := time.NewTicker(200 * time.Millisecond) // Faster updates
 		defer ticker.Stop()
 
 		lastTransactionCount := 0
@@ -205,7 +244,10 @@ func (hub *WebSocketHub) HandleWebSocket(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	hub.AddConnection(conn)
+	// Create thread-safe connection wrapper
+	safeConn := &SafeConn{conn: conn}
+
+	hub.AddConnection(safeConn)
 
 	// Send initial data
 	if hub.txStore != nil {
@@ -219,7 +261,7 @@ func (hub *WebSocketHub) HandleWebSocket(w http.ResponseWriter, r *http.Request)
 				"transactions": transactions,
 			},
 		})
-		conn.WriteMessage(websocket.TextMessage, jsonData)
+		safeConn.WriteMessage(websocket.TextMessage, jsonData)
 	}
 
 	if hub.clientStore != nil {
@@ -230,17 +272,17 @@ func (hub *WebSocketHub) HandleWebSocket(w http.ResponseWriter, r *http.Request)
 				"clients": clients,
 			},
 		})
-		conn.WriteMessage(websocket.TextMessage, jsonData)
+		safeConn.WriteMessage(websocket.TextMessage, jsonData)
 	}
 
 	// Keep connection alive and handle incoming messages
 	go func() {
-		defer hub.RemoveConnection(conn)
+		defer hub.RemoveConnection(safeConn)
 
 		// Set up ping/pong to keep connection alive
-		conn.SetReadDeadline(time.Now().Add(60 * time.Second))
-		conn.SetPongHandler(func(string) error {
-			conn.SetReadDeadline(time.Now().Add(60 * time.Second))
+		safeConn.SetReadDeadline(time.Now().Add(60 * time.Second))
+		safeConn.SetPongHandler(func(string) error {
+			safeConn.SetReadDeadline(time.Now().Add(60 * time.Second))
 			return nil
 		})
 
@@ -250,14 +292,14 @@ func (hub *WebSocketHub) HandleWebSocket(w http.ResponseWriter, r *http.Request)
 
 		go func() {
 			for range ticker.C {
-				if err := conn.WriteMessage(websocket.PingMessage, nil); err != nil {
+				if err := safeConn.WriteMessage(websocket.PingMessage, nil); err != nil {
 					return
 				}
 			}
 		}()
 
 		for {
-			_, _, err := conn.ReadMessage()
+			_, _, err := safeConn.ReadMessage()
 			if err != nil {
 				if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
 					log.Printf("[WebSocket] Error: %v", err)
