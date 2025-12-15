@@ -38,17 +38,23 @@ type transactionProgressWriter struct {
 	http.ResponseWriter
 	ProgressBar  *progressbar.ProgressBar
 	TxStore      *TransactionStore
+	WSHub        *WebSocketHub // WebSocket hub for broadcasting updates
 	TxnID        int
+	ClientID     string // Client downloading the file
 	TotalBytes   int64
 	BytesWritten int64
 	LastUpdate   time.Time
 }
 
 func (w *transactionProgressWriter) Write(p []byte) (int, error) {
-	// Check if transaction has been cancelled
-	if w.TxStore != nil && w.TxnID > 0 && w.TxStore.IsCancelled(w.TxnID) {
-		// Return error to stop the transfer
-		return 0, fmt.Errorf("transfer cancelled by user")
+	// Check if transaction has been cancelled (global or client-specific)
+	if w.TxStore != nil && w.TxnID > 0 {
+		if w.TxStore.IsCancelled(w.TxnID) {
+			return 0, fmt.Errorf("transfer cancelled by user")
+		}
+		if w.ClientID != "" && w.TxStore.IsClientCancelled(w.TxnID, w.ClientID) {
+			return 0, fmt.Errorf("transfer cancelled by client")
+		}
 	}
 
 	n, err := w.ResponseWriter.Write(p)
@@ -60,13 +66,26 @@ func (w *transactionProgressWriter) Write(p []byte) (int, error) {
 			w.ProgressBar.Add(n)
 		}
 
-		// Update transaction progress
 		// Update transaction progress (Throttled)
 		if w.TxStore != nil && w.TxnID > 0 {
 			// Update if throttled interval passed OR if download completed
 			if w.BytesWritten >= w.TotalBytes || time.Since(w.LastUpdate) > 200*time.Millisecond {
-				w.TxStore.UpdateProgress(w.TxnID, w.BytesWritten, w.TotalBytes)
+				// Use client-specific progress if we have a client ID
+				if w.ClientID != "" {
+					w.TxStore.UpdateClientProgress(w.TxnID, w.ClientID, w.BytesWritten, w.TotalBytes)
+				} else {
+					w.TxStore.UpdateProgress(w.TxnID, w.BytesWritten, w.TotalBytes)
+				}
 				w.LastUpdate = time.Now()
+
+				// Broadcast update via WebSocket
+				if w.WSHub != nil {
+					// Use GetTransactionCopy to avoid race conditions (concurrent map read/write)
+					txn, exists := w.TxStore.GetTransactionCopy(w.TxnID)
+					if exists {
+						w.WSHub.BroadcastTransactionUpdate(txn)
+					}
+				}
 			}
 		}
 	}
@@ -148,7 +167,7 @@ func (h *UnifiedHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "No file available for download", http.StatusNotFound)
 			return
 		}
-		h.serveFile(w, r, filePath, false)
+		h.serveFile(w, r, filePath, 0)
 		return
 	}
 
@@ -160,7 +179,7 @@ func (h *UnifiedHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			// Find transaction with this download link
 			txn, found := h.TxStore.FindTransactionByDownloadLink(downloadLink)
 			if found && txn.ServerFilePath != "" {
-				h.serveFile(w, r, txn.ServerFilePath, false)
+				h.serveFile(w, r, txn.ServerFilePath, txn.ID)
 				return
 			}
 		}
@@ -292,17 +311,24 @@ func (h *UnifiedHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		success := h.TxStore.CancelTransaction(id)
+		// Get client ID from header
+		clientID := r.Header.Get("X-Client-ID")
+		if clientID == "" {
+			clientID = "unknown"
+		}
+
+		// Use client-specific cancellation
+		success := h.TxStore.CancelClientDownload(id, clientID)
 		if !success {
 			http.Error(w, "Transaction not found", http.StatusNotFound)
 			return
 		}
 
-		fmt.Printf("[API] Cancelled and reset transaction %d (progress reset to 0%%)\n", id)
+		fmt.Printf("[API] Cancelled download for client %s on transaction %d (progress reset to 0%%)\n", clientID, id)
 
 		// Broadcast the reset transaction state via WebSocket
 		if h.WSHub != nil {
-			txn, exists := h.TxStore.GetTransaction(id)
+			txn, exists := h.TxStore.GetTransactionCopy(id)
 			if exists {
 				h.WSHub.BroadcastTransactionUpdate(txn)
 			}
@@ -347,7 +373,7 @@ func (h *UnifiedHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if err == nil && h.TxStore != nil {
 			txn, exists := h.TxStore.GetTransaction(id)
 			if exists && txn.ServerFilePath != "" {
-				h.serveFile(w, r, txn.ServerFilePath, true)
+				h.serveFile(w, r, txn.ServerFilePath, -1)
 				return
 			}
 		}
@@ -431,7 +457,7 @@ func (h *UnifiedHandler) proxyToDevServer(w http.ResponseWriter, r *http.Request
 	io.Copy(w, resp.Body)
 }
 
-func (h *UnifiedHandler) serveFile(w http.ResponseWriter, r *http.Request, filePath string, skipTxUpdate bool) {
+func (h *UnifiedHandler) serveFile(w http.ResponseWriter, r *http.Request, filePath string, forceTxnID int) {
 	f, err := os.Open(filePath)
 	if err != nil {
 		http.Error(w, "File not found", http.StatusNotFound)
@@ -452,13 +478,24 @@ func (h *UnifiedHandler) serveFile(w http.ResponseWriter, r *http.Request, fileP
 	// Find existing transaction to update progress
 	var txnID int
 	var txStore *TransactionStore
-	if !skipTxUpdate && h.TxStore != nil {
-		id, found := h.TxStore.FindLatestTransactionByFilename(stat.Name())
-		if found {
-			txnID = id
+	// Get client ID from header first, then from query parameter
+	clientID := r.Header.Get("X-Client-ID")
+	if clientID == "" {
+		clientID = r.URL.Query().Get("clientId")
+	}
+
+	if forceTxnID != -1 && h.TxStore != nil {
+		if forceTxnID > 0 {
+			// Use the explicitly requested transaction ID
+			txnID = forceTxnID
 			txStore = h.TxStore
-			// Reset status to in_progress if it was pending
-			h.TxStore.UpdateStatus(txnID, "in_progress")
+		} else {
+			// Fallback: Find latest transaction by filename
+			id, found := h.TxStore.FindLatestTransactionByFilename(stat.Name())
+			if found {
+				txnID = id
+				txStore = h.TxStore
+			}
 		}
 	}
 
@@ -470,7 +507,9 @@ func (h *UnifiedHandler) serveFile(w http.ResponseWriter, r *http.Request, fileP
 		ResponseWriter: w,
 		ProgressBar:    h.Bar,
 		TxStore:        txStore, // Use the store only if we found a valid transaction to update
+		WSHub:          h.WSHub, // Pass WSHub for broadcasting updates
 		TxnID:          txnID,
+		ClientID:       clientID, // Pass client ID for client-specific tracking
 		TotalBytes:     stat.Size(),
 		BytesWritten:   0,
 	}
@@ -545,7 +584,7 @@ func (h *UnifiedHandler) handleUpload(w http.ResponseWriter, r *http.Request) {
 				ClientID:           r.Header.Get("X-Client-ID"),
 			}
 			txnID = h.TxStore.AddTransaction(txn)
-			h.TxStore.SetDownloadLink(txnID, fmt.Sprintf("/api/view/%d", txnID)) // Enable preview
+			h.TxStore.SetDownloadLink(txnID, fmt.Sprintf("/api/download-file/%d", txnID)) // Enable download with progress
 			transactionIDs = append(transactionIDs, txnID)
 			fmt.Printf("[Upload] Created transaction ID=%d for file: %s (Streaming)\n", txnID, filename)
 		}

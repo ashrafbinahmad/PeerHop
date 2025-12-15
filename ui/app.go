@@ -164,12 +164,13 @@ func (a *App) StartTransfer(paths []string) (*ServerInfo, error) {
 				SenderID:           server.SenderServer,
 				Filename:           filepath.Base(zipPath),
 				FileSize:           stat.Size(),
-				DownloadLink:       "/api/download",
+				DownloadLink:       "", // Set after ID generation
 				ServerFilePath:     zipPath,
 				TransactionPercent: 0,
 				Status:             "pending",
 			}
 			txnID := a.unifiedHandler.TxStore.AddTransaction(txn)
+			a.unifiedHandler.TxStore.SetDownloadLink(txnID, fmt.Sprintf("/api/download-file/%d", txnID))
 			fmt.Printf("[Desktop] Created download transaction ID=%d for zip: %s\n", txnID, filepath.Base(zipPath))
 		}
 
@@ -202,12 +203,14 @@ func (a *App) StartTransfer(paths []string) (*ServerInfo, error) {
 				SenderID:           server.SenderServer,
 				Filename:           filepath.Base(filePath),
 				FileSize:           stat.Size(),
-				DownloadLink:       fmt.Sprintf("/api/download-file/%d", i),
+				DownloadLink:       "", // Set after ID is generated
 				ServerFilePath:     filePath,
 				TransactionPercent: 0,
 				Status:             "pending",
 			}
 			txnID := a.unifiedHandler.TxStore.AddTransaction(txn)
+			// Update download link with correct ID
+			a.unifiedHandler.TxStore.SetDownloadLink(txnID, fmt.Sprintf("/api/download-file/%d", txnID))
 			fmt.Printf("[Desktop] Created download transaction ID=%d for file: %s\n", txnID, filepath.Base(filePath))
 		}
 

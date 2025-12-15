@@ -68,14 +68,13 @@ export const MobileUnified: React.FC<Props> = ({
 
   useEffect(() => {
     // Client ID identification
-    let clientId = sessionStorage.getItem("transend_client_id") || localStorage.getItem("transend_client_id");
+    let clientId = localStorage.getItem("transend_client_id");
 
     if (!clientId) {
       clientId = Math.random().toString(36).substring(2) + Date.now().toString(36);
     }
 
     localStorage.setItem("transend_client_id", clientId);
-    sessionStorage.setItem("transend_client_id", clientId);
 
     setMyClientId(clientId);
     axios.defaults.headers.common["X-Client-ID"] = clientId;
@@ -89,11 +88,18 @@ export const MobileUnified: React.FC<Props> = ({
   useEffect(() => {
     if (downloadingTransactionId !== null) {
       const transaction = transactions.find(t => t.id === downloadingTransactionId);
-      if (transaction && (transaction.status === 'in_progress' || transaction.status === 'completed')) {
-        setDownloadingTransactionId(null);
+      if (transaction) {
+        // Check both global status and client-specific status
+        const isCompleted = transaction.status === 'completed';
+        const clientStatus = (myClientId && transaction.clientStatus) ? transaction.clientStatus[myClientId] : undefined;
+        const isClientDone = clientStatus === 'completed' || clientStatus === 'in_progress';
+
+        if (isCompleted || isClientDone) {
+          setDownloadingTransactionId(null);
+        }
       }
     }
-  }, [transactions, downloadingTransactionId]);
+  }, [transactions, downloadingTransactionId, myClientId]);
 
   const formatSize = (bytes?: number) => {
     if (bytes === undefined || bytes === null) return "Unknown size";
@@ -176,8 +182,11 @@ export const MobileUnified: React.FC<Props> = ({
     setDownloadingTransactionId(transaction.id);
 
     if (transaction.downloadLink) {
+      // Append client ID as query parameter to the download link
+      const downloadUrl = `${transaction.downloadLink}${transaction.downloadLink.includes('?') ? '&' : '?'}clientId=${myClientId}`;
+
       const link = document.createElement("a");
-      link.href = transaction.downloadLink;
+      link.href = downloadUrl;
       link.download = transaction.filename || "file";
       document.body.appendChild(link);
       link.click();
@@ -271,13 +280,27 @@ export const MobileUnified: React.FC<Props> = ({
               ? "w-[calc(95vw-90px)]"
               : "w-fit max-w-[75%]";
 
-            // Progress logic
+            // Progress logic - use client-specific for downloads
             const currentFilename = transaction.filename || "";
             const localProgress = currentFilename ? uploadProgress[currentFilename] : undefined;
+
+            // For downloads (!isMe), check client-specific progress
+            let clientProgress = 0;
+            let clientStatus = transaction.status;
+            if (!isMe && myClientId && transaction.clientProgress && transaction.clientStatus) {
+              clientProgress = transaction.clientProgress[myClientId] || 0;
+              clientStatus = transaction.clientStatus[myClientId] || 'pending';
+            }
+
             const rawPercent = (localProgress !== undefined && transaction.status === 'in_progress')
-              ? localProgress
-              : transaction.transactionPercent;
+              ? localProgress // Upload progress
+              : !isMe && clientProgress > 0
+                ? clientProgress // Download progress (client-specific)
+                : transaction.transactionPercent; // Fallback to global
             const displayPercent = isNaN(Number(rawPercent)) ? 0 : Number(rawPercent);
+
+            // Use client-specific status for downloads
+            const effectiveStatus = !isMe && clientStatus ? clientStatus : transaction.status;
 
             return (
               <div
@@ -327,7 +350,7 @@ export const MobileUnified: React.FC<Props> = ({
                           </div>
                           <div className="text-xs opacity-70">
                             {formatSize(transaction.fileSize)}
-                            {!isMe && (transaction.status === 'in_progress' || downloadingTransactionId === transaction.id) && (
+                            {!isMe && (effectiveStatus === 'in_progress' || downloadingTransactionId === transaction.id) && (
                               <span className="ml-1 text-[#007AFF] font-medium">• Downloading...</span>
                             )}
                           </div>
@@ -346,7 +369,7 @@ export const MobileUnified: React.FC<Props> = ({
                         {/* Download/Cancel button only if NOT me */}
                         {!isMe && transaction.downloadLink && (
                           <>
-                            {transaction.status === "in_progress" ? (
+                            {effectiveStatus === "in_progress" ? (
                               // Cancel button during download
                               <button
                                 onClick={(e) => handleCancelDownload(e, transaction)}
@@ -373,7 +396,7 @@ export const MobileUnified: React.FC<Props> = ({
                             <div
                               className={`absolute top-0 left-0 h-full bg-[#007bff50] pointer-events-none transition-all duration-300`}
                               style={{
-                                width: `${transaction.transactionPercent}%`,
+                                width: `${displayPercent}%`,
                               }}
                             ></div>
                           </>

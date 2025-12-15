@@ -16,6 +16,11 @@ export interface Transaction {
   timestamp: string;
   bytesTransferred?: number;
   status: "pending" | "in_progress" | "completed" | "failed";
+  
+  // Client-specific tracking
+  clientProgress?: Record<string, number>; // clientId -> progress %
+  clientStatus?: Record<string, "pending" | "in_progress" | "completed" | "failed">;
+  clientBytes?: Record<string, number>; // clientId -> bytes transferred
 }
 
 interface UseTransactionsResult {

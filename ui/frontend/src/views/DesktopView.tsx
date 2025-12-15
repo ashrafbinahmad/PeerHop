@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import axios from "axios";
 import QRCode from "react-qr-code";
 import {
   SelectFiles,
@@ -231,6 +232,7 @@ export const DesktopView = () => {
   // UI States
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [showQRPanel, setShowQRPanel] = useState(true);
+  const [urlCopied, setUrlCopied] = useState(false);
 
   // Scroll and Refs
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -317,6 +319,16 @@ export const DesktopView = () => {
 
   const handleCopyText = (text: string) => {
     navigator.clipboard.writeText(text).catch(console.error);
+  };
+
+  const handleCopyUrl = () => {
+    if (serverInfo?.url) {
+      navigator.clipboard.writeText(serverInfo.url).catch(console.error);
+      setUrlCopied(true);
+      setTimeout(() => {
+        setUrlCopied(false);
+      }, 500);
+    }
   };
 
   const formatSize = (bytes?: number) => {
@@ -587,11 +599,56 @@ export const DesktopView = () => {
                               {formatSize(transaction.fileSize)}
                             </div>
 
-                            {transaction.status === "in_progress" && (
+                            {/* Multiple progress bars for client downloads */}
+                            {!isMe && transaction.clientProgress && Object.keys(transaction.clientProgress).length > 0 && (
+                              <div className="mt-2 space-y-1.5">
+                                {Object.entries(transaction.clientProgress).map(([clientId, progress]) => {
+                                  const clientSt = transaction.clientStatus?.[clientId];
+                                  const client = clients.find(c => c.id === clientId);
+
+                                  // Only show if in progress
+                                  if (clientSt !== 'in_progress') return null;
+
+                                  return (
+                                    <div key={clientId} className="flex items-center gap-2">
+                                      <div className={`w-4 h-4 rounded-full flex items-center justify-center shrink-0 ${isDarkMode ? "bg-slate-700 text-slate-400" : "bg-gray-100 text-gray-500"}`}>
+                                        <PlatformIcon platform={client?.platform || "unknown"} size={10} />
+                                      </div>
+                                      <div className="flex-1 h-1 bg-gray-200/30 rounded-full overflow-hidden">
+                                        <div
+                                          className="h-full bg-[#007AFF] transition-all duration-300"
+                                          style={{ width: `${progress}%` }}
+                                        />
+                                      </div>
+                                      <span className={`text-[10px] w-8 text-right ${isDarkMode ? "text-slate-400" : "text-gray-500"}`}>
+                                        {Math.round(progress)}%
+                                      </span>
+                                      <button
+                                        onClick={async () => {
+                                          try {
+                                            await axios.post(`/api/cancel-download/${transaction.id}`, {}, {
+                                              headers: { 'X-Client-ID': clientId }
+                                            });
+                                          } catch (err) {
+                                            console.error('Failed to cancel:', err);
+                                          }
+                                        }}
+                                        className={`p-0.5 rounded hover:bg-red-100 text-red-500 transition-colors ${isDarkMode ? "hover:bg-red-900/20" : ""}`}
+                                        title={`Cancel download for ${client?.platform || 'client'}`}
+                                      >
+                                        <X size={12} />
+                                      </button>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+
+                            {/* Single progress bar for uploads (server sending) */}
+                            {isMe && transaction.status === "in_progress" && (
                               <div className="w-full h-1 bg-gray-200/30 rounded-full mt-2 overflow-hidden">
                                 <div
-                                  className={`h-full ${isMe ? "bg-white" : "bg-[#007AFF]"
-                                    }`}
+                                  className="h-full bg-white"
                                   style={{
                                     width: `${transaction.transactionPercent}%`,
                                   }}
@@ -723,9 +780,42 @@ export const DesktopView = () => {
                     <h1 className={`text-xl font-bold ${theme.text}`}>
                       Scan to Connect
                     </h1>
-                    <p className={`text-sm mt-1 font-mono ${theme.subText}`}>
-                      {serverInfo.url}
-                    </p>
+                    <div className="flex items-center gap-2 mt-1">
+                      <p className={`text-sm font-mono ${theme.subText}`}>
+                        {serverInfo.url}
+                      </p>
+                      <button
+                        onClick={handleCopyUrl}
+                        className={`p-1.5 rounded-md transition-all duration-200 ${urlCopied
+                          ? isDarkMode
+                            ? "bg-green-900/30 text-green-400"
+                            : "bg-green-100 text-green-600"
+                          : isDarkMode
+                            ? "hover:bg-slate-700 text-slate-400 hover:text-slate-300"
+                            : "hover:bg-gray-100 text-gray-400 hover:text-gray-600"
+                          }`}
+                        title={urlCopied ? "Copied!" : "Copy URL"}
+                      >
+                        <div className="relative w-[14px] h-[14px]">
+                          <div
+                            className={`absolute inset-0 transition-all duration-200 ${urlCopied
+                              ? "opacity-0 scale-50 rotate-90"
+                              : "opacity-100 scale-100 rotate-0"
+                              }`}
+                          >
+                            <Copy size={14} />
+                          </div>
+                          <div
+                            className={`absolute inset-0 transition-all duration-200 ${urlCopied
+                              ? "opacity-100 scale-100 rotate-0"
+                              : "opacity-0 scale-50 -rotate-90"
+                              }`}
+                          >
+                            <Check size={14} />
+                          </div>
+                        </div>
+                      </button>
+                    </div>
                   </div>
 
                   <div
