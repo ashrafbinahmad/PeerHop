@@ -8,6 +8,7 @@ import {
   GetOpenableApps,
   OpenFileWith,
   OpenSourceFile,
+  ShowInFolder,
 } from "../../wailsjs/go/main/App";
 import { main, utils } from "../../wailsjs/go/models";
 import {
@@ -50,6 +51,62 @@ interface Client {
   lastSeen: string;
   platform: "android" | "ios" | "windows" | "linux" | "unknown";
 }
+
+// Helper function to get app icon based on app name
+const getAppIcon = (appName: string, appCommand: string) => {
+  const name = appName.toLowerCase();
+  const command = appCommand.toLowerCase();
+
+  // Browser icons
+  if (name.includes('chrome') || command.includes('chrome')) {
+    return <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10" fill="#4285F4" /><circle cx="12" cy="12" r="5" fill="white" /><circle cx="12" cy="12" r="3" fill="#4285F4" /><path d="M12 2a10 10 0 0 0-8.66 5h8.66z" fill="#EA4335" /><path d="M12 17l-7.48 4.33A10 10 0 0 0 12 22z" fill="#34A853" /><path d="M12 17l7.48 4.33A10 10 0 0 0 20.66 7z" fill="#FBBC05" /></svg>;
+  }
+  if (name.includes('firefox')) {
+    return <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z" fill="#FF7139" /></svg>;
+  }
+  if (name.includes('edge')) {
+    return <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M21.86 12.5a9.87 9.87 0 0 1-18.8 4.4 10 10 0 0 0 16-8.4 10 10 0 0 0-18.9-4 9.87 9.87 0 0 1 18.2 3.5l3.5.5z" fill="#0078D7" /></svg>;
+  }
+
+  // Adobe apps
+  if (name.includes('photoshop') || command.includes('photoshop')) {
+    return <svg width="14" height="14" viewBox="0 0 24 24"><rect width="24" height="24" rx="4" fill="#001E36" /><text x="50%" y="50%" dominantBaseline="middle" textAnchor="middle" fill="#31A8FF" fontSize="14" fontWeight="bold">Ps</text></svg>;
+  }
+  if (name.includes('illustrator')) {
+    return <svg width="14" height="14" viewBox="0 0 24 24"><rect width="24" height="24" rx="4" fill="#330000" /><text x="50%" y="50%" dominantBaseline="middle" textAnchor="middle" fill="#FF9A00" fontSize="14" fontWeight="bold">Ai</text></svg>;
+  }
+
+  // Code editors
+  if (name.includes('vscode') || name.includes('code')) {
+    return <svg width="14" height="14" viewBox="0 0 24 24" fill="#007ACC"><path d="M17.5 0l-10 10L2 6.5 0 8.5l7.5 3.5L0 15.5 2 17.5l5.5-3.5 10 10L24 21V3L17.5 0z" /></svg>;
+  }
+  if (name.includes('sublime')) {
+    return <svg width="14" height="14" viewBox="0 0 24 24"><rect width="24" height="24" fill="#FF9800" /></svg>;
+  }
+
+  // Image viewers
+  if (name.includes('paint') || command.includes('mspaint')) {
+    return <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2L2 7l10 5 10-5-10-5z" /><path d="M2 17l10 5 10-5" /><path d="M2 12l10 5 10-5" /></svg>;
+  }
+
+  // Snipping Tool
+  if (name.includes('snip') || command.includes('snip')) {
+    return <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M9 9l6 6m0-6l-6 6" /></svg>;
+  }
+
+  // Windows / System default
+  if (name.includes('windows') || name.includes('system') || command.includes('explorer')) {
+    return <FolderOpen size={14} />;
+  }
+
+  // Video players
+  if (name.includes('vlc')) {
+    return <svg width="14" height="14" viewBox="0 0 24 24" fill="#FF8800"><path d="M12 2l-8 8v8l8 4 8-4V10l-8-8z" /></svg>;
+  }
+
+  // Default icon
+  return <ExternalLink size={14} />;
+};
 
 const TransactionActions = ({ transaction, isDarkMode }: { transaction: any, isDarkMode: boolean }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -98,6 +155,15 @@ const TransactionActions = ({ transaction, isDarkMode }: { transaction: any, isD
     }
   };
 
+  const handleShowInFolder = async () => {
+    try {
+      await ShowInFolder(transaction.filename || "");
+    } catch (err) {
+      console.error(err);
+      alert("Failed to show in folder");
+    }
+  };
+
   return (
     <div className="relative" ref={dropdownRef}>
       <div className="flex items-center gap-2">
@@ -105,6 +171,15 @@ const TransactionActions = ({ transaction, isDarkMode }: { transaction: any, isD
           {new Date(transaction.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
           <Check size={12} className="ml-1 inline" />
         </div>
+
+        <button
+          onClick={handleShowInFolder}
+          className={`p-1.5 rounded-md transition-colors ${isDarkMode ? "bg-slate-700/50 hover:bg-slate-700 text-slate-300" : "bg-gray-100 hover:bg-gray-200 text-gray-600"
+            }`}
+          title="Show in Folder"
+        >
+          <FolderOpen size={12} />
+        </button>
 
         <button
           onClick={handleOpen}
@@ -135,7 +210,13 @@ const TransactionActions = ({ transaction, isDarkMode }: { transaction: any, isD
                   className={`w-full text-left px-3 py-2 text-xs flex items-center gap-2 transition-colors ${isDarkMode ? "hover:bg-slate-700" : "hover:bg-gray-50"
                     }`}
                 >
-                  {app.command === 'explorer' ? <FolderOpen size={12} /> : <ExternalLink size={12} />}
+                  <div className="w-4 h-4 flex items-center justify-center shrink-0">
+                    {app.icon ? (
+                      <img src={app.icon} alt="" className="w-full h-full object-contain" />
+                    ) : (
+                      getAppIcon(app.name, app.command)
+                    )}
+                  </div>
                   <span className="truncate">{app.name}</span>
                 </button>
               ))}
@@ -186,6 +267,18 @@ export const DesktopView = () => {
     const interval = setInterval(fetchClients, 3000);
     return () => clearInterval(interval);
   }, [serverInfo?.url]);
+
+  // Auto-hide QR panel on mobile when a client connects
+  useEffect(() => {
+    // Only apply this logic on small screens (max-md)
+    if (clients.length > 0 && showQRPanel) {
+      // Check if screen is mobile size
+      const isMobile = window.innerWidth < 768; // md breakpoint is 768px
+      if (isMobile) {
+        setShowQRPanel(false);
+      }
+    }
+  }, [clients.length]);
 
   const handleRestartServer = async () => {
     try {
@@ -333,10 +426,10 @@ export const DesktopView = () => {
               {isDarkMode ? <Sun size={18} /> : <Moon size={18} />}
             </button>
 
-            {/* QR Toggle - Controls visibility on all screens now */}
+            {/* QR Toggle - Only visible on mobile/small screens (max-md) */}
             <button
               onClick={() => setShowQRPanel(!showQRPanel)}
-              className={`p-2 rounded-lg transition-colors ${isDarkMode
+              className={`md:hidden p-2 rounded-lg transition-colors ${isDarkMode
                 ? "hover:bg-slate-800 text-slate-400"
                 : "hover:bg-gray-200 text-gray-600"
                 } ${showQRPanel ? (isDarkMode ? "bg-slate-800" : "bg-gray-200") : ""
@@ -623,10 +716,6 @@ export const DesktopView = () => {
               <span>Select Files</span>
             </button>
           </div>
-
-          <p className={`text-[11px] text-center mt-2 ${theme.subText}`}>
-            Pressing select will open system dialog
-          </p>
         </div>
       </div>
 
@@ -635,13 +724,15 @@ export const DesktopView = () => {
          On Desktop: Static positioning sits side-by-side.
       */}
       {
-        showQRPanel && (
+        /* QR Panel: Always visible on md+, toggleable on mobile */
+        (showQRPanel || (typeof window !== 'undefined' && window.innerWidth >= 768)) && (
           <div
             className={`
             absolute top-[60px] bottom-0 right-0 w-full z-40 
             md:static md:w-[350px] md:border-l md:z-30
             flex flex-col shadow-xl transition-all duration-300 
             ${theme.panelBg}
+            ${!showQRPanel ? 'max-md:hidden' : ''}
         `}
           >
             <div className="flex-1 flex flex-col items-center justify-center p-8 animate-in slide-in-from-right duration-300">

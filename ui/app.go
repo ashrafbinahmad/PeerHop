@@ -236,3 +236,16 @@ func (a *App) OpenSourceFile(filePath string) error {
 	}
 	return utils.OpenFileDefault(filePath)
 }
+
+// ShowInFolder opens the file manager and selects the file
+func (a *App) ShowInFolder(filePath string) error {
+	// Resolve path
+	if !filepath.IsAbs(filePath) {
+		home, _ := os.UserHomeDir()
+		dlPath := filepath.Join(home, "Downloads", filePath)
+		if _, err := os.Stat(dlPath); err == nil {
+			filePath = dlPath
+		}
+	}
+	return utils.ShowInFolder(filePath)
+}

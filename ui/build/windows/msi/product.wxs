@@ -3,7 +3,7 @@
      xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
   
   <Package Name="Transend"
-           Version="2.11.4"
+           Version="2.12.0"
            Manufacturer="Muhammed Asraf"
            UpgradeCode="12345678-1234-1234-1234-123456789ABC"
            Language="1033"

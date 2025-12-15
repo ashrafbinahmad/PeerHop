@@ -17,4 +17,6 @@ export function RestartServer():Promise<main.ServerInfo>;
 
 export function SelectFiles():Promise<Array<string>>;
 
+export function ShowInFolder(arg1:string):Promise<void>;
+
 export function StartTransfer(arg1:Array<string>):Promise<main.ServerInfo>;

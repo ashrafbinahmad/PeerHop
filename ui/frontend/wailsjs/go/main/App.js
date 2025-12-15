@@ -30,6 +30,10 @@ export function SelectFiles() {
   return window['go']['main']['App']['SelectFiles']();
 }
 
+export function ShowInFolder(arg1) {
+  return window['go']['main']['App']['ShowInFolder'](arg1);
+}
+
 export function StartTransfer(arg1) {
   return window['go']['main']['App']['StartTransfer'](arg1);
 }
