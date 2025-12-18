@@ -1,6 +1,6 @@
 {
   "name": "peerhop-root",
-  "version": "2.1.0",
+  "version": "2.1.1",
   "description": "Root package for PeerHop build scripts",
   "scripts": {
     "build:win": "cd ui && wails build -platform windows/amd64 -o ../../../builds/peerhop_win.exe",
