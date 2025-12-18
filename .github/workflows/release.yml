@@ -45,7 +45,7 @@ jobs:
       - name: Create Release in peerhop repo
         uses: softprops/action-gh-release@v2
         with:
-          repository: ashrafbinahmad/peerhop
+          repository: ashrafbinahmad/PeerHop-releases
           token: ${{ secrets.RELEASE_PAT }}
           body: |
             ## Download Binaries
