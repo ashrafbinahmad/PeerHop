@@ -3,7 +3,7 @@ name: Release
 on:
   push:
     tags:
-      - 'v*'
+      - "v*"
 
 permissions:
   contents: write
@@ -21,14 +21,14 @@ jobs:
         shell: pwsh
         run: |
           $possibleFiles = @(
-            "builds/transend_win.exe",
-            "builds/transend_setup.exe",
-            "builds/transend_setup.msi",
-            "builds/transend_linux",
-            "builds/transend_cli_win.exe",
-            "builds/transend_cli_linux"
+            "builds/peerhop_win.exe",
+            "builds/peerhop_setup.exe",
+            "builds/peerhop_setup.msi",
+            "builds/peerhop_linux",
+            "builds/peerhop_cli_win.exe",
+            "builds/peerhop_cli_linux"
           )
-          
+
           Write-Host "Available build files:"
           $foundCount = 0
           foreach ($file in $possibleFiles) {
@@ -39,31 +39,32 @@ jobs:
               Write-Host "  - $file (not found)" -ForegroundColor Yellow
             }
           }
-          
+
           Write-Host "`nFound $foundCount file(s) to upload"
 
-      - name: Create Release in transender-releases repo
+      - name: Create Release in peerhop repo
         uses: softprops/action-gh-release@v2
         with:
-          repository: ashrafbinahmad/transender-releases
+          repository: ashrafbinahmad/peerhop
           token: ${{ secrets.RELEASE_PAT }}
           body: |
             ## Download Binaries
-            
+
             Please download the pre-built binaries below:
-            - **transend_win.exe** - Windows GUI application
-            - **transend_setup.exe** - Windows installer
-            - **transend_cli_win.exe** - Windows CLI tool
-            - **transend_cli_linux** - Linux CLI tool
-            - **transend_linux** - Linux GUI application
-            
+            - **peerhop_win.exe** - Windows GUI application
+            - **peerhop_setup.exe** - Windows installer
+            - **peerhop_cli_win.exe** - Windows CLI tool
+            - **peerhop_cli_linux** - Linux CLI tool
+            - **peerhop_linux** - Linux GUI application
+
             > **Note:** Ignore the "Source code" archives - they are automatically added by GitHub and are not needed.
           files: |
-            builds/transend_win.exe
-            builds/transend_setup.msi
-            builds/transend_cli_win.exe
-            builds/transend_cli_linux
-            builds/transend_linux
+            builds/peerhop_win.exe
+            builds/peerhop_setup.exe
+            builds/peerhop_setup.msi
+            builds/peerhop_cli_win.exe
+            builds/peerhop_cli_linux
+            builds/peerhop_linux
           draft: false
           prerelease: false
           generate_release_notes: false
