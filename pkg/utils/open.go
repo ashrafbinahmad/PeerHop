@@ -6,6 +6,12 @@ import (
 	"runtime"
 )
 
+type AppInfo struct {
+	Name string `json:"name"`
+	Path string `json:"command"`
+	Icon string `json:"icon,omitempty"`
+}
+
 // OpenFileDefault opens the file using the system's default application
 func OpenFileDefault(path string) error {
 	var cmd *exec.Cmd

@@ -1,3 +1,5 @@
+//go:build windows
+
 package utils
 
 import (
@@ -8,12 +10,6 @@ import (
 
 	"golang.org/x/sys/windows/registry"
 )
-
-type AppInfo struct {
-	Name string `json:"name"`
-	Path string `json:"command"`
-	Icon string `json:"icon,omitempty"`
-}
 
 // GetOpenableApps returns a list of apps that can open the file based on its extension
 func GetOpenableApps(path string) ([]AppInfo, error) {
