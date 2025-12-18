@@ -13,9 +13,9 @@ if (arch !== 'x64') {
 
 let binName = '';
 if (platform === 'win32') {
-    binName = 'transend-win.exe';
+    binName = 'peerhop-win.exe';
 } else if (platform === 'linux') {
-    binName = 'transend-linux';
+    binName = 'peerhop-linux';
 } else {
     console.error(`Platform '${platform}' is not supported. Supported: linux, win32`);
     process.exit(1);

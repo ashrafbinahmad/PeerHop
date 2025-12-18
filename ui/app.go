@@ -2,18 +2,21 @@ package main
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 
-	"transend/pkg/network"
-	"transend/pkg/server"
-	"transend/pkg/utils"
+	"peerhop/pkg/network"
+	"peerhop/pkg/server"
+	"peerhop/pkg/utils"
 )
 
 // App struct
@@ -294,4 +297,59 @@ func (a *App) ShowInFolder(filePath string) error {
 		}
 	}
 	return utils.ShowInFolder(filePath)
+}
+
+// SaveTempFile saves base64 data to a temporary file and returns the path
+func (a *App) SaveTempFile(filename string, dataB64 string) (string, error) {
+	// Decode base64
+	data, err := base64.StdEncoding.DecodeString(dataB64)
+	if err != nil {
+		return "", fmt.Errorf("failed to decode base64: %w", err)
+	}
+
+	// Create temp file
+	tempDir := os.TempDir()
+	// Add timestamp to ensure uniqueness
+	name := filepath.Base(filename)
+	ext := filepath.Ext(name)
+	base := name[:len(name)-len(ext)]
+	timestamp := time.Now().Format("20060102150405")
+	finalName := fmt.Sprintf("%s_%s%s", base, timestamp, ext)
+
+	filePath := filepath.Join(tempDir, finalName)
+
+	if err := os.WriteFile(filePath, data, 0644); err != nil {
+		return "", fmt.Errorf("failed to write temp file: %w", err)
+	}
+
+	return filePath, nil
+}
+
+// GetClipboardFiles returns a list of file paths currently in the clipboard (Windows only)
+func (a *App) GetClipboardFiles() ([]string, error) {
+	// Use PowerShell to get the file drop list
+	cmd := exec.Command("powershell", "-NoProfile", "-Command", "Get-Clipboard -Format FileDropList | Select-Object -ExpandProperty FullName")
+
+	// Create SysProcAttr to hide window if necessary.
+	// For standard `exec.Command` in a GUI app, it usually doesn't popup a console unless it's a console build.
+	// But PowerShell might flicker.
+	// We will stick to basic exec for now as `syscall` is not imported yet (though I could add it).
+	// To keep it simple and avoid adding more imports if possible.
+
+	output, err := cmd.Output()
+	if err != nil {
+		// It might error if clipboard is empty or not files
+		return []string{}, nil
+	}
+
+	lines := strings.Split(string(output), "\r\n")
+	var paths []string
+	for _, line := range lines {
+		val := strings.TrimSpace(line)
+		if val != "" {
+			paths = append(paths, val)
+		}
+	}
+
+	return paths, nil
 }

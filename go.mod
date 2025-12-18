@@ -1,4 +1,4 @@
-module transend
+module peerhop
 
 go 1.25.1
 

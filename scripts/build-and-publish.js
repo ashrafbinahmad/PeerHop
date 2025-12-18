@@ -51,7 +51,7 @@ try {
     log(`  Version ${version} has been:`, 'white');
     log('  - Built for all platforms', 'white');
     log('  - Tagged in git', 'white');
-    log('  - Published to npm', 'white');
+    log('  - Published to npm (if confirmed)', 'white');
     log('  - GitHub release will be created automatically', 'white');
 
 } catch (err) {

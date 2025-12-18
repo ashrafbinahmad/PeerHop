@@ -10,6 +10,7 @@ export interface Transaction {
   downloadLink?: string;
   uploadLink?: string;
   savedInLocation?: string;
+  serverFilePath?: string; // absolute path on server for files sent from desktop
   filename?: string;
   fileSize?: number;
   textContent?: string;
@@ -28,6 +29,7 @@ interface UseTransactionsResult {
   loading: boolean;
   error: string | null;
   isDarkMode: boolean;
+  isConnected: boolean;
   sendText: (
     text: string,
     senderId: string
@@ -44,8 +46,10 @@ export const useTransactions = (
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isDarkMode, setIsDarkMode] = useState(true); // Default Dark
+  const [isConnected, setIsConnected] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const pingIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   if (isSample) {
     return {
@@ -76,6 +80,7 @@ export const useTransactions = (
       loading: false,
       error: null,
       isDarkMode: true,
+      isConnected: true,
       sendText: async () => {
         /* no-op */
       },
@@ -170,14 +175,37 @@ export const useTransactions = (
       ws.onopen = () => {
         console.log("[useTransactions] WebSocket connected");
         setError(null);
+        setIsConnected(true);
+        
+        // Start ping interval to detect stale connections
+        if (pingIntervalRef.current) {
+          clearInterval(pingIntervalRef.current);
+        }
+        pingIntervalRef.current = setInterval(() => {
+          if (ws.readyState === WebSocket.OPEN) {
+            try {
+              ws.send(JSON.stringify({ type: "ping" }));
+            } catch (e) {
+              console.error("[useTransactions] Failed to send ping:", e);
+              setIsConnected(false);
+            }
+          }
+        }, 5000); // Ping every 5 seconds
       };
 
       ws.onmessage = (event) => {
         try {
           const message = JSON.parse(event.data);
           // console.log("[useTransactions] WebSocket message:", message);
+          
+          // Any message received means we're connected
+          setIsConnected(true);
 
           switch (message.type) {
+            case "pong":
+              // Server responded to ping - connection is alive
+              break;
+              
             case "transactions_init":
               // Initial data
               setTransactions(message.data.transactions || []);
@@ -223,11 +251,19 @@ export const useTransactions = (
       ws.onerror = (error) => {
         console.error("[useTransactions] WebSocket error:", error);
         setError("WebSocket connection error");
+        setIsConnected(false);
       };
 
       ws.onclose = () => {
         console.log("[useTransactions] WebSocket closed, reconnecting in 3s...");
         wsRef.current = null;
+        setIsConnected(false);
+        
+        // Clear ping interval
+        if (pingIntervalRef.current) {
+          clearInterval(pingIntervalRef.current);
+          pingIntervalRef.current = null;
+        }
 
         // Attempt to reconnect after 3 seconds
         reconnectTimeoutRef.current = setTimeout(() => {
@@ -247,6 +283,9 @@ export const useTransactions = (
       if (reconnectTimeoutRef.current) {
         clearTimeout(reconnectTimeoutRef.current);
       }
+      if (pingIntervalRef.current) {
+        clearInterval(pingIntervalRef.current);
+      }
       if (wsRef.current) {
         wsRef.current.close();
         wsRef.current = null;
@@ -259,6 +298,7 @@ export const useTransactions = (
     loading,
     error,
     isDarkMode,
+    isConnected,
     sendText,
     refreshTransactions: fetchTransactions,
   };

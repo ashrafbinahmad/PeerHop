@@ -299,12 +299,25 @@ func (hub *WebSocketHub) HandleWebSocket(w http.ResponseWriter, r *http.Request)
 		}()
 
 		for {
-			_, _, err := safeConn.ReadMessage()
+			_, msg, err := safeConn.ReadMessage()
 			if err != nil {
 				if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
 					log.Printf("[WebSocket] Error: %v", err)
 				}
 				break
+			}
+
+			// Handle incoming messages
+			var incomingMsg struct {
+				Type string `json:"type"`
+			}
+			if json.Unmarshal(msg, &incomingMsg) == nil {
+				switch incomingMsg.Type {
+				case "ping":
+					// Respond with pong
+					pongMsg, _ := json.Marshal(WSMessage{Type: "pong", Data: nil})
+					safeConn.WriteMessage(websocket.TextMessage, pongMsg)
+				}
 			}
 		}
 	}()

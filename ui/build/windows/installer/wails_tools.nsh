@@ -5,13 +5,13 @@
 !include "FileFunc.nsh"
 
 !ifndef INFO_PROJECTNAME
-    !define INFO_PROJECTNAME "transend"
+    !define INFO_PROJECTNAME "peerhop"
 !endif
 !ifndef INFO_COMPANYNAME
-    !define INFO_COMPANYNAME "transend"
+    !define INFO_COMPANYNAME "peerhop"
 !endif
 !ifndef INFO_PRODUCTNAME
-    !define INFO_PRODUCTNAME "transend"
+    !define INFO_PRODUCTNAME "peerhop"
 !endif
 !ifndef INFO_PRODUCTVERSION
     !define INFO_PRODUCTVERSION "1.0.0"

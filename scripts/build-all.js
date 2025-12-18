@@ -58,7 +58,7 @@ if (!/^\d+\.\d+\.\d+$/.test(version)) {
     process.exit(1);
 }
 
-log(`\nBuilding Transend v${version}`, 'cyan');
+log(`\nBuilding PeerHop v${version}`, 'cyan');
 log('================================\n', 'cyan');
 log('Build Process Overview:', 'cyan');
 log('  1. Clean old builds', 'white');
@@ -227,7 +227,7 @@ const uiDir = path.join(__dirname, '..', 'ui');
 
 log('  Building Windows GUI NSIS installer...', 'white');
 process.chdir(uiDir);
-if (!exec(`wails build -platform windows/amd64 -nsis ${buildFlags} -o ../../../builds/transend_setup.exe`, 'Windows GUI NSIS build')) {
+if (!exec(`wails build -platform windows/amd64 -nsis ${buildFlags} -o ../../../builds/peerhop_setup.exe`, 'Windows GUI NSIS build')) {
     process.exit(1);
 }
 process.chdir(path.join(__dirname, '..'));
@@ -239,7 +239,7 @@ if (!exec(`wails build -platform windows/amd64 ${buildFlags}`, 'Windows GUI buil
     process.exit(1);
 }
 process.chdir(path.join(uiDir, 'build', 'windows', 'msi'));
-if (!exec('wix build product.wxs -o ../../../../builds/transend_setup.msi', 'WiX MSI build')) {
+if (!exec('wix build product.wxs -o ../../../../builds/peerhop_setup.msi', 'WiX MSI build')) {
     process.exit(1);
 }
 process.chdir(path.join(__dirname, '..'));
@@ -255,7 +255,7 @@ process.chdir(path.join(__dirname, '..'));
 
 // Copy the built binary to builds directory
 const sourceBinary = path.join(uiDir, 'build', 'bin', 'ui.exe');
-const targetBinary = path.join(__dirname, '..', 'builds', 'transend_win.exe');
+const targetBinary = path.join(__dirname, '..', 'builds', 'peerhop_win.exe');
 
 if (!fs.existsSync(sourceBinary)) {
     error(`Built binary not found at: ${sourceBinary}`);
@@ -317,15 +317,15 @@ try {
 // Step 5: Verify all builds
 step(6, 6, 'Verifying builds...');
 const requiredFiles = [
-    'builds/transend_win.exe',
-    'builds/transend_setup.exe',
-    'builds/transend_setup.msi',
-    'builds/transend_cli_win.exe',
-    'builds/transend_cli_linux'
+    'builds/peerhop_win.exe',
+    'builds/peerhop_setup.exe',
+    'builds/peerhop_setup.msi',
+    'builds/peerhop_cli_win.exe',
+    'builds/peerhop_cli_linux'
 ];
 
 const optionalFiles = [
-    'builds/transend_linux'
+    'builds/peerhop_linux'
 ];
 
 let missingFiles = [];

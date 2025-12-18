@@ -1,12 +1,12 @@
-module transend-gui
+module peerhop-gui
 
-replace transend => ../
+replace peerhop => ../
 
 go 1.25.1
 
 require (
 	github.com/wailsapp/wails/v2 v2.11.0
-	transend v0.0.0-00010101000000-000000000000
+	peerhop v0.0.0-00010101000000-000000000000
 )
 
 require (

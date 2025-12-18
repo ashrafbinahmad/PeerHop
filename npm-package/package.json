@@ -1,9 +1,9 @@
 {
-  "name": "transend",
+  "name": "peerhop",
   "version": "2.0.0",
   "description": "Fast local network file transfer CLI",
   "bin": {
-    "transend": "index.js"
+    "peerhop": "index.js"
   },
   "files": [
     "bin/",

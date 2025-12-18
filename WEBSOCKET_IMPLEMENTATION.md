@@ -1,4 +1,4 @@
-# WebSocket Implementation for Transender
+# WebSocket Implementation for PeerHop
 
 ## Summary
 
@@ -9,6 +9,7 @@ Successfully converted all polling mechanisms to WebSocket-based real-time updat
 ### Backend (Go)
 
 1. **Created WebSocket Hub** (`pkg/server/websocket.go`):
+
    - Implemented WebSocketHub to manage all active WebSocket connections
    - Added smart percentage broadcasting: only sends updates when percentage increases by whole numbers
    - Implemented connection lifecycle management (add, remove, reconnect)
@@ -17,6 +18,7 @@ Successfully converted all polling mechanisms to WebSocket-based real-time updat
    - Implements ping/pong for connection keep-alive
 
 2. **Updated UnifiedHandler** (`pkg/server/unified_handler.go`):
+
    - Added WSHub field to UnifiedHandler struct
    - Created `/api/ws` WebSocket endpoint
    - Modified NewUnifiedHandler to initialize WebSocket hub and start monitoring
@@ -28,8 +30,9 @@ Successfully converted all polling mechanisms to WebSocket-based real-time updat
 ### Frontend (TypeScript/React)
 
 1. **Created WebSocket Hooks**:
-   
+
    **`hooks/useTransactions.ts`**:
+
    - Converted from polling to WebSocket-based real-time updates
    - Implements automatic reconnection with 3-second delay on disconnect
    - Smart transaction state management:
@@ -40,14 +43,16 @@ Successfully converted all polling mechanisms to WebSocket-based real-time updat
    - Exports Transaction interface for type safety
 
    **`hooks/useDevices.ts`**:
+
    - New WebSocket hook for real-time device/client updates
    - Implements automatic reconnection
    - Handles `devices_init` and `devices_update` WebSocket messages
    - Exports Client interface for type safety
 
 2. **Updated Views**:
-   
+
    **`views/DesktopView.tsx`**:
+
    - Removed polling useEffect for clients
    - Integrated useDevices WebSocket hook
    - Imported Client type from useDevices
@@ -71,6 +76,7 @@ Successfully converted all polling mechanisms to WebSocket-based real-time updat
 ### Percentage Update Optimization
 
 The backend only broadcasts percentage updates when:
+
 1. First time sending for a transaction
 2. Percentage increased to next whole number
 3. Status changed to completed

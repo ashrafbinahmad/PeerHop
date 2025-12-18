@@ -5,6 +5,8 @@ import {main} from '../models';
 
 export function ClearTransfer():Promise<void>;
 
+export function GetClipboardFiles():Promise<Array<string>>;
+
 export function GetOpenableApps(arg1:string):Promise<Array<utils.AppInfo>>;
 
 export function GetServerInfo():Promise<main.ServerInfo>;
@@ -14,6 +16,8 @@ export function OpenFileWith(arg1:string,arg2:string):Promise<void>;
 export function OpenSourceFile(arg1:string):Promise<void>;
 
 export function RestartServer():Promise<main.ServerInfo>;
+
+export function SaveTempFile(arg1:string,arg2:string):Promise<string>;
 
 export function SelectFiles():Promise<Array<string>>;
 
