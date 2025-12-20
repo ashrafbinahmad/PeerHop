@@ -146,6 +146,11 @@ func (ts *TransactionStore) UpdateProgress(id int, bytesTransferred int64, total
 	defer ts.mu.Unlock()
 
 	if txn, exists := ts.transactions[id]; exists {
+		// Prevent overwriting cancelled status
+		if txn.Status == "cancelled" || ts.cancelled[id] {
+			return
+		}
+
 		txn.BytesTransferred = bytesTransferred
 		if totalBytes > 0 {
 			txn.TransactionPercent = (float64(bytesTransferred) / float64(totalBytes)) * 100
@@ -165,6 +170,16 @@ func (ts *TransactionStore) UpdateClientProgress(id int, clientID string, bytesT
 	defer ts.mu.Unlock()
 
 	if txn, exists := ts.transactions[id]; exists {
+		// Check for cancellation
+		if txn.ClientStatus != nil && txn.ClientStatus[clientID] == "cancelled" {
+			return
+		}
+		// Also check valid cancellation map
+		cancelKey := fmt.Sprintf("%d_%s", id, clientID)
+		if ts.clientCancelled[cancelKey] {
+			return
+		}
+
 		// Initialize maps if needed
 		if txn.ClientProgress == nil {
 			txn.ClientProgress = make(map[string]float64)
@@ -337,7 +352,7 @@ func (ts *TransactionStore) CancelClientDownload(id int, clientID string) bool {
 			txn.ClientProgress[clientID] = 0
 		}
 		if txn.ClientStatus != nil {
-			txn.ClientStatus[clientID] = "pending"
+			txn.ClientStatus[clientID] = "cancelled"
 		}
 		if txn.ClientBytes != nil {
 			txn.ClientBytes[clientID] = 0
@@ -378,5 +393,14 @@ func (ts *TransactionStore) IsClientCancelled(id int, clientID string) bool {
 func (ts *TransactionStore) IsCancelled(id int) bool {
 	ts.mu.RLock()
 	defer ts.mu.RUnlock()
-	return ts.cancelled[id]
+
+	if ts.cancelled[id] {
+		return true
+	}
+
+	if txn, exists := ts.transactions[id]; exists {
+		return txn.Status == "cancelled"
+	}
+
+	return false
 }

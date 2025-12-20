@@ -13,7 +13,8 @@
     "lucide-react": "^0.561.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "react-qr-code": "^2.0.18"
+    "react-qr-code": "^2.0.18",
+    "tailwindcss-safe-area": "^0.5.1"
   },
   "devDependencies": {
     "@types/node": "^25.0.2",

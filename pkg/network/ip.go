@@ -1,21 +1,35 @@
 package network
 
 import (
-	"log"
 	"net"
 )
 
 // GetLocalIP returns the non-loopback local IP of the host
-func GetLocalIP() string {
+func GetLocalIP() (string, error) {
+	// Try dialing external DNS to get preferred outbound IP
 	conn, err := net.Dial("udp", "8.8.8.8:80")
-	if err != nil {
-		log.Fatal(err)
+	if err == nil {
+		defer conn.Close()
+		localAddr := conn.LocalAddr().(*net.UDPAddr)
+		return localAddr.IP.String(), nil
 	}
-	defer conn.Close()
 
-	localAddr := conn.LocalAddr().(*net.UDPAddr)
+	// Fallback: iterate over interfaces
+	addrs, err := net.InterfaceAddrs()
+	if err != nil {
+		return "", err
+	}
 
-	return localAddr.IP.String()
+	for _, addr := range addrs {
+		if ipnet, ok := addr.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
+			if ipnet.IP.To4() != nil {
+				return ipnet.IP.String(), nil
+			}
+		}
+	}
+
+	// Double fallback: return localhost if no other IP found (e.g. offline)
+	return "127.0.0.1", nil
 }
 
 // GetFreePort asks the kernel for a free open port

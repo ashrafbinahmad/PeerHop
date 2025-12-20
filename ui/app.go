@@ -41,12 +41,20 @@ func (a *App) startup(ctx context.Context) {
 	if err := a.startPersistentServer(); err != nil {
 		fmt.Printf("Failed to start server: %v\n", err)
 	}
+
+	// Start monitoring network changes
+	go a.monitorNetwork()
 }
 
 // startPersistentServer starts a server that runs throughout the app lifetime
 func (a *App) startPersistentServer() error {
 	// Get network info
-	ip := network.GetLocalIP()
+	ip, err := network.GetLocalIP()
+	if err != nil {
+		fmt.Printf("Failed to get local IP: %v - falling back to loopback\n", err)
+		ip = "127.0.0.1"
+	}
+
 	port, err := network.GetFreePort()
 	if err != nil {
 		return err
@@ -72,14 +80,15 @@ func (a *App) startPersistentServer() error {
 		Handler: mux,
 	}
 
-	// Store server info
+	// Store server info (start with empty SSID, will be populated asynchronously)
 	a.serverInfo = &ServerInfo{
-		URL: fmt.Sprintf("http://%s:%d", ip, port),
+		URL:  fmt.Sprintf("http://%s:%d", ip, port),
+		SSID: "",
 	}
 
 	a.httpServer = httpServer
 
-	// Run in goroutine
+	// Run server in goroutine
 	go func() {
 		if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			fmt.Printf("Server error: %v\n", err)
@@ -87,6 +96,16 @@ func (a *App) startPersistentServer() error {
 	}()
 
 	fmt.Printf("Server started at %s\n", a.serverInfo.URL)
+
+	// Asynchronously fetch WiFi name to avoid blocking startup
+	go func() {
+		ssid := network.GetWiFiName()
+		if a.serverInfo != nil {
+			a.serverInfo.SSID = ssid
+			fmt.Printf("WiFi SSID detected: %s\n", ssid)
+		}
+	}()
+
 	return nil
 }
 
@@ -100,6 +119,11 @@ func (a *App) GetServerInfo() (*ServerInfo, error) {
 
 // RestartServer restarts the HTTP server
 func (a *App) RestartServer() (*ServerInfo, error) {
+	// Shutdown existing handlers
+	if a.unifiedHandler != nil {
+		a.unifiedHandler.Shutdown()
+	}
+
 	if a.httpServer != nil {
 		// Shutdown with a short timeout
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
@@ -119,6 +143,66 @@ func (a *App) RestartServer() (*ServerInfo, error) {
 	return a.serverInfo, nil
 }
 
+// monitorNetwork checks for network changes every few seconds
+func (a *App) monitorNetwork() {
+	ticker := time.NewTicker(2 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-a.ctx.Done():
+			return
+		case <-ticker.C:
+			// Copy serverInfo to avoid race conditions
+			if a.serverInfo == nil {
+				continue
+			}
+
+			// Make local copies to avoid nil pointer dereference during restart
+			savedURL := a.serverInfo.URL
+			savedSSID := a.serverInfo.SSID
+
+			// Early check if we have valid data
+			if savedURL == "" {
+				continue
+			}
+
+			currentIP, err := network.GetLocalIP()
+			if err != nil {
+				// If we can't get IP, assume network down or unchanged?
+				// Just checking "127.0.0.1" vs saved might trigger unnecessary restarts.
+				// Let's use loopback as currentIP if failed
+				currentIP = "127.0.0.1"
+			}
+			currentSSID := network.GetWiFiName()
+
+			// Check for changes
+			// We extract the IP from the URL (http://192.168.1.10:1234 -> 192.168.1.10)
+			savedIP := ""
+			if strings.HasPrefix(savedURL, "http://") {
+				parts := strings.Split(strings.TrimPrefix(savedURL, "http://"), ":")
+				if len(parts) > 0 {
+					savedIP = parts[0]
+				}
+			}
+
+			if (currentIP != savedIP) || (currentSSID != savedSSID) {
+				fmt.Printf("[Network] Change detected! IP: %s -> %s, SSID: %s -> %s\n", savedIP, currentIP, savedSSID, currentSSID)
+
+				// Restart server
+				newInfo, err := a.RestartServer()
+				if err != nil {
+					fmt.Printf("[Network] Failed to restart server: %v\n", err)
+					continue
+				}
+
+				// Emit event to frontend
+				runtime.EventsEmit(a.ctx, "network-changed", newInfo)
+			}
+		}
+	}
+}
+
 // SelectFiles opens a dialog to select multiple files
 func (a *App) SelectFiles() ([]string, error) {
 	selection, err := runtime.OpenMultipleFilesDialog(a.ctx, runtime.OpenDialogOptions{
@@ -131,6 +215,7 @@ type ServerInfo struct {
 	URL      string `json:"url"`
 	Filename string `json:"filename"`
 	Size     int64  `json:"size"`
+	SSID     string `json:"ssid"`
 }
 
 // StartTransfer prepares files and makes them available for download
@@ -328,13 +413,11 @@ func (a *App) SaveTempFile(filename string, dataB64 string) (string, error) {
 // GetClipboardFiles returns a list of file paths currently in the clipboard (Windows only)
 func (a *App) GetClipboardFiles() ([]string, error) {
 	// Use PowerShell to get the file drop list
-	cmd := exec.Command("powershell", "-NoProfile", "-Command", "Get-Clipboard -Format FileDropList | Select-Object -ExpandProperty FullName")
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "powershell", "-NoProfile", "-NonInteractive", "-Command", "Get-Clipboard -Format FileDropList | Select-Object -ExpandProperty FullName")
 
-	// Create SysProcAttr to hide window if necessary.
-	// For standard `exec.Command` in a GUI app, it usually doesn't popup a console unless it's a console build.
-	// But PowerShell might flicker.
-	// We will stick to basic exec for now as `syscall` is not imported yet (though I could add it).
-	// To keep it simple and avoid adding more imports if possible.
+	utils.HideWindow(cmd)
 
 	output, err := cmd.Output()
 	if err != nil {

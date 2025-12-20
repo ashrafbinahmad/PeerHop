@@ -17,31 +17,6 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: List available build files
-        shell: pwsh
-        run: |
-          $possibleFiles = @(
-            "builds/peerhop_win.exe",
-            "builds/peerhop_setup.exe",
-            "builds/peerhop_setup.msi",
-            "builds/peerhop_linux",
-            "builds/peerhop_cli_win.exe",
-            "builds/peerhop_cli_linux"
-          )
-
-          Write-Host "Available build files:"
-          $foundCount = 0
-          foreach ($file in $possibleFiles) {
-            if (Test-Path $file) {
-              Write-Host "  ✓ $file"
-              $foundCount++
-            } else {
-              Write-Host "  - $file (not found)" -ForegroundColor Yellow
-            }
-          }
-
-          Write-Host "`nFound $foundCount file(s) to upload"
-
       - name: Create Release in peerhop repo
         uses: softprops/action-gh-release@v2
         with:
@@ -59,12 +34,10 @@ jobs:
 
             > **Note:** Ignore the "Source code" archives - they are automatically added by GitHub and are not needed.
           files: |
-            builds/peerhop_win.exe
-            builds/peerhop_setup.exe
-            builds/peerhop_setup.msi
-            builds/peerhop_cli_win.exe
-            builds/peerhop_cli_linux
-            builds/peerhop_linux
+            builds/*.exe
+            builds/*.msi
+            builds/*_linux
+          fail_on_unmatched_files: false
           draft: false
           prerelease: false
           generate_release_notes: false

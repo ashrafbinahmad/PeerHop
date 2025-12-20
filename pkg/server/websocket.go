@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -25,8 +26,9 @@ type WSMessage struct {
 
 // SafeConn wraps websocket.Conn to ensure thread-safe writes
 type SafeConn struct {
-	conn *websocket.Conn
-	mu   sync.Mutex
+	conn     *websocket.Conn
+	mu       sync.Mutex
+	clientIP string // Track client IP for blocking
 }
 
 // WriteMessage sends a message to the connection in a thread-safe manner
@@ -58,13 +60,19 @@ func (sc *SafeConn) SetPongHandler(h func(appData string) error) {
 
 // WebSocketHub manages all active WebSocket connections
 type WebSocketHub struct {
-	mu          sync.RWMutex
-	connections map[*SafeConn]bool
-	txStore     *TransactionStore
-	clientStore *ClientStore
+	mu                  sync.RWMutex
+	connections         map[*SafeConn]bool
+	txStore             *TransactionStore
+	clientStore         *ClientStore
+	desktopName         string // Desktop device name
+	textTransferEnabled bool   // Text transfer setting
+	themeID             string // Current theme ID
+	accentID            string // Current accent ID
 
 	// Track last sent percentage for each transaction to only send whole number changes
 	lastSentPercent map[int]int
+
+	done chan struct{} // Channel to signal shutdown
 }
 
 // NewWebSocketHub creates a new WebSocket hub
@@ -73,7 +81,11 @@ func NewWebSocketHub(txStore *TransactionStore, clientStore *ClientStore) *WebSo
 		connections:     make(map[*SafeConn]bool),
 		txStore:         txStore,
 		clientStore:     clientStore,
+		desktopName:     "PeerHop", // Default name
+		themeID:         "night",   // Default theme
+		accentID:        "blue",    // Default accent
 		lastSentPercent: make(map[int]int),
+		done:            make(chan struct{}),
 	}
 }
 
@@ -113,6 +125,14 @@ func (hub *WebSocketHub) Broadcast(msgType string, data interface{}) {
 	}
 
 	for conn := range hub.connections {
+		// Check if client is blocked - only allow devices_update messages through
+		if hub.clientStore != nil && conn.clientIP != "" && hub.clientStore.IsBlocked(conn.clientIP) {
+			// Blocked clients can only receive devices_update to see their blocked status
+			if msgType != "devices_update" && msgType != "devices_init" {
+				continue // Skip this client for other message types
+			}
+		}
+
 		err := conn.WriteMessage(websocket.TextMessage, jsonData)
 		if err != nil {
 			log.Printf("[WebSocket] Error writing to connection: %v", err)
@@ -167,6 +187,58 @@ func (hub *WebSocketHub) BroadcastDevicesUpdate() {
 	})
 }
 
+// SetDesktopName sets the desktop device name and broadcasts the update
+func (hub *WebSocketHub) SetDesktopName(name string) {
+	hub.mu.Lock()
+	hub.desktopName = name
+	hub.mu.Unlock()
+	hub.Broadcast("desktop_name_update", map[string]interface{}{
+		"name": name,
+	})
+}
+
+// GetDesktopName returns the current desktop device name
+func (hub *WebSocketHub) GetDesktopName() string {
+	hub.mu.RLock()
+	defer hub.mu.RUnlock()
+	return hub.desktopName
+}
+
+// SetTextTransferEnabled sets the text transfer setting and broadcasts the update
+func (hub *WebSocketHub) SetTextTransferEnabled(enabled bool) {
+	hub.mu.Lock()
+	hub.textTransferEnabled = enabled
+	hub.mu.Unlock()
+	hub.Broadcast("settings_update", map[string]interface{}{
+		"textTransferEnabled": enabled,
+	})
+}
+
+func (hub *WebSocketHub) GetTextTransferEnabled() bool {
+	hub.mu.RLock()
+	defer hub.mu.RUnlock()
+	return hub.textTransferEnabled
+}
+
+// SetTheme sets the theme settings and broadcasts the update
+func (hub *WebSocketHub) SetTheme(themeId, accentId string) {
+	hub.mu.Lock()
+	hub.themeID = themeId
+	hub.accentID = accentId
+	hub.mu.Unlock()
+	hub.Broadcast("theme_update", map[string]interface{}{
+		"themeId":  themeId,
+		"accentId": accentId,
+	})
+}
+
+// GetTheme returns the current theme settings
+func (hub *WebSocketHub) GetTheme() (string, string) {
+	hub.mu.RLock()
+	defer hub.mu.RUnlock()
+	return hub.themeID, hub.accentID
+}
+
 // StartMonitoring starts monitoring transactions and devices for changes
 func (hub *WebSocketHub) StartMonitoring() {
 	// Start transaction monitoring
@@ -177,39 +249,44 @@ func (hub *WebSocketHub) StartMonitoring() {
 		lastTransactionCount := 0
 		lastTransactions := make(map[int]*Transaction)
 
-		for range ticker.C {
-			if hub.txStore == nil {
-				continue
-			}
-
-			transactions := hub.txStore.GetAllTransactions()
-
-			// Check if transaction count changed
-			if len(transactions) != lastTransactionCount {
-				lastTransactionCount = len(transactions)
-			}
-
-			// Check each transaction for changes
-			for _, txn := range transactions {
-				lastTxn, exists := lastTransactions[txn.ID]
-
-				// New transaction
-				if !exists {
-					hub.BroadcastTransactionUpdate(txn)
-					// Store a copy of the transaction
-					txnCopy := *txn
-					lastTransactions[txn.ID] = &txnCopy
+		for {
+			select {
+			case <-hub.done:
+				return
+			case <-ticker.C:
+				if hub.txStore == nil {
 					continue
 				}
 
-				// Check if transaction changed
-				if txn.TransactionPercent != lastTxn.TransactionPercent ||
-					txn.Status != lastTxn.Status ||
-					txn.BytesTransferred != lastTxn.BytesTransferred {
-					hub.BroadcastTransactionUpdate(txn)
-					// Update with a copy of the transaction
-					txnCopy := *txn
-					lastTransactions[txn.ID] = &txnCopy
+				transactions := hub.txStore.GetAllTransactions()
+
+				// Check if transaction count changed
+				if len(transactions) != lastTransactionCount {
+					lastTransactionCount = len(transactions)
+				}
+
+				// Check each transaction for changes
+				for _, txn := range transactions {
+					lastTxn, exists := lastTransactions[txn.ID]
+
+					// New transaction
+					if !exists {
+						hub.BroadcastTransactionUpdate(txn)
+						// Store a copy of the transaction
+						txnCopy := *txn
+						lastTransactions[txn.ID] = &txnCopy
+						continue
+					}
+
+					// Check if transaction changed
+					if txn.TransactionPercent != lastTxn.TransactionPercent ||
+						txn.Status != lastTxn.Status ||
+						txn.BytesTransferred != lastTxn.BytesTransferred {
+						hub.BroadcastTransactionUpdate(txn)
+						// Update with a copy of the transaction
+						txnCopy := *txn
+						lastTransactions[txn.ID] = &txnCopy
+					}
 				}
 			}
 		}
@@ -222,30 +299,73 @@ func (hub *WebSocketHub) StartMonitoring() {
 
 		lastClientCount := 0
 
-		for range ticker.C {
-			if hub.clientStore == nil {
-				continue
-			}
+		for {
+			select {
+			case <-hub.done:
+				return
+			case <-ticker.C:
+				if hub.clientStore == nil {
+					continue
+				}
 
-			clients := hub.clientStore.GetClients()
-			if len(clients) != lastClientCount {
-				lastClientCount = len(clients)
-				hub.BroadcastDevicesUpdate()
+				clients := hub.clientStore.GetClients()
+				if len(clients) != lastClientCount {
+					lastClientCount = len(clients)
+					hub.BroadcastDevicesUpdate()
+				}
 			}
 		}
 	}()
 }
 
+// Shutdown closes the hub, stops monitoring, and closes all connections
+func (hub *WebSocketHub) Shutdown() {
+	// Signal monitoring goroutines to stop
+	close(hub.done)
+
+	// Close all connections
+	hub.mu.Lock()
+	defer hub.mu.Unlock()
+
+	log.Printf("[WebSocket] Shutting down hub. Closing %d connections...", len(hub.connections))
+	for conn := range hub.connections {
+		conn.Close()
+		delete(hub.connections, conn)
+	}
+}
+
+// DisconnectClient disconnects a client by IP
+func (hub *WebSocketHub) DisconnectClient(ip string) {
+	hub.mu.Lock()
+	defer hub.mu.Unlock()
+	for conn := range hub.connections {
+		if conn.clientIP == ip {
+			conn.Close()
+			delete(hub.connections, conn)
+			log.Printf("[WebSocket] Disconnected blocked client: %s", ip)
+		}
+	}
+}
+
 // HandleWebSocket handles WebSocket upgrade and connection
 func (hub *WebSocketHub) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
+	// Check if client is blocked before upgrading
+	clientIP := r.RemoteAddr
+	if idx := strings.LastIndex(clientIP, ":"); idx != -1 {
+		clientIP = clientIP[:idx] // Strip port
+	}
+
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Printf("[WebSocket] Upgrade error: %v", err)
 		return
 	}
 
-	// Create thread-safe connection wrapper
-	safeConn := &SafeConn{conn: conn}
+	// Create thread-safe connection wrapper with client IP
+	safeConn := &SafeConn{
+		conn:     conn,
+		clientIP: clientIP,
+	}
 
 	hub.AddConnection(safeConn)
 
@@ -274,6 +394,44 @@ func (hub *WebSocketHub) HandleWebSocket(w http.ResponseWriter, r *http.Request)
 		})
 		safeConn.WriteMessage(websocket.TextMessage, jsonData)
 	}
+
+	// Send desktop name
+	hub.mu.RLock()
+	desktopName := hub.desktopName
+	hub.mu.RUnlock()
+	jsonData, _ := json.Marshal(WSMessage{
+		Type: "desktop_name_init",
+		Data: map[string]interface{}{
+			"name": desktopName,
+		},
+	})
+	safeConn.WriteMessage(websocket.TextMessage, jsonData)
+
+	// Send text transfer setting
+	hub.mu.RLock()
+	textTransferEnabled := hub.textTransferEnabled
+	hub.mu.RUnlock()
+	settingsData, _ := json.Marshal(WSMessage{
+		Type: "settings_init",
+		Data: map[string]interface{}{
+			"textTransferEnabled": textTransferEnabled,
+		},
+	})
+	safeConn.WriteMessage(websocket.TextMessage, settingsData)
+
+	// Send theme settings
+	hub.mu.RLock()
+	themeID := hub.themeID
+	accentID := hub.accentID
+	hub.mu.RUnlock()
+	themeData, _ := json.Marshal(WSMessage{
+		Type: "theme_init",
+		Data: map[string]interface{}{
+			"themeId":  themeID,
+			"accentId": accentID,
+		},
+	})
+	safeConn.WriteMessage(websocket.TextMessage, themeData)
 
 	// Keep connection alive and handle incoming messages
 	go func() {

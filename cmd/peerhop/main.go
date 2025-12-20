@@ -33,7 +33,11 @@ func main() {
 	args := flag.Args()
 
 	// 1. Get Network Info
-	ip := network.GetLocalIP()
+	ip, err := network.GetLocalIP()
+	if err != nil {
+		log.Fatalf("Failed to get local IP: %v", err)
+	}
+
 	port, err := network.GetFreePort()
 	if err != nil {
 		log.Fatalf("Failed to get a free port: %v", err)

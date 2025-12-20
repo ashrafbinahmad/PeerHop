@@ -4,6 +4,7 @@ export namespace main {
 	    url: string;
 	    filename: string;
 	    size: number;
+	    ssid: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new ServerInfo(source);
@@ -14,6 +15,7 @@ export namespace main {
 	        this.url = source["url"];
 	        this.filename = source["filename"];
 	        this.size = source["size"];
+	        this.ssid = source["ssid"];
 	    }
 	}
 

@@ -20,9 +20,12 @@ import {
   Quit,
   OnFileDrop,
   OnFileDropOff,
+  EventsOn,
+  EventsOff,
 } from "../../wailsjs/runtime/runtime";
 import logo from "../assets/images/logo-universal.png";
 import { useTransactions } from "../hooks/useTransactions";
+import { useTransferSpeed, formatBytes } from "../hooks/useTransferSpeed";
 import { useDevices, type Client } from "../hooks/useDevices";
 import {
   X,
@@ -47,8 +50,14 @@ import {
   ExternalLink,
   FolderOpen,
   Play,
+  Pencil,
+  Edit2,
+  Settings,
+  Flame,
 } from "lucide-react";
 import { PlatformIcon } from "../components/PlatformIcon";
+
+import { ACCENT_COLORS, THEME_PRESETS } from "../themeConstants";
 
 // Helper function to get app icon based on app name
 const getAppIcon = (appName: string, appCommand: string) => {
@@ -392,6 +401,7 @@ const TransactionActions = ({
 };
 
 import { CopyButton } from "../components/CopyButton";
+import { ConfirmDialog } from "../components/ConfirmDialog";
 
 // ... existing imports ...
 
@@ -411,12 +421,150 @@ const blobToBase64 = (blob: Blob): Promise<string> => {
   });
 };
 
+const EditableDeviceName = ({
+  client,
+  isDarkMode,
+  theme,
+  serverUrl,
+  onBlock,
+  onBlockSending,
+}: {
+  client: Client;
+  isDarkMode: boolean;
+  theme: any;
+  serverUrl: string;
+  onBlock: (client: Client) => void;
+  onBlockSending: (client: Client) => void;
+}) => {
+  const [isEditing, setIsEditing] = useState(false);
+  const [name, setName] = useState(client.name || client.platform);
+
+  // Update name if client data changes from backend
+  useEffect(() => {
+    if (client.name && !isEditing) {
+      setName(client.name);
+    }
+  }, [client.name, isEditing]);
+
+  const handleUpdateName = async () => {
+    if (!name.trim()) {
+      setName(client.name || client.platform);
+      setIsEditing(false);
+      return;
+    }
+
+    try {
+      await axios.post(`${serverUrl}/api/update-client-name`, {
+        ip: client.ip,
+        name: name.trim(),
+      });
+      setIsEditing(false);
+    } catch (err) {
+      console.error("Failed to update name:", err);
+      // Revert name on error
+      setName(client.name || client.platform);
+      setIsEditing(false);
+    }
+  };
+
+  return (
+    <div
+      className={`flex items-center gap-3 p-3 rounded-xl border transition-all ${theme.deviceItemBg}`}
+    >
+      <div
+        className={`w-8 h-8 rounded-full flex items-center justify-center ${theme.iconBg} ${theme.iconText}`}
+      >
+        <PlatformIcon platform={client.platform} size={16} />
+      </div>
+      <div className="flex-1 min-w-0 text-left">
+        {isEditing ? (
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              onBlur={handleUpdateName}
+              onKeyDown={(e) => e.key === "Enter" && handleUpdateName()}
+              className={`text-sm font-medium w-full px-1 py-0.5 rounded border ${
+                isDarkMode
+                  ? "bg-slate-900 border-slate-700 text-white"
+                  : "bg-white border-gray-200 text-gray-900"
+              }`}
+              autoFocus
+            />
+          </div>
+        ) : (
+          <div className="flex items-center gap-1.5 group">
+            <div className={`text-sm font-medium truncate ${theme.text}`}>
+              {client.name || client.platform}
+            </div>
+            <button
+              onClick={() => setIsEditing(true)}
+              className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-black/5 transition-opacity"
+              title="Edit name"
+            >
+              <Pencil
+                size={10}
+                className={isDarkMode ? "text-slate-400" : "text-gray-400"}
+              />
+            </button>
+          </div>
+        )}
+        <div className={`text-[10px] truncate font-mono ${theme.subText}`}>
+          {client.ip}
+        </div>
+
+        <div className="flex gap-2 mt-1">
+          {/* Block Sending Button */}
+          <button
+            onClick={() => onBlockSending(client)}
+            className={`text-[10px] px-2 py-0.5 rounded transition-colors ${
+              client.sendingBlocked
+                ? "bg-yellow-500/20 text-yellow-600 hover:bg-yellow-500/30 dark:text-yellow-400"
+                : "bg-gray-200 text-gray-600 hover:bg-gray-300 dark:bg-slate-700 dark:text-slate-300 dark:hover:bg-slate-600"
+            }`}
+          >
+            {client.sendingBlocked ? "Allow Sending" : "Block Sending"}
+          </button>
+
+          {/* Block/Unblock Button */}
+          <button
+            onClick={() => onBlock(client)}
+            className={`text-[10px] px-2 py-0.5 rounded transition-colors ${
+              client.blocked
+                ? "bg-green-500/20 text-green-600 hover:bg-green-500/30"
+                : "bg-red-500/20 text-red-600 hover:bg-red-500/30"
+            }`}
+          >
+            {client.blocked ? "🔓 Unblock" : "🚫 Block"}
+          </button>
+        </div>
+      </div>
+      <div
+        className={`w-1.5 h-1.5 rounded-full ${
+          client.blocked
+            ? "bg-red-500"
+            : client.sendingBlocked
+            ? "bg-yellow-500"
+            : "bg-green-500"
+        }`}
+      ></div>
+    </div>
+  );
+};
+
 export const DesktopView = () => {
   const [filePaths, setFilePaths] = useState<string[]>([]);
   const [serverInfo, setServerInfo] = useState<main.ServerInfo | null>(null);
   const [textInput, setTextInput] = useState("");
   const [showTextInput, setShowTextInput] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  const [notification, setNotification] = useState<{
+    show: boolean;
+    message: string;
+  }>({ show: false, message: "" });
+  const [isCheckingNetwork, setIsCheckingNetwork] = useState(false);
+  const [transactionToCancel, setTransactionToCancel] = useState<any>(null); // Use any or specific type if available
 
   // Wails Native File Drop Handler
   useEffect(() => {
@@ -431,7 +579,7 @@ export const DesktopView = () => {
       } catch (err) {
         console.error("OnFileDrop error:", err);
       }
-    }, true); // true = Use CSS drop target (--wails-drop-target)
+    }, false); // false = Global drop listener (ignore CSS drop target)
 
     return () => {
       OnFileDropOff();
@@ -454,14 +602,88 @@ export const DesktopView = () => {
   const handleDragLeave = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    // Only set false if we are leaving the main container (current target is related to exit)
-    if (e.currentTarget.contains(e.relatedTarget as Node)) return;
-    setIsDragging(false);
+
+    // We only want to hide the overlay if we're actually leaving the container,
+    // not just moving over a child element.
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX;
+    const y = e.clientY;
+
+    if (
+      x <= rect.left ||
+      x >= rect.right ||
+      y <= rect.top ||
+      y >= rect.bottom
+    ) {
+      setIsDragging(false);
+    }
   };
 
-  // UI States
-  const [isDarkMode, setIsDarkMode] = useState(true);
-  const [showQRPanel, setShowQRPanel] = useState(true);
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    // Removed e.stopPropagation() to allow event to bubble to Wails handler if needed
+    setIsDragging(false);
+
+    // Handle Text Drop
+    const droppedText = e.dataTransfer.getData("text");
+    if (droppedText && droppedText.trim()) {
+      try {
+        await sendText(droppedText, "server");
+      } catch (err) {
+        console.error("Failed to send dropped text:", err);
+      }
+      return;
+    }
+
+    // Files are handled by Wails OnFileDrop (native)
+  };
+
+  // Prevent default browser behavior for drag/drop on the whole window
+  useEffect(() => {
+    const preventDefault = (e: DragEvent) => {
+      if (e.dataTransfer) {
+        // e.dataTransfer.dropEffect = "copy";
+      }
+      e.preventDefault();
+    };
+
+    window.addEventListener("dragover", preventDefault);
+    window.addEventListener("drop", preventDefault);
+
+    return () => {
+      window.removeEventListener("dragover", preventDefault);
+      window.removeEventListener("drop", preventDefault);
+    };
+  }, []);
+
+  // UI States - Load theme from localStorage
+  const [activeThemeId, setActiveThemeId] = useState<string>(() => {
+    return localStorage.getItem("themeId") || "night";
+  });
+
+  // Set axios base URL when server info is available
+  useEffect(() => {
+    if (serverInfo?.url) {
+      axios.defaults.baseURL = serverInfo.url;
+    }
+  }, [serverInfo?.url]);
+  const [activeAccentId, setActiveAccentId] = useState<string>(() => {
+    return localStorage.getItem("accentId") || "blue";
+  });
+
+  const activeTheme =
+    THEME_PRESETS.find((t) => t.id === activeThemeId) || THEME_PRESETS[3];
+  const activeAccent =
+    ACCENT_COLORS.find((a) => a.id === activeAccentId) || ACCENT_COLORS[0];
+  const isDarkMode = activeTheme.isDark; // Derived state
+  // Tab system: 'chat' | 'qr' | 'settings'
+  const [activeTab, setActiveTab] = useState<"chat" | "qr" | "settings">("qr");
+
+  // Settings - Load from localStorage
+  const [textTransferEnabled, setTextTransferEnabled] = useState(() => {
+    const saved = localStorage.getItem("textTransferEnabled");
+    return saved !== null ? saved === "true" : false; // Default to false
+  });
 
   // Scroll and Refs
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -472,26 +694,91 @@ export const DesktopView = () => {
 
   // Hook: WebSocket for devices/clients
   const { clients } = useDevices(serverInfo?.url);
+  const speeds = useTransferSpeed(transactions);
 
-  // Auto-hide QR panel on mobile when a client connects
+  const handleBlockClient = async (client: Client) => {
+    if (!serverInfo?.url) return;
+    try {
+      if (client.blocked) {
+        await axios.post(`${serverInfo.url}/api/unblock-client`, {
+          ip: client.ip,
+        });
+      } else {
+        await axios.post(`${serverInfo.url}/api/block-client`, {
+          ip: client.ip,
+        });
+      }
+    } catch (err) {
+      console.error("Failed to block/unblock client:", err);
+      alert("Failed to update client status");
+    }
+  };
+
+  const handleBlockSending = async (client: Client) => {
+    if (!serverInfo?.url) return;
+    try {
+      if (client.sendingBlocked) {
+        await axios.post(`${serverInfo.url}/api/unblock-sending`, {
+          ip: client.ip,
+        });
+      } else {
+        await axios.post(`${serverInfo.url}/api/block-sending`, {
+          ip: client.ip,
+        });
+      }
+    } catch (err) {
+      console.error("Failed to block/unblock sending for client:", err);
+      alert("Failed to update client status");
+    }
+  };
+
+  // Auto-switch to chat tab on mobile when a client connects
   useEffect(() => {
-    // Only apply this logic on small screens (max-md)
-    if (clients.length > 0 && showQRPanel) {
+    if (clients.length > 0 && activeTab !== "chat") {
       // Check if screen is mobile size
       const isMobile = window.innerWidth < 768; // md breakpoint is 768px
       if (isMobile) {
-        setShowQRPanel(false);
+        setActiveTab("chat");
       }
     }
   }, [clients.length]);
 
   const handleRestartServer = async () => {
+    setIsCheckingNetwork(true);
     try {
       const info = await RestartServer();
       setServerInfo(info);
-      // alert("Server restarted successfully");
+
+      // If SSID is missing, poll for it
+      if (!info.ssid) {
+        let attempts = 0;
+        const checkSSID = async () => {
+          if (attempts >= 4) {
+            setIsCheckingNetwork(false);
+            return;
+          }
+          setTimeout(async () => {
+            try {
+              const updated = await GetServerInfo();
+              setServerInfo(updated);
+              if (updated.ssid) {
+                setIsCheckingNetwork(false);
+              } else {
+                attempts++;
+                checkSSID();
+              }
+            } catch (ignore) {
+              setIsCheckingNetwork(false);
+            }
+          }, 1000);
+        };
+        checkSSID();
+      } else {
+        setIsCheckingNetwork(false);
+      }
     } catch (err) {
       console.error("Failed to restart server:", err);
+      setIsCheckingNetwork(false);
       alert("Failed to restart server");
     }
   };
@@ -503,19 +790,85 @@ export const DesktopView = () => {
       try {
         const info = await GetServerInfo();
         setServerInfo(info);
+
+        // If SSID is empty, retry after a short delay to get updated SSID
+        if (!info.ssid) {
+          setTimeout(async () => {
+            try {
+              const updatedInfo = await GetServerInfo();
+              setServerInfo(updatedInfo);
+            } catch (err) {
+              console.error("Failed to get updated server info:", err);
+            }
+          }, 1000); // Retry after 1 second
+        }
       } catch (err) {
         console.error("Failed to get server info:", err);
       }
     };
     fetchServerInfo();
+
+    // Listen for network changes
+    const unsubscribe = EventsOn("network-changed", (info: main.ServerInfo) => {
+      console.log("[DesktopView] Network changed:", info);
+      setServerInfo(info);
+      setNotification({
+        show: true,
+        message: "Network changed! Server restarted",
+      });
+      setTimeout(() => setNotification({ show: false, message: "" }), 3000);
+
+      // If SSID is empty, poll for it (as backend fetches it asynchronously)
+      if (!info.ssid) {
+        setTimeout(async () => {
+          try {
+            const updated = await GetServerInfo();
+            setServerInfo(updated);
+          } catch (err) {
+            console.error(err);
+          }
+        }, 1000);
+      }
+    });
+
+    return () => {
+      if (typeof unsubscribe === "function") {
+        unsubscribe();
+      } else {
+        EventsOff("network-changed");
+      }
+    };
   }, []);
 
-  // Sync theme with server
+  // Sync theme with server and save to localStorage
   useEffect(() => {
+    // Save to localStorage
+    localStorage.setItem("themeId", activeThemeId);
+    localStorage.setItem("accentId", activeAccentId);
+
+    if (!serverInfo?.url) return;
+
+    // We still sync isDarkMode for basic compatibility with clients if needed
     axios
-      .post("/api/theme", { isDarkMode })
+      .post(`${serverInfo.url}/api/theme`, {
+        isDarkMode: activeTheme.isDark,
+        themeId: activeThemeId,
+        accentId: activeAccentId,
+      })
       .catch((e) => console.error("Failed to sync theme:", e));
-  }, [isDarkMode]);
+  }, [activeThemeId, activeAccentId, serverInfo?.url]);
+
+  // Save text transfer setting to localStorage and sync with server
+  useEffect(() => {
+    localStorage.setItem("textTransferEnabled", String(textTransferEnabled));
+
+    if (!serverInfo?.url) return;
+
+    // Send setting to server so mobile clients can receive it
+    axios
+      .post(`${serverInfo.url}/api/settings`, { textTransferEnabled })
+      .catch((e) => console.error("Failed to sync settings:", e));
+  }, [textTransferEnabled, serverInfo?.url]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -642,135 +995,171 @@ export const DesktopView = () => {
     }
   };
 
-  const formatSize = (bytes?: number) => {
-    if (!bytes) return "Unknown size";
-    const units = ["B", "KB", "MB", "GB"];
-    let i = 0;
-    let value = bytes;
-    while (value >= 1024 && i < units.length - 1) {
-      value /= 1024;
-      i++;
-    }
-    return `${value.toFixed(1)} ${units[i]}`;
-  };
-
   const visibleTransactions = transactions;
 
   // --- Theme Variables ---
+
   const theme = {
-    bg: isDarkMode ? "bg-[#0f172a]" : "bg-[#F2F2F7]",
-    headerBg: isDarkMode
-      ? "bg-[#0f172a]/95 border-slate-800"
-      : "bg-[#F2F2F7]/95 border-gray-200/50",
-    text: isDarkMode ? "text-slate-100" : "text-gray-900",
-    subText: isDarkMode ? "text-slate-400" : "text-gray-500",
+    ...activeTheme, // Spread the active theme preset properties
+    accentColor: activeAccent.color,
 
-    // Chat Bubbles
-    bubbleMe: "bg-[#007AFF] text-white",
-    bubbleOther: isDarkMode
-      ? "bg-[#1e293b] border-slate-700 text-slate-100"
-      : "bg-white border-gray-200 text-gray-900",
-
-    // Input Area
-    inputAreaBg: isDarkMode
-      ? "bg-[#1e293b] border-slate-700"
-      : "bg-white border-gray-200",
-    inputField: isDarkMode
-      ? "bg-[#334155] text-white focus:bg-[#475569]"
-      : "bg-gray-100 hover:bg-gray-50 focus:bg-white",
-
-    // Right Panel
-    panelBg: isDarkMode
-      ? "bg-[#1e293b] border-slate-700"
-      : "bg-white border-gray-200",
-    panelCard: isDarkMode
-      ? "bg-[#0f172a] border-slate-700"
-      : "bg-white border-gray-100",
+    // Dynamic Bubble Me (uses accent)
+    bubbleMe: "text-white", // Bg color handled via style
+    bubbleMeStyle: { backgroundColor: activeAccent.color },
   };
 
   return (
     <div
       className={`flex h-screen w-full font-sans overflow-hidden transition-colors duration-300 ${theme.bg} ${theme.text} relative`}
-      style={{ "--wails-drop-target": "drop" } as React.CSSProperties}
+      style={
+        {
+          "--wails-drop-target": "drop",
+          "--wails-draggable": "drag",
+        } as React.CSSProperties
+      }
       onDragEnter={handleDragEnter}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
     >
       {/* Drag Overlay */}
       {isDragging && (
-        <div className="absolute inset-0 z-[100] bg-[#007AFF]/10 backdrop-blur-sm border-4 border-[#007AFF] border-dashed rounded-lg flex flex-col items-center justify-center pointer-events-none animate-in fade-in duration-200">
-          <Upload size={64} className="text-[#007AFF] mb-4" />
-          <h3 className="text-2xl font-bold text-[#007AFF]">
+        <div
+          className="absolute inset-0 z-[100] backdrop-blur-sm border-4 border-dashed rounded-lg flex flex-col items-center justify-center pointer-events-none animate-in fade-in duration-200"
+          style={{
+            borderColor: theme.accentColor,
+            backgroundColor: theme.accentColor + "1A",
+          }}
+        >
+          <Upload
+            size={64}
+            className="mb-4"
+            style={{ color: theme.accentColor }}
+          />
+          <h3
+            className="text-2xl font-bold"
+            style={{ color: theme.accentColor }}
+          >
             Drop files to send
           </h3>
         </div>
       )}
+
+      {/* Network Notification */}
+      {notification.show && (
+        <div className="absolute top-16 left-1/2 -translate-x-1/2 z-[100] animate-in slide-in-from-top-4 duration-300">
+          <div
+            className={`px-4 py-2 rounded-full shadow-lg border flex items-center gap-2 ${
+              isDarkMode
+                ? "bg-slate-800 border-slate-700 text-slate-200"
+                : "bg-white border-gray-100 text-gray-900"
+            }`}
+          >
+            <span className="text-sm font-medium">{notification.message}</span>
+            <button
+              onClick={() => setNotification({ show: false, message: "" })}
+              className="ml-2 hover:opacity-70"
+            >
+              <X size={14} />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* PERSISTENT HEADER - Always visible */}
+      <div
+        className={`absolute top-0 left-0 right-0 z-40 h-[48px] flex items-center px-4 ${theme.panelBg}`}
+        style={{ "--wails-draggable": "drag" } as React.CSSProperties}
+      >
+        <h2 className={`text-[17px] font-semibold ${theme.text}`}>PeerHop</h2>
+      </div>
 
       {/* WINDOW CONTROLS - FIXED TOP RIGHT */}
       <div
         className="absolute top-0 right-0 z-50 p-2 flex items-center gap-1"
         style={{ "--wails-draggable": "no-drag" } as React.CSSProperties}
       >
-        <button
-          onClick={() => setIsDarkMode(!isDarkMode)}
-          className={`p-2 rounded-lg transition-colors ${
-            isDarkMode
-              ? "hover:bg-slate-800 text-yellow-400"
-              : "hover:bg-gray-200 text-gray-600"
-          }`}
-          title="Toggle Theme"
-        >
-          {isDarkMode ? <Sun size={18} /> : <Moon size={18} />}
-        </button>
+        {/* Tab controls - Different for mobile vs desktop */}
+        {/* Mobile: Show all 3 tabs */}
+        <div className="md:hidden flex items-center gap-1  ">
+          <button
+            onClick={() => setActiveTab("chat")}
+            className={`p-2 rounded-lg transition-colors ${
+              activeTab === "chat"
+                ? theme.iconBg + " " + theme.text
+                : theme.ghostHover
+            }`}
+            title="File Transfer"
+          >
+            <MessageSquare size={18} />
+          </button>
+          <button
+            onClick={() => setActiveTab("qr")}
+            className={`p-2 rounded-lg transition-colors ${
+              activeTab === "qr"
+                ? theme.iconBg + " " + theme.text
+                : theme.ghostHover
+            }`}
+            title="QR Code"
+          >
+            <QrCode size={18} />
+          </button>
+          <button
+            onClick={() => setActiveTab("settings")}
+            className={`p-2 rounded-lg transition-colors ${
+              activeTab === "settings"
+                ? theme.iconBg + " " + theme.text
+                : theme.ghostHover
+            }`}
+            title="Settings"
+          >
+            <Settings size={18} />
+          </button>
+        </div>
 
-        {/* QR Toggle - Only visible on mobile/small screens (max-md) */}
-        <button
-          onClick={() => setShowQRPanel(!showQRPanel)}
-          className={`md:hidden p-2 rounded-lg transition-colors ${
-            isDarkMode
-              ? "hover:bg-slate-800 text-slate-400"
-              : "hover:bg-gray-200 text-gray-600"
-          } ${
-            showQRPanel ? (isDarkMode ? "bg-slate-800" : "bg-gray-200") : ""
-          }`}
-          title={showQRPanel ? "Hide Info" : "Show Info"}
-        >
-          {showQRPanel ? <PanelRightClose size={18} /> : <QrCode size={18} />}
-        </button>
+        {/* Desktop: Show QR and Settings tabs only */}
+        <div className="hidden md:flex items-center gap-1">
+          <button
+            onClick={() => setActiveTab("qr")}
+            className={`p-2 rounded-lg transition-colors ${
+              activeTab === "qr" || activeTab === "chat"
+                ? theme.iconBg + " " + theme.text
+                : theme.ghostHover
+            }`}
+            title="QR Code"
+          >
+            <QrCode size={18} />
+          </button>
+          <button
+            onClick={() => setActiveTab("settings")}
+            className={`p-2 rounded-lg transition-colors ${
+              activeTab === "settings"
+                ? theme.iconBg + " " + theme.text
+                : theme.ghostHover
+            }`}
+            title="Settings"
+          >
+            <Settings size={18} />
+          </button>
+        </div>
 
-        <div
-          className={`w-px h-4 mx-1 ${
-            isDarkMode ? "bg-slate-700" : "bg-gray-300"
-          }`}
-        ></div>
+        <div className={`w-px h-4 mx-1 ${theme.border}`}></div>
 
         <button
           onClick={handleMinimize}
-          className={`p-2 rounded-lg transition-colors ${
-            isDarkMode
-              ? "hover:bg-slate-800 text-slate-400 hover:text-white"
-              : "hover:bg-gray-200 text-gray-500 hover:text-gray-900"
-          }`}
+          className={`p-2 rounded-lg transition-colors ${theme.ghostHover}`}
         >
           <Minus size={18} />
         </button>
         <button
           onClick={handleMaximizeToggle}
-          className={`p-2 rounded-lg transition-colors ${
-            isDarkMode
-              ? "hover:bg-slate-800 text-slate-400 hover:text-white"
-              : "hover:bg-gray-200 text-gray-500 hover:text-gray-900"
-          }`}
+          className={`p-2 rounded-lg transition-colors ${theme.ghostHover}`}
         >
           <Maximize2 size={16} />
         </button>
         <button
           onClick={handleClose}
-          className={`p-2 rounded-lg transition-colors ${
-            isDarkMode
-              ? "hover:bg-red-900/50 text-slate-400 hover:text-red-400"
-              : "hover:bg-red-50 text-gray-500 hover:text-red-600"
-          }`}
+          className={`p-2 rounded-lg transition-colors hover:bg-red-500 hover:text-white ${theme.subText}`}
         >
           <X size={18} />
         </button>
@@ -780,22 +1169,14 @@ export const DesktopView = () => {
       <div
         className={`flex flex-col flex-1 h-full relative transition-all duration-300 ${
           isDarkMode ? "border-slate-800" : "border-gray-200/60"
-        } ${showQRPanel ? "md:border-r" : ""}`}
+        } md:border-r ${activeTab === "chat" ? "flex" : "hidden md:flex"}`}
+        style={{ "--wails-draggable": "no-drag" } as React.CSSProperties}
       >
-        {/* HEADER */}
+        {/* HEADER - Empty for spacing, title is in persistent header */}
         <div
-          className={`shrink-0 h-[60px] backdrop-blur-xl border-b flex items-center px-4 justify-between z-20 transition-colors duration-300 ${theme.headerBg}`}
+          className={`shrink-0 h-[48px] backdrop-blur-xl flex items-center px-4 justify-between z-20 transition-colors duration-300 relative ${theme.headerBg}`}
           style={{ "--wails-draggable": "drag" } as React.CSSProperties}
-        >
-          {/* Title Area */}
-          <div className="flex items-center gap-3">
-            <h2 className={`text-[17px] font-semibold ${theme.text}`}>
-              PeerHop
-            </h2>
-          </div>
-
-          {/* Header Controls */}
-        </div>
+        ></div>
 
         {/* MESSAGES AREA */}
         <div
@@ -804,14 +1185,56 @@ export const DesktopView = () => {
         >
           <div className="mt-auto flex flex-col gap-3">
             {visibleTransactions.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-20 opacity-40">
-                <MessageSquare
-                  size={48}
-                  className={`${
-                    isDarkMode ? "text-slate-600" : "text-gray-400"
-                  } mb-2`}
-                />
-                <p className="text-sm font-medium">No transfers yet</p>
+              <div className="flex flex-col items-center justify-center h-full gap-6 animate-in fade-in zoom-in-95 duration-500 my-auto pb-20">
+                {/* Big Share File Button */}
+                <button
+                  onClick={handleSelectFiles}
+                  className={`group relative flex flex-col items-center justify-center gap-4 w-60 h-48 rounded-[2rem] border transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] ${
+                    theme.border
+                  } ${
+                    isDarkMode ? "hover:bg-slate-800/50" : "hover:bg-gray-50"
+                  }`}
+                >
+                  <div
+                    className="p-4 rounded-full transition-all duration-300 group-hover:scale-110"
+                    style={{
+                      backgroundColor: theme.accentColor + "10",
+                      color: theme.accentColor,
+                    }}
+                  >
+                    <Upload size={32} strokeWidth={1.5} />
+                  </div>
+                  <div className="flex flex-col items-center gap-1">
+                    <span className="text-lg font-medium tracking-tight opacity-90">
+                      Share a file
+                    </span>
+                    <span className={`text-xs opacity-50`}>
+                      Click to browse or drop here
+                    </span>
+                  </div>
+                </button>
+
+                {/* Small Send Text Button */}
+                <button
+                  onClick={() => {
+                    if (!textTransferEnabled) setTextTransferEnabled(true);
+                    setShowTextInput(true);
+                  }}
+                  className={`flex items-center gap-2 px-5 py-2.5 rounded-full border transition-all duration-300 hover:scale-105 active:scale-95 ${
+                    theme.border
+                  } ${
+                    isDarkMode ? "hover:bg-slate-800/50" : "hover:bg-gray-50"
+                  }`}
+                >
+                  <MessageSquare
+                    size={16}
+                    strokeWidth={1.5}
+                    style={{ color: theme.accentColor }}
+                  />
+                  <span className="text-sm font-medium opacity-90">
+                    Send text
+                  </span>
+                </button>
               </div>
             ) : (
               visibleTransactions.map((transaction) => {
@@ -821,7 +1244,7 @@ export const DesktopView = () => {
                 const bubbleClass = isMe ? theme.bubbleMe : theme.bubbleOther;
 
                 const widthClass = isFile
-                  ? "w-[calc(95vw-120px)] max-w-[500px]"
+                  ? "w-[calc(99%-100px)] max-w-[500px]"
                   : "w-fit max-w-[500px] text-left";
 
                 // Lookup client platform if message is from client
@@ -841,11 +1264,7 @@ export const DesktopView = () => {
                     {/* Avatar for Client (Left Side) */}
                     {!isMe && (
                       <div
-                        className={`shrink-0 w-8 h-8 rounded-full flex items-center justify-center overflow-hidden mb-1 ${
-                          isDarkMode
-                            ? "bg-slate-800 text-slate-400"
-                            : "bg-gray-100 text-gray-500"
-                        }`}
+                        className={`shrink-0 w-8 h-8 rounded-full flex items-center justify-center overflow-hidden mb-1 ${theme.iconBg} ${theme.iconText}`}
                       >
                         <PlatformIcon
                           platform={clientPlatform || "unknown"}
@@ -855,20 +1274,26 @@ export const DesktopView = () => {
                     )}
 
                     <div
-                      className={`relative rounded-2xl p-3 shadow-sm ${widthClass} ${bubbleClass} transition-all duration-300 overflow-hidden ${
+                      className={`relative rounded-2xl p-3 shadow-sm ${widthClass} ${
+                        isMe ? theme.bubbleMe : theme.bubbleOther
+                      } transition-all duration-300 overflow-hidden ${
                         transaction.status === "cancelled"
                           ? "opacity-60 grayscale-[0.5]"
                           : ""
                       }`}
+                      style={isMe ? theme.bubbleMeStyle : undefined}
                     >
                       {/* Background Progress Fill (Both Incoming and Outgoing) */}
                       {transaction.status === "in_progress" && (
                         <div
                           className={`absolute top-0 left-0 h-full ${
-                            isMe ? "bg-white/20" : "bg-[#007AFF]/10"
+                            isMe ? "bg-white/20" : ""
                           } pointer-events-none transition-all duration-300`}
                           style={{
                             width: `${transaction.transactionPercent}%`,
+                            backgroundColor: !isMe
+                              ? theme.accentColor + "20"
+                              : undefined, // 20 = 10% approx opacity in hex?? No 1A is 10%.
                           }}
                         />
                       )}
@@ -933,7 +1358,9 @@ export const DesktopView = () => {
                                       title="Open Image"
                                     >
                                       <img
-                                        src={mediaUrl}
+                                        src={`${mediaUrl}${
+                                          mediaUrl.includes("?") ? "&" : "?"
+                                        }preview=true`}
                                         alt="preview"
                                         className="w-full h-full object-cover"
                                       />
@@ -944,7 +1371,7 @@ export const DesktopView = () => {
                                 if (isVideo && mediaUrl) {
                                   return (
                                     <div
-                                      className="w-12 h-12 rounded-lg bg-black/10 overflow-hidden shrink-0 cursor-pointer hover:opacity-80 transition-opacity relative group flex items-center justify-center"
+                                      className="w-12 h-12 rounded-lg bg-black/10 overflow-hidden shrink-0 cursor-pointer hover:opacity-80 transition-opacity relative group flex items-center justify-center border border-black/5"
                                       onClick={() =>
                                         OpenSourceFile(
                                           transaction.filename || ""
@@ -953,8 +1380,11 @@ export const DesktopView = () => {
                                       title="Open Video"
                                     >
                                       <video
-                                        src={mediaUrl}
+                                        src={`${mediaUrl}${
+                                          mediaUrl.includes("?") ? "&" : "?"
+                                        }preview=true`}
                                         className="w-full h-full object-cover absolute inset-0 pointer-events-none"
+                                        preload="metadata"
                                       />
                                       <div className="w-6 h-6 rounded-full bg-black/40 flex items-center justify-center z-10 backdrop-blur-sm">
                                         <Play
@@ -970,17 +1400,14 @@ export const DesktopView = () => {
                                   <div
                                     className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${
                                       isMe
-                                        ? "bg-white/20"
-                                        : isDarkMode
-                                        ? "bg-slate-700"
-                                        : "bg-gray-100"
+                                        ? "bg-white/20 text-white"
+                                        : theme.iconBg + " " + theme.iconText
                                     }`}
                                   >
                                     <File size={20} />
                                   </div>
                                 );
                               })()}
-
                               <div className="min-w-[140px] flex-1 text-left">
                                 <div
                                   className="font-semibold text-sm truncate max-w-[200px]"
@@ -997,23 +1424,40 @@ export const DesktopView = () => {
                                       : "text-gray-500"
                                   }`}
                                 >
-                                  {formatSize(transaction.fileSize)}
-                                  {transaction.status === "in_progress" && (
-                                    <span
-                                      className={`ml-2 font-mono font-medium ${
-                                        isMe
-                                          ? "text-white/90"
-                                          : "text-[#007AFF]"
-                                      }`}
-                                    >
-                                      {Math.round(
-                                        transaction.transactionPercent
-                                      )}
-                                      %
-                                    </span>
-                                  )}
+                                  {transaction.status === "in_progress" ? (
+                                    <div className="flex flex-col gap-0.5 mt-1 font-mono">
+                                      <span>
+                                        {speeds[transaction.id] || "0.0 MB/s"}
+                                      </span>
+                                      <span>
+                                        {formatBytes(
+                                          (transaction.fileSize || 0) *
+                                            (transaction.transactionPercent /
+                                              100)
+                                        )}{" "}
+                                        / {formatBytes(transaction.fileSize)}
+                                      </span>
+                                      <span
+                                        className={`font-medium ${
+                                          isMe ? "text-white/90" : ""
+                                        }`}
+                                        style={{
+                                          color: !isMe
+                                            ? theme.accentColor
+                                            : undefined,
+                                        }}
+                                      >
+                                        {Math.round(
+                                          transaction.transactionPercent
+                                        )}
+                                        %
+                                      </span>
+                                    </div>
+                                  ) : transaction.status !== "cancelled" ? (
+                                    formatBytes(transaction.fileSize)
+                                  ) : null}
                                   {transaction.status === "cancelled" && (
-                                    <span className="ml-2 font-medium text-red-500/70">
+                                    <span className="font-medium text-red-500/70">
                                       Cancelled
                                     </span>
                                   )}
@@ -1044,11 +1488,7 @@ export const DesktopView = () => {
                                             className="flex items-center gap-2"
                                           >
                                             <div
-                                              className={`w-4 h-4 rounded-full flex items-center justify-center shrink-0 ${
-                                                isDarkMode
-                                                  ? "bg-slate-700 text-slate-400"
-                                                  : "bg-gray-100 text-gray-500"
-                                              }`}
+                                              className={`w-4 h-4 rounded-full flex items-center justify-center shrink-0 ${theme.iconBg} ${theme.iconText}`}
                                             >
                                               <PlatformIcon
                                                 platform={
@@ -1059,9 +1499,11 @@ export const DesktopView = () => {
                                             </div>
                                             <div className="flex-1 h-1 bg-gray-200/30 rounded-full overflow-hidden">
                                               <div
-                                                className="h-full bg-[#007AFF] transition-all duration-300"
+                                                className="h-full transition-all duration-300"
                                                 style={{
                                                   width: `${progress}%`,
+                                                  backgroundColor:
+                                                    theme.accentColor,
                                                 }}
                                               />
                                             </div>
@@ -1113,40 +1555,33 @@ export const DesktopView = () => {
                                       })}
                                     </div>
                                   )}
-
-                                {/* Incoming Upload Cancel Button */}
-                                {!isMe &&
-                                  transaction.status === "in_progress" &&
-                                  (!transaction.clientProgress ||
-                                    Object.keys(transaction.clientProgress)
-                                      .length === 0) && (
-                                    <div className="flex justify-end mt-1">
+                              </div>{" "}
+                              {/* Close text content div */}
+                              {/* Incoming Upload Cancel Button - Outside text flow, rightsided */}
+                              {!isMe &&
+                                transaction.status === "in_progress" &&
+                                (!transaction.clientProgress ||
+                                  Object.keys(transaction.clientProgress)
+                                    .length === 0) && (
+                                  <div className="flex flex-col justify-center ml-3 self-center">
+                                    <div className="flex flex-col justify-center ml-3 self-center">
                                       <button
-                                        onClick={async (e) => {
+                                        onClick={(e) => {
                                           e.stopPropagation();
-                                          try {
-                                            await axios.post(
-                                              `/api/cancel-transaction/${transaction.id}`
-                                            );
-                                          } catch (err) {
-                                            console.error(
-                                              "Failed to cancel transaction:",
-                                              err
-                                            );
-                                          }
+                                          setTransactionToCancel(transaction);
                                         }}
-                                        className={`p-1 rounded cursor-pointer relative z-20 hover:bg-red-100 text-red-500 transition-colors ${
+                                        className={`p-2 rounded-full cursor-pointer relative z-20 transition-colors ${
                                           isDarkMode
-                                            ? "hover:bg-red-900/20"
-                                            : ""
+                                            ? "bg-red-500/20 text-red-400 hover:bg-red-500/30"
+                                            : "bg-red-100 text-red-600 hover:bg-red-200"
                                         }`}
                                         title="Cancel upload"
                                       >
-                                        <X size={14} />
+                                        <X size={18} />
                                       </button>
                                     </div>
-                                  )}
-                              </div>
+                                  </div>
+                                )}
                             </div>
 
                             {/* Actions row - full width, aligned to right */}
@@ -1157,9 +1592,7 @@ export const DesktopView = () => {
                                 <div className="mt-3 pt-2 border-t border-gray-100/10 flex items-center w-full gap-2">
                                   <div
                                     className={`text-[11px] ${
-                                      isDarkMode
-                                        ? "text-slate-500"
-                                        : "text-gray-400"
+                                      isDarkMode ? theme.subText : theme.subText
                                     }`}
                                   >
                                     {new Date(transaction.timestamp)
@@ -1183,7 +1616,8 @@ export const DesktopView = () => {
                             {/* Divider and Actions for Completed Sent Files (Server-sent) */}
                             {isFile &&
                               isMe &&
-                              transaction.status === "completed" && (
+                              transaction.status !== "cancelled" &&
+                              transaction.status !== "failed" && (
                                 <div className="mt-3 pt-2 border-t border-white/10 flex items-center w-full gap-2">
                                   <div className="text-[11px] text-white/50">
                                     {new Date(transaction.timestamp)
@@ -1217,11 +1651,7 @@ export const DesktopView = () => {
                     {/* Avatar for Server (Right Side) */}
                     {isMe && (
                       <div
-                        className={`shrink-0 w-8 h-8 rounded-full flex items-center justify-center overflow-hidden mb-1 ${
-                          isDarkMode
-                            ? "bg-slate-800 text-slate-400"
-                            : "bg-gray-100 text-gray-500"
-                        }`}
+                        className={`shrink-0 w-8 h-8 rounded-full flex items-center justify-center overflow-hidden mb-1 ${theme.iconBg} ${theme.iconText}`}
                       >
                         <Monitor size={16} />
                       </div>
@@ -1235,216 +1665,525 @@ export const DesktopView = () => {
         </div>
 
         {/* INPUT AREA */}
-        <div
-          className={`shrink-0 border-t z-30 pb-4 pt-3 px-4 transition-colors duration-300 ${theme.inputAreaBg}`}
-        >
-          {showTextInput && (
-            <div className="flex gap-2 mb-3 animate-in slide-in-from-bottom-2">
-              <input
-                type="text"
-                value={textInput}
-                onChange={(e) => setTextInput(e.target.value)}
-                onKeyPress={(e) => e.key === "Enter" && handleSendText()}
-                placeholder="Type a message..."
-                className={`flex-1 px-4 py-2 border-transparent border transition-all rounded-2xl text-[15px] outline-none ${theme.inputField}`}
-                autoFocus
-              />
-              <button
-                onClick={handleSendText}
-                className="w-10 h-10 bg-[#007AFF] hover:bg-[#0066CC] text-white rounded-full flex items-center justify-center transition-colors shadow-sm"
-              >
-                <ArrowUp size={20} />
-              </button>
-            </div>
-          )}
+        {(visibleTransactions.length > 0 || showTextInput) && (
+          <div
+            className={`shrink-0 border-t z-30 pb-4 pt-3 px-4 transition-colors duration-300 ${theme.inputAreaBg}`}
+          >
+            {showTextInput && (
+              <div className="flex gap-2 mb-3 animate-in slide-in-from-bottom-2">
+                <input
+                  type="text"
+                  value={textInput}
+                  onChange={(e) => setTextInput(e.target.value)}
+                  onKeyPress={(e) => e.key === "Enter" && handleSendText()}
+                  placeholder="Type a message..."
+                  className={`flex-1 px-4 py-2 border-transparent border transition-all rounded-2xl text-[15px] outline-none ${theme.inputField}`}
+                  autoFocus
+                />
+                <button
+                  onClick={handleSendText}
+                  className="w-10 h-10 text-white rounded-full flex items-center justify-center transition-colors shadow-sm hover:opacity-90"
+                  style={{ backgroundColor: theme.accentColor }}
+                >
+                  <ArrowUp size={20} />
+                </button>
+              </div>
+            )}
 
-          <div className="flex items-center gap-3">
-            <button
-              onClick={handleSelectFiles}
-              className={`flex-1 h-12 rounded-2xl font-semibold flex items-center justify-center gap-2 border shadow-sm transition-all group ${
-                isDarkMode
-                  ? "bg-slate-800 border-slate-700 hover:border-[#007AFF] text-slate-200"
-                  : "bg-white border-gray-200 hover:border-[#007AFF] text-gray-700"
-              } hover:text-[#007AFF]`}
-            >
-              <Upload
-                size={18}
-                className="group-hover:-translate-y-0.5 transition-transform"
-              />
-              <span>Select Files</span>
-            </button>
+            {visibleTransactions.length > 0 && (
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={handleSelectFiles}
+                  className={`flex-1 h-12 rounded-2xl font-semibold flex items-center justify-center gap-2 border shadow-sm transition-all group ${theme.panelCard} ${theme.border} ${theme.text}`}
+                  style={
+                    {
+                      // Dynamic hover border color is hard in inline style without onMouseOver.
+                      // For now we trust the hover:opacity or we skip the hover accent color for border
+                      // Or we use a tiny trick:
+                    }
+                  }
+                >
+                  <Upload
+                    size={18}
+                    className="group-hover:-translate-y-0.5 transition-transform"
+                    style={{ color: theme.accentColor }} // Always accent color? or on hover? Original was hover.
+                  />
+                  <span className="group-hover:text-current">Select Files</span>
+                </button>
 
-            <button
-              onClick={() => {
-                if (showTextInput) {
-                  setShowTextInput(false);
-                  setTextInput("");
-                } else {
-                  setShowTextInput(true);
-                }
-              }}
-              className={`p-3 rounded-full transition-colors ${
-                showTextInput
-                  ? "bg-red-500/10 hover:bg-red-500/20 text-red-500"
-                  : isDarkMode
-                  ? "bg-slate-700 hover:bg-slate-600 text-slate-300"
-                  : "bg-gray-100 hover:bg-gray-200 text-gray-600"
-              }`}
-              title={showTextInput ? "Close Text Input" : "Send Text"}
-            >
-              {showTextInput ? <X size={22} /> : <MessageSquare size={22} />}
-            </button>
+                {textTransferEnabled && (
+                  <button
+                    onClick={() => {
+                      if (showTextInput) {
+                        setShowTextInput(false);
+
+                        setTextInput("");
+                      } else {
+                        setShowTextInput(true);
+                      }
+                    }}
+                    className={`p-3 rounded-full transition-colors ${
+                      showTextInput
+                        ? "bg-red-500/10 hover:bg-red-500/20 text-red-500"
+                        : theme.iconBg + " " + theme.ghostHover
+                    }`}
+                    title={showTextInput ? "Close Text Input" : "Send Text"}
+                  >
+                    {showTextInput ? (
+                      <X size={22} />
+                    ) : (
+                      <MessageSquare size={22} />
+                    )}
+                  </button>
+                )}
+              </div>
+            )}
           </div>
-        </div>
+        )}
       </div>
 
       {/* --- RIGHT SIDE: SERVER INFO & QR --- */}
-      {/* On Mobile: Absolute positioning covers the entire chat area (top-[60px] respects header).
+      {/* On Mobile: Absolute positioning covers the entire chat area (respects header).
          On Desktop: Static positioning sits side-by-side.
       */}
       <div
         className={`
-            absolute top-[60px] bottom-0 right-0 w-full z-40 
-            md:static md:w-[350px] md:border-l md:z-30
+            absolute top-[48px] bottom-0 right-0 w-full z-40 
+            md:static md:w-[350px] md:border-l md:z-30 md:pr-1
             flex flex-col shadow-xl transition-all duration-300 
             ${theme.panelBg}
-            ${!showQRPanel ? "hidden" : "flex"} md:flex
+            ${
+              activeTab === "qr" || activeTab === "settings"
+                ? "flex"
+                : "hidden md:flex"
+            }
         `}
+        style={{ "--wails-draggable": "no-drag" } as React.CSSProperties}
       >
-        <div className="flex-1 flex flex-col items-center justify-center p-8 animate-in slide-in-from-right duration-300">
-          {serverInfo ? (
-            <>
-              <div className="mb-6 flex flex-col items-center">
-                <img
-                  src={logo}
-                  alt="Logo"
-                  className="w-16 h-16 rounded-2xl shadow-lg mb-4"
-                />
-                <h1 className={`text-xl font-bold ${theme.text}`}>
-                  Scan to Connect
-                </h1>
-                <div className="flex items-center gap-2 mt-1">
-                  <p className={`text-sm font-mono ${theme.subText}`}>
-                    {serverInfo.url}
-                  </p>
-                  <CopyButton
-                    text={serverInfo.url}
-                    className={`p-1.5 rounded-md ${
-                      isDarkMode
-                        ? "hover:bg-slate-700 text-slate-400 hover:text-slate-300"
-                        : "hover:bg-gray-100 text-gray-400 hover:text-gray-600"
-                    }`}
-                    title="Copy URL"
-                    isDarkMode={isDarkMode}
-                  />
-                </div>
-              </div>
-
-              <div
-                className={`p-4 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] border ${theme.panelCard}`}
-              >
-                <div className="w-[180px] h-[180px] bg-white rounded-xl p-2">
-                  <QRCode
-                    value={serverInfo.url}
-                    style={{ height: "100%", width: "100%" }}
-                    viewBox={`0 0 256 256`}
-                  />
-                </div>
-              </div>
-
-              <div className="mt-8 text-center">
-                <div
-                  className={`inline-flex items-center gap-2 px-3 py-1 text-xs font-medium rounded-full border ${
-                    isDarkMode
-                      ? "bg-green-900/30 text-green-400 border-green-900/50"
-                      : "bg-green-50 text-green-700 border-green-100"
-                  }`}
-                >
-                  <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
-                  Server Active
+        {/* Toggle between Settings and QR Panel */}
+        <div className="flex-1 overflow-y-auto custom-scrollbar p-8 animate-in slide-in-from-right duration-300">
+          <div className="min-h-full flex flex-col items-center justify-start">
+            {activeTab === "settings" ? (
+              /* Settings Panel */
+              <div className="w-full self-start text-left pt-8">
+                {/* Left-aligned header */}
+                <div className="mb-8 flex items-center gap-3">
+                  <Settings size={24} className={theme.text} />
+                  <h1 className={`text-2xl font-bold ${theme.text}`}>
+                    Settings
+                  </h1>
                 </div>
 
-                <button
-                  onClick={handleRestartServer}
-                  className={`ml-2 p-1.5 rounded-full hover:bg-gray-100 transition-colors inline-flex items-center justify-center ${
-                    isDarkMode
-                      ? "hover:bg-slate-700 text-slate-400"
-                      : "hover:bg-gray-200 text-gray-500"
-                  }`}
-                  title="Restart Server"
-                >
-                  <RefreshCw size={14} />
-                </button>
+                {/* Settings Content - No borders, left-aligned */}
+                <div className="space-y-6 text-left">
+                  {/* Theme Setting */}
+                  <div>
+                    <h3 className={`text-sm font-semibold mb-3 ${theme.text}`}>
+                      Themes
+                    </h3>
 
-                <p
-                  className={`text-xs mt-3 max-w-[200px] mx-auto leading-relaxed ${theme.subText}`}
-                >
-                  Ensure both devices are connected to the same Wi-Fi network.
-                </p>
+                    {/* Theme Cards - Horizontal Scroll */}
+                    {/* Theme Cards - Horizontal Scroll */}
+                    <div className="flex overflow-x-auto gap-3 mb-2 pb-2 -mx-2 px-2 select-none scrollbar-hide">
+                      {THEME_PRESETS.map((t) => (
+                        <button
+                          key={t.id}
+                          onClick={() => setActiveThemeId(t.id)}
+                          className={`shrink-0 w-20 p-1 rounded-xl border-2 transition-all duration-200 group ${
+                            activeThemeId === t.id
+                              ? "border-[#007AFF]"
+                              : "border-transparent hover:border-gray-200 dark:hover:border-slate-700"
+                          }`}
+                          style={{
+                            borderColor:
+                              activeThemeId === t.id
+                                ? activeAccent.color
+                                : undefined,
+                          }}
+                        >
+                          <div
+                            className={`h-12 rounded-lg mb-1.5 relative overflow-hidden`}
+                            style={{ backgroundColor: t.previewColor }}
+                          >
+                            {/* Scaled Mock UI in Card */}
+                            <div className="absolute top-1.5 left-1.5 right-6 h-1.5 rounded-full bg-slate-400/20"></div>
+                            <div className="absolute top-4 left-1.5 right-3 h-3 rounded bg-white/20"></div>
+                            <div
+                              className="absolute top-8 right-1.5 left-6 h-3 rounded"
+                              style={{ backgroundColor: activeAccent.color }}
+                            ></div>
+                          </div>
+                          <div
+                            className={`text-[10px] font-medium text-center truncate ${
+                              theme.subText
+                            } ${activeThemeId === t.id ? "font-bold" : ""}`}
+                            style={{
+                              color:
+                                activeThemeId === t.id
+                                  ? activeAccent.color
+                                  : undefined,
+                            }}
+                          >
+                            {t.name}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Accent Colors */}
+                    <div className="flex flex-wrap gap-2 items-center justify-start">
+                      {ACCENT_COLORS.map((color) => (
+                        <button
+                          key={color.id}
+                          onClick={() => setActiveAccentId(color.id)}
+                          className={`w-4 h-4 rounded-full transition-all duration-200 flex items-center justify-center ${
+                            activeAccentId === color.id
+                              ? "scale-105 ring ring-offset-2 ring-offset-transparent"
+                              : "hover:scale-105"
+                          }`}
+                          style={{
+                            backgroundColor: color.color,
+                            boxShadow:
+                              activeAccentId === color.id
+                                ? `0 0 0 2px ${
+                                    theme.bg === "bg-[#0f172a]"
+                                      ? "#0f172a"
+                                      : "white"
+                                  }, 0 0 0 3px ${color.color}`
+                                : "none",
+                          }}
+                        >
+                          {activeAccentId === color.id && (
+                            <Check size={10} className="text-white" />
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Features */}
+                  <div>
+                    <h3 className={`text-sm font-semibold mb-4 ${theme.text}`}>
+                      Features
+                    </h3>
+                    <div className="space-y-3">
+                      {/* Text Transfer Toggle */}
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1">
+                          <p className={`text-sm font-medium ${theme.text}`}>
+                            Text Transfer
+                          </p>
+                          <p className={`text-xs mt-0.5 ${theme.subText}`}>
+                            Enable sending and receiving text messages
+                          </p>
+                        </div>
+                        <button
+                          onClick={() =>
+                            setTextTransferEnabled(!textTransferEnabled)
+                          }
+                          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors shrink-0 ${
+                            textTransferEnabled ? "" : theme.iconBg
+                          }`}
+                          style={{
+                            backgroundColor: textTransferEnabled
+                              ? theme.accentColor
+                              : undefined,
+                          }}
+                        >
+                          <span
+                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                              textTransferEnabled
+                                ? "translate-x-6"
+                                : "translate-x-1"
+                            }`}
+                          />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Server Info */}
+                  {serverInfo && (
+                    <div>
+                      <h3
+                        className={`text-sm font-semibold mb-4 ${theme.text}`}
+                      >
+                        Server Information
+                      </h3>
+                      <div className="space-y-3">
+                        <div>
+                          <p
+                            className={`text-[10px] uppercase tracking-wider mb-1.5 ${theme.subText}`}
+                          >
+                            URL
+                          </p>
+                          <div className="flex items-center gap-2">
+                            <code
+                              className={`text-xs font-mono flex-1 ${theme.text}`}
+                            >
+                              {serverInfo.url}
+                            </code>
+                            <CopyButton
+                              text={serverInfo.url}
+                              className={`p-1.5 rounded-md ${
+                                isDarkMode
+                                  ? "hover:bg-slate-700 text-slate-400 hover:text-slate-300"
+                                  : "hover:bg-gray-100 text-gray-400 hover:text-gray-600"
+                              }`}
+                              isDarkMode={isDarkMode}
+                            />
+                          </div>
+                        </div>
+                        {serverInfo.ssid && (
+                          <div>
+                            <p
+                              className={`text-[10px] uppercase tracking-wider mb-1.5 ${theme.subText}`}
+                            >
+                              Wi-Fi Network
+                            </p>
+                            <code className={`text-xs font-mono ${theme.text}`}>
+                              {serverInfo.ssid}
+                            </code>
+                          </div>
+                        )}
+                        <div className="pt-2">
+                          <button
+                            onClick={handleRestartServer}
+                            disabled={isCheckingNetwork}
+                            className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                              theme.iconBg
+                            } ${theme.ghostHover} ${theme.text} ${
+                              isCheckingNetwork
+                                ? "opacity-50 cursor-not-allowed"
+                                : ""
+                            }`}
+                          >
+                            <RefreshCw
+                              size={14}
+                              className={
+                                isCheckingNetwork ? "animate-spin" : ""
+                              }
+                            />
+                            {isCheckingNetwork
+                              ? "Restarting..."
+                              : "Restart Server"}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Connected Devices */}
+                  {clients.length > 0 && (
+                    <div>
+                      <h3
+                        className={`text-sm font-semibold mb-4 ${theme.text}`}
+                      >
+                        Connected Devices ({clients.length})
+                      </h3>
+                      <div className="space-y-2">
+                        {clients.map((client) => (
+                          <EditableDeviceName
+                            key={client.id}
+                            client={client}
+                            isDarkMode={isDarkMode}
+                            theme={theme}
+                            serverUrl={serverInfo?.url || ""}
+                            onBlock={handleBlockClient}
+                            onBlockSending={handleBlockSending}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
+            ) : serverInfo ? (
+              <>
+                {/* Header */}
+                <div className="mb-8 flex flex-col items-center pt-8">
+                  <h1 className={`text-xl font-bold ${theme.text}`}>
+                    Connect Device
+                  </h1>
+                </div>
 
-              {/* Connected Clients Section */}
-              {clients.length > 0 && (
-                <div
-                  className={`mt-6 w-full px-4 animate-in slide-in-from-bottom-2 fade-in duration-500`}
-                >
-                  <h3
-                    className={`text-xs font-semibold uppercase tracking-wider mb-3 px-2 ${theme.subText}`}
-                  >
-                    Connected Devices
-                  </h3>
-                  <div className="flex flex-col gap-2">
-                    {clients.map((client) => (
+                <div className="w-full max-w-[300px] mx-auto space-y-8">
+                  {/* Step 1: Network */}
+                  <div className="text-center space-y-2">
+                    <p
+                      className={`text-xs font-semibold uppercase tracking-wider ${theme.subText}`}
+                    >
+                      Step 1: Network
+                    </p>
+
+                    {serverInfo?.ssid ? (
                       <div
-                        key={client.id}
-                        className={`flex items-center gap-3 p-3 rounded-xl border transition-all ${
+                        className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg font-mono text-sm font-medium border ${
                           isDarkMode
-                            ? "bg-slate-800/50 border-slate-700"
-                            : "bg-gray-50 border-gray-100"
+                            ? "bg-slate-800/50 border-slate-700 text-green-400"
+                            : "bg-white border-green-200 text-green-700"
                         }`}
                       >
-                        <div
-                          className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                            isDarkMode
-                              ? "bg-slate-700 text-slate-300"
-                              : "bg-white text-gray-500 shadow-sm"
-                          }`}
-                        >
-                          <PlatformIcon platform={client.platform} size={16} />
-                        </div>
-                        <div className="flex-1 min-w-0 text-left">
-                          <div
-                            className={`text-sm font-medium truncate capitalize ${theme.text}`}
-                          >
-                            {client.platform}
-                          </div>
-                          <div
-                            className={`text-[10px] truncate font-mono ${theme.subText}`}
-                          >
-                            {client.ip}
-                          </div>
-                        </div>
-                        <div className="w-1.5 h-1.5 rounded-full bg-green-500"></div>
+                        <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
+                        {serverInfo.ssid}
                       </div>
-                    ))}
+                    ) : (
+                      <div
+                        className={`px-4 py-3 rounded-lg border border-dashed ${theme.border}`}
+                      >
+                        <p className={`text-sm ${theme.text} mb-1`}>
+                          {isCheckingNetwork
+                            ? "Checking Network..."
+                            : "No Wi-Fi Detected"}
+                        </p>
+                        <p className={`text-xs ${theme.subText}`}>
+                          {isCheckingNetwork
+                            ? "Please wait while we scan connections"
+                            : "Connect devices to the same network or use hotspot"}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Step 2: QR Code */}
+                  <div className="text-center space-y-4">
+                    <p
+                      className={`text-xs font-semibold uppercase tracking-wider ${theme.subText}`}
+                    >
+                      Step 2: Scan QR
+                    </p>
+
+                    <div className="flex justify-center">
+                      <div
+                        className={`p-3 rounded-2xl ${
+                          isDarkMode
+                            ? "bg-white shadow-lg"
+                            : "bg-white shadow-[0_8px_30px_rgba(0,0,0,0.12)] border border-gray-100"
+                        }`}
+                        style={{
+                          opacity: serverInfo?.ssid ? 1 : 0.5,
+                          filter: serverInfo?.ssid ? "none" : "grayscale(100%)",
+                          transition: "all 0.3s ease",
+                        }}
+                      >
+                        <div className="w-[180px] h-[180px]">
+                          <QRCode
+                            value={serverInfo?.url || ""}
+                            style={{ height: "100%", width: "100%" }}
+                            viewBox={`0 0 256 256`}
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* URL Fallback */}
+                    {serverInfo?.ssid ? (
+                      <div className="flex items-center justify-center gap-2">
+                        <code className={`text-xs font-mono ${theme.subText}`}>
+                          {serverInfo.url}
+                        </code>
+                        <CopyButton
+                          text={serverInfo.url}
+                          className={`p-1.5 rounded-md transition-colors ${theme.ghostHover} ${theme.subText}`}
+                          iconSize={12}
+                          isDarkMode={isDarkMode}
+                        />
+                      </div>
+                    ) : (
+                      <p className={`text-xs ${theme.subText}`}>
+                        Waiting for network connection...
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Server Controls */}
+                  <div className="flex justify-center pt-2">
+                    <button
+                      onClick={handleRestartServer}
+                      disabled={isCheckingNetwork}
+                      className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs transition-colors ${
+                        theme.ghostHover
+                      } ${theme.subText} ${
+                        isCheckingNetwork ? "opacity-50 cursor-not-allowed" : ""
+                      }`}
+                    >
+                      <RefreshCw
+                        size={12}
+                        className={isCheckingNetwork ? "animate-spin" : ""}
+                      />
+                      {isCheckingNetwork ? "Restarting..." : "Restart"}
+                    </button>
                   </div>
                 </div>
-              )}
-            </>
-          ) : (
-            <div className={`text-center ${theme.subText}`}>
-              <div
-                className={`w-16 h-16 rounded-full border-2 border-dashed flex items-center justify-center mx-auto mb-4 animate-spin-slow ${
-                  isDarkMode ? "border-slate-700" : "border-gray-300"
-                }`}
-              >
-                <Upload size={24} />
+
+                {/* Connected Clients */}
+                {clients.length > 0 && (
+                  <div
+                    className={`mt-10 w-full px-4 animate-in slide-in-from-bottom-2 fade-in duration-500`}
+                  >
+                    <h3
+                      className={`text-xs font-semibold uppercase tracking-wider mb-3 text-center ${theme.subText}`}
+                    >
+                      Connected Devices
+                    </h3>
+                    <div className="flex flex-col gap-2">
+                      {clients.map((client) => (
+                        <EditableDeviceName
+                          key={client.id}
+                          client={client}
+                          isDarkMode={isDarkMode}
+                          theme={theme}
+                          serverUrl={serverInfo?.url || ""}
+                          onBlock={handleBlockClient}
+                          onBlockSending={handleBlockSending}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className={`text-center ${theme.subText}`}>
+                <div
+                  className={`w-16 h-16 rounded-full border-2 border-dashed flex items-center justify-center mx-auto mb-4 animate-spin-slow ${theme.border} ${theme.iconText}`}
+                >
+                  <Upload size={24} />
+                </div>
+                <p>Starting server...</p>
               </div>
-              <p>Starting server...</p>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </div>
+
+      <ConfirmDialog
+        isOpen={!!transactionToCancel}
+        title="Cancel Transfer"
+        message={
+          <>
+            Stop receiving "{transactionToCancel?.filename}"?
+            <br />
+            This will end the file transfer.
+          </>
+        }
+        confirmText="Stop"
+        cancelText="Continue"
+        onConfirm={async () => {
+          if (transactionToCancel) {
+            try {
+              await axios.post(
+                `/api/cancel-transaction/${transactionToCancel.id}`
+              );
+            } catch (err) {
+              console.error("Failed to cancel transaction:", err);
+            }
+            setTransactionToCancel(null);
+          }
+        }}
+        onCancel={() => setTransactionToCancel(null)}
+        destructive={true}
+        isDarkMode={isDarkMode}
+      />
     </div>
   );
 };

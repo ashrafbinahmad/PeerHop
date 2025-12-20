@@ -5,7 +5,7 @@
   "scripts": {
     "build:win": "cd ui && wails build -platform windows/amd64 -o ../../../builds/peerhop_win.exe",
     "build:win:nsis": "cd ui && wails build -platform windows/amd64 -nsis -o ../../../builds/peerhop_setup.exe",
-    "build:win:msi": "cd ui && wails build -platform windows/amd64 && cd build/windows/msi && wix build product.wxs -o ../../../../builds/peerhop_setup.msi",
+    "build:win:msi": "cd ui && wails build -platform windows/amd64 && cd build/windows/msi && wix build product.wxs -ext WixToolset.UI.wixext -o ../../../../builds/peerhop_setup.msi",
     "build:linux": "cd ui && wails build -platform linux/amd64 -o ../../../builds/peerhop_linux",
     "build:linux:wsl": "wsl bash \"/mnt/f/PeerHop/PeerHop desktop/build-linux-wsl.sh\"",
     "build:cli:win": "go build -o builds/peerhop_cli_win.exe ./cmd/peerhop",

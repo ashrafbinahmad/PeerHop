@@ -39,14 +39,21 @@ type transactionProgressWriter struct {
 	ProgressBar  *progressbar.ProgressBar
 	TxStore      *TransactionStore
 	WSHub        *WebSocketHub // WebSocket hub for broadcasting updates
+	ClientStore  *ClientStore  // Check for blocked status
 	TxnID        int
 	ClientID     string // Client downloading the file
+	ClientIP     string // IP to check for blocking
 	TotalBytes   int64
 	BytesWritten int64
 	LastUpdate   time.Time
 }
 
 func (w *transactionProgressWriter) Write(p []byte) (int, error) {
+	// Check if client is blocked
+	if w.ClientStore != nil && w.ClientIP != "" && w.ClientStore.IsBlocked(w.ClientIP) {
+		return 0, fmt.Errorf("client blocked")
+	}
+
 	// Check if transaction has been cancelled (global or client-specific)
 	if w.TxStore != nil && w.TxnID > 0 {
 		if w.TxStore.IsCancelled(w.TxnID) {
@@ -94,15 +101,16 @@ func (w *transactionProgressWriter) Write(p []byte) (int, error) {
 
 // UnifiedHandler handles both file downloads and uploads
 type UnifiedHandler struct {
-	mu            sync.RWMutex
-	FilePath      string
-	Bar           *progressbar.ProgressBar
-	DevServerURL  string            // If set, proxy frontend requests to this URL (e.g., "http://localhost:5173")
-	UploadedFiles []string          // Track files uploaded from mobile
-	TxStore       *TransactionStore // Transaction store for tracking all transfers
-	ClientStore   *ClientStore      // Client store for tracking connected devices
-	WSHub         *WebSocketHub     // WebSocket hub for real-time updates
-	IsDarkMode    bool              // Track current theme
+	mu                sync.RWMutex
+	FilePath          string
+	Bar               *progressbar.ProgressBar
+	DevServerURL      string            // If set, proxy frontend requests to this URL (e.g., "http://localhost:5173")
+	UploadedFiles     []string          // Track files uploaded from mobile
+	TxStore           *TransactionStore // Transaction store for tracking all transfers
+	ClientStore       *ClientStore      // Client store for tracking connected devices
+	WSHub             *WebSocketHub     // WebSocket hub for real-time updates
+	IsDarkMode        bool              // Track current theme
+	DesktopDeviceName string            // Desktop device name (editable)
 }
 
 func (h *UnifiedHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -120,6 +128,27 @@ func (h *UnifiedHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		userAgent := r.UserAgent()
 		h.ClientStore.AddOrUpdateClient(clientID, userAgent, ip)
+	}
+
+	// Check if client is blocked
+	// We allow access for now so they can load the UI to see "You are blocked" message
+	// But we will block specific API actions below
+	if h.ClientStore != nil {
+		clientIP := r.RemoteAddr
+		if idx := strings.LastIndex(clientIP, ":"); idx != -1 {
+			clientIP = clientIP[:idx]
+		}
+		if h.ClientStore.IsBlocked(clientIP) {
+			// Only strictly block critical APIs here.
+			// We allow /, /assets/, /api/ws (to receive events), /api/meta etc so UI loads.
+			// Block uploads/downloads/actions
+			if r.Method == http.MethodPost ||
+				strings.Contains(r.URL.Path, "/download") ||
+				strings.Contains(r.URL.Path, "/upload") {
+				http.Error(w, "Access denied", http.StatusForbidden)
+				return
+			}
+		}
 	}
 
 	// Handle preflight requests
@@ -191,6 +220,17 @@ func (h *UnifiedHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// API: Upload
 	if r.URL.Path == "/api/upload" && r.Method == http.MethodPost {
+		// Check if sending is blocked
+		if h.ClientStore != nil {
+			clientIP := r.RemoteAddr
+			if idx := strings.LastIndex(clientIP, ":"); idx != -1 {
+				clientIP = clientIP[:idx]
+			}
+			if h.ClientStore.IsSendingBlocked(clientIP) {
+				http.Error(w, "Sending is blocked", http.StatusForbidden)
+				return
+			}
+		}
 		h.handleUpload(w, r)
 		return
 	}
@@ -226,7 +266,9 @@ func (h *UnifiedHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path == "/api/theme" {
 		if r.Method == http.MethodPost {
 			var req struct {
-				IsDarkMode bool `json:"isDarkMode"`
+				IsDarkMode bool   `json:"isDarkMode"`
+				ThemeID    string `json:"themeId"`
+				AccentID   string `json:"accentId"`
 			}
 			if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 				http.Error(w, "Invalid body", http.StatusBadRequest)
@@ -239,9 +281,14 @@ func (h *UnifiedHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 			// Broadcast
 			if h.WSHub != nil {
-				h.WSHub.Broadcast("theme_update", map[string]interface{}{
-					"isDarkMode": req.IsDarkMode,
-				})
+				if req.ThemeID != "" {
+					h.WSHub.SetTheme(req.ThemeID, req.AccentID)
+				} else {
+					// Fallback for just IsDarkMode update
+					h.WSHub.Broadcast("theme_update", map[string]interface{}{
+						"isDarkMode": req.IsDarkMode,
+					})
+				}
 			}
 
 			json.NewEncoder(w).Encode(map[string]bool{"success": true})
@@ -253,8 +300,87 @@ func (h *UnifiedHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		isDark := h.IsDarkMode
 		h.mu.RUnlock()
 
-		json.NewEncoder(w).Encode(map[string]bool{
+		var themeID, accentID string
+		if h.WSHub != nil {
+			themeID, accentID = h.WSHub.GetTheme()
+		}
+
+		json.NewEncoder(w).Encode(map[string]interface{}{
 			"isDarkMode": isDark,
+			"themeId":    themeID,
+			"accentId":   accentID,
+		})
+		return
+	}
+
+	// API: Settings
+	if r.URL.Path == "/api/settings" {
+		if r.Method == http.MethodPost {
+			var req struct {
+				TextTransferEnabled bool `json:"textTransferEnabled"`
+			}
+			if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+				http.Error(w, "Invalid body", http.StatusBadRequest)
+				return
+			}
+
+			// Update in WebSocket hub and broadcast
+			if h.WSHub != nil {
+				h.WSHub.SetTextTransferEnabled(req.TextTransferEnabled)
+			}
+
+			json.NewEncoder(w).Encode(map[string]bool{"success": true})
+			return
+		}
+
+		// GET
+		enabled := false
+		if h.WSHub != nil {
+			enabled = h.WSHub.GetTextTransferEnabled()
+		}
+
+		json.NewEncoder(w).Encode(map[string]bool{
+			"textTransferEnabled": enabled,
+		})
+		return
+	}
+
+	// API: Desktop Device Name
+	if r.URL.Path == "/api/desktop-name" {
+		if r.Method == http.MethodPost {
+			var req struct {
+				Name string `json:"name"`
+			}
+			if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+				http.Error(w, "Invalid body", http.StatusBadRequest)
+				return
+			}
+
+			h.mu.Lock()
+			h.DesktopDeviceName = req.Name
+			h.mu.Unlock()
+
+			// Broadcast to all clients via WebSocket
+			if h.WSHub != nil {
+				h.WSHub.SetDesktopName(req.Name)
+			}
+
+			json.NewEncoder(w).Encode(map[string]bool{"success": true})
+			return
+		}
+
+		// GET
+		h.mu.RLock()
+		name := h.DesktopDeviceName
+		h.mu.RUnlock()
+
+		// If empty, try to get from WebSocket hub
+		if name == "" && h.WSHub != nil {
+			name = h.WSHub.GetDesktopName()
+		}
+
+		json.NewEncoder(w).Encode(map[string]string{
+			"name": name,
 		})
 		return
 	}
@@ -298,6 +424,18 @@ func (h *UnifiedHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			http.Error(w, "Invalid request", http.StatusBadRequest)
 			return
+		}
+
+		// Check if sending is blocked
+		if h.ClientStore != nil {
+			clientIP := r.RemoteAddr
+			if idx := strings.LastIndex(clientIP, ":"); idx != -1 {
+				clientIP = clientIP[:idx]
+			}
+			if h.ClientStore.IsSendingBlocked(clientIP) {
+				http.Error(w, "Sending is blocked", http.StatusForbidden)
+				return
+			}
 		}
 
 		if h.TxStore == nil {
@@ -379,8 +517,199 @@ func (h *UnifiedHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// API: Update client name
+	if r.URL.Path == "/api/update-client-name" && r.Method == http.MethodPost {
+		var req struct {
+			IP   string `json:"ip"`
+			Name string `json:"name"`
+		}
+
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "Invalid request", http.StatusBadRequest)
+			return
+		}
+
+		if h.ClientStore == nil {
+			http.Error(w, "Client store not initialized", http.StatusInternalServerError)
+			return
+		}
+
+		success := h.ClientStore.UpdateClientName(req.IP, req.Name)
+		if !success {
+			http.Error(w, "Client not found", http.StatusNotFound)
+			return
+		}
+
+		fmt.Printf("[API] Updated name for client %s to: %s\n", req.IP, req.Name)
+
+		// Broadcast update
+		if h.WSHub != nil {
+			h.WSHub.BroadcastDevicesUpdate()
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": true,
+		})
+		return
+	}
+
+	// API: Block client
+	if r.URL.Path == "/api/block-client" && r.Method == http.MethodPost {
+		var req struct {
+			IP string `json:"ip"`
+		}
+
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "Invalid request", http.StatusBadRequest)
+			return
+		}
+
+		if h.ClientStore == nil {
+			http.Error(w, "Client store not initialized", http.StatusInternalServerError)
+			return
+		}
+
+		success := h.ClientStore.BlockClient(req.IP)
+		if !success {
+			http.Error(w, "Client not found", http.StatusNotFound)
+			return
+		}
+
+		fmt.Printf("[API] Blocked client with IP: %s\n", req.IP)
+
+		fmt.Printf("[API] Blocked client with IP: %s\n", req.IP)
+
+		// Note: We do NOT disconnect WebSocket completely anymore,
+		// so the client can receive the update that it is blocked.
+		// However, we still rely on the ServeHTTP blocked check to prevent actions.
+
+		// Broadcast update
+		if h.WSHub != nil {
+			h.WSHub.BroadcastDevicesUpdate()
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": true,
+		})
+		return
+	}
+
+	// API: Block Sending
+	if r.URL.Path == "/api/block-sending" && r.Method == http.MethodPost {
+		var req struct {
+			IP string `json:"ip"`
+		}
+
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "Invalid request", http.StatusBadRequest)
+			return
+		}
+
+		if h.ClientStore == nil {
+			http.Error(w, "Client store not initialized", http.StatusInternalServerError)
+			return
+		}
+
+		success := h.ClientStore.BlockSending(req.IP)
+		if !success {
+			http.Error(w, "Client not found", http.StatusNotFound)
+			return
+		}
+
+		fmt.Printf("[API] Blocked sending for client with IP: %s\n", req.IP)
+
+		// Broadcast update
+		if h.WSHub != nil {
+			h.WSHub.BroadcastDevicesUpdate()
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": true,
+		})
+		return
+	}
+
+	// API: Unblock Sending
+	if r.URL.Path == "/api/unblock-sending" && r.Method == http.MethodPost {
+		var req struct {
+			IP string `json:"ip"`
+		}
+
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "Invalid request", http.StatusBadRequest)
+			return
+		}
+
+		if h.ClientStore == nil {
+			http.Error(w, "Client store not initialized", http.StatusInternalServerError)
+			return
+		}
+
+		success := h.ClientStore.UnblockSending(req.IP)
+		if !success {
+			http.Error(w, "Client not found", http.StatusNotFound)
+			return
+		}
+
+		fmt.Printf("[API] Unblocked sending for client with IP: %s\n", req.IP)
+
+		// Broadcast update
+		if h.WSHub != nil {
+			h.WSHub.BroadcastDevicesUpdate()
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": true,
+		})
+		return
+	}
+
+	// API: Unblock client
+	if r.URL.Path == "/api/unblock-client" && r.Method == http.MethodPost {
+		var req struct {
+			IP string `json:"ip"`
+		}
+
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "Invalid request", http.StatusBadRequest)
+			return
+		}
+
+		if h.ClientStore == nil {
+			http.Error(w, "Client store not initialized", http.StatusInternalServerError)
+			return
+		}
+
+		success := h.ClientStore.UnblockClient(req.IP)
+		if !success {
+			http.Error(w, "Client not found", http.StatusNotFound)
+			return
+		}
+
+		fmt.Printf("[API] Unblocked client with IP: %s\n", req.IP)
+
+		// Broadcast update
+		if h.WSHub != nil {
+			h.WSHub.BroadcastDevicesUpdate()
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": true,
+		})
+		return
+	}
+
 	// API: Cancel transaction (generic, e.g. stopping an incoming upload)
-	if strings.HasPrefix(r.URL.Path, "/api/cancel-transaction/") && r.Method == http.MethodPost {
+	if strings.HasPrefix(r.URL.Path, "/api/cancel-transaction/") {
+		if r.Method != http.MethodPost {
+			http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+			return
+		}
 		idStr := strings.TrimPrefix(r.URL.Path, "/api/cancel-transaction/")
 		id, err := strconv.Atoi(idStr)
 		if err != nil {
@@ -575,22 +904,38 @@ func (h *UnifiedHandler) serveFile(w http.ResponseWriter, r *http.Request, fileP
 		}
 	}
 
+	// Check if this is a preview request (thumbnail)
+	isPreview := r.URL.Query().Get("preview") == "true"
+
 	// Create a custom writer that tracks progress (mainly for CLI progress bar if active)
 	// We do NOT create a new Transaction here, because that would create a duplicate
 	// "new message" in the UI chat for every download action.
 	// Instead, we try to attach to the existing "File Available" transaction if it exists.
-	pw := &transactionProgressWriter{
-		ResponseWriter: w,
-		ProgressBar:    h.Bar,
-		TxStore:        txStore, // Use the store only if we found a valid transaction to update
-		WSHub:          h.WSHub, // Pass WSHub for broadcasting updates
-		TxnID:          txnID,
-		ClientID:       clientID, // Pass client ID for client-specific tracking
-		TotalBytes:     stat.Size(),
-		BytesWritten:   0,
+	var writer http.ResponseWriter
+	if isPreview {
+		// Just write directly without tracking progress
+		writer = w
+	} else {
+		clientIP := r.RemoteAddr
+		if idx := strings.LastIndex(clientIP, ":"); idx != -1 {
+			clientIP = clientIP[:idx]
+		}
+		pw := &transactionProgressWriter{
+			ResponseWriter: w,
+			ProgressBar:    h.Bar,
+			TxStore:        txStore, // Use the store only if we found a valid transaction to update
+			WSHub:          h.WSHub, // Pass WSHub for broadcasting updates
+			ClientStore:    h.ClientStore,
+			TxnID:          txnID,
+			ClientID:       clientID, // Pass client ID for client-specific tracking
+			ClientIP:       clientIP,
+			TotalBytes:     stat.Size(),
+			BytesWritten:   0,
+		}
+		writer = pw
 	}
 
-	http.ServeContent(pw, r, stat.Name(), stat.ModTime(), f)
+	http.ServeContent(writer, r, stat.Name(), stat.ModTime(), f)
 }
 
 func (h *UnifiedHandler) handleUpload(w http.ResponseWriter, r *http.Request) {
@@ -647,7 +992,9 @@ func (h *UnifiedHandler) handleUpload(w http.ResponseWriter, r *http.Request) {
 
 		// Check for collision in Downloads folder
 		if _, err := os.Stat(fullPath); err == nil {
-			filename = fmt.Sprintf("%d_%s", time.Now().Unix(), filename)
+			ext := filepath.Ext(filename)
+			name := strings.TrimSuffix(filename, ext)
+			filename = fmt.Sprintf("%s_%d%s", name, time.Now().Unix(), ext)
 			fullPath = filepath.Join(downloadsDir, filename)
 		}
 
@@ -700,27 +1047,47 @@ func (h *UnifiedHandler) handleUpload(w http.ResponseWriter, r *http.Request) {
 					// Throttle progress updates to avoid mutex locking on every chunk
 					// Update max 5 times per second (200ms)
 					if h.TxStore != nil && txnID > 0 {
-						if time.Since(lastUpdate) > 200*time.Millisecond {
-							// Check for cancellation
-							if h.TxStore.IsCancelled(txnID) {
-								if h.TxStore != nil && txnID > 0 {
-									h.TxStore.UpdateStatus(txnID, "cancelled")
-									// Force broadcast
-									if txn, exists := h.TxStore.GetTransactionCopy(txnID); exists {
-										h.WSHub.BroadcastTransactionUpdate(txn)
-									}
+						// Check for cancellation immediately (every chunk)
+						if h.TxStore.IsCancelled(txnID) {
+							fmt.Printf("[Upload] Cancellation detected for txn %d\n", txnID)
+							if h.TxStore != nil && txnID > 0 {
+								h.TxStore.UpdateStatus(txnID, "cancelled")
+								// Force broadcast
+								if txn, exists := h.TxStore.GetTransactionCopy(txnID); exists {
+									h.WSHub.BroadcastTransactionUpdate(txn)
 								}
-								// Remove partial file
+							}
+							// Remove partial file
+							dst.Close()
+							os.Remove(fullPath)
+
+							// Error 499 Client Closed Request
+							http.Error(w, "Upload cancelled", 499)
+							return
+						}
+
+						// Throttle progress updates to avoid mutex locking on every chunk
+						// Update max 5 times per second (200ms)
+						if time.Since(lastUpdate) > 200*time.Millisecond {
+							// Check if client is blocked
+							clientIP := r.RemoteAddr
+							if idx := strings.LastIndex(clientIP, ":"); idx != -1 {
+								clientIP = clientIP[:idx]
+							}
+							if h.ClientStore != nil && (h.ClientStore.IsBlocked(clientIP) || h.ClientStore.IsSendingBlocked(clientIP)) {
+								// Cleanup and return
 								dst.Close()
 								os.Remove(fullPath)
-
-								// Error 499 Client Closed Request
-								http.Error(w, "Upload cancelled", 499)
+								fmt.Printf("[Upload] Terminated upload from blocked client: %s\n", clientIP)
+								http.Error(w, "Client blocked", http.StatusForbidden)
 								return
 							}
 
 							h.TxStore.UpdateProgress(txnID, written, currentFileSize)
-							// Broadcast update locally? The WebSocketHub handles it via UpdateProgress -> BroadcastTransactionUpdate
+							// Broadcast update including speed info implicitly via BytesTransferred
+							if txn, exists := h.TxStore.GetTransactionCopy(txnID); exists {
+								h.WSHub.BroadcastTransactionUpdate(txn)
+							}
 							lastUpdate = time.Now()
 						}
 					}
@@ -744,15 +1111,39 @@ func (h *UnifiedHandler) handleUpload(w http.ResponseWriter, r *http.Request) {
 		dst.Close() // Close explicitly to flush buffers
 
 		if err != nil {
-			fmt.Printf("Error saving file %s: %v\n", fullPath, err)
+			// Check if error is due to cancellation (client disconnect or context cancel)
+			isCancelled := strings.Contains(err.Error(), "unexpected EOF") ||
+				strings.Contains(err.Error(), "context canceled") ||
+				strings.Contains(err.Error(), "connection reset") ||
+				strings.Contains(err.Error(), "multipart: NextPart: EOF")
+
+			if isCancelled {
+				fmt.Printf("Upload cancelled for file %s: %v\n", fullPath, err)
+				// Delete the partial file
+				os.Remove(fullPath)
+			} else {
+				fmt.Printf("Error saving file %s: %v\n", fullPath, err)
+			}
+
 			if h.TxStore != nil && txnID > 0 {
-				h.TxStore.UpdateStatus(txnID, "failed")
-				// Force broadcast of failed status so UI updates
+				status := "failed"
+				if isCancelled {
+					status = "cancelled"
+				}
+				h.TxStore.UpdateStatus(txnID, status)
+				// Force broadcast of status so UI updates
 				if txn, exists := h.TxStore.GetTransactionCopy(txnID); exists {
+					h.TxStore.UpdateProgress(txnID, written, currentFileSize)
 					h.WSHub.BroadcastTransactionUpdate(txn)
 				}
 			}
-			http.Error(w, fmt.Sprintf("Error saving file: %v", err), http.StatusInternalServerError)
+
+			if isCancelled {
+				// Client closed connection, so writing response might fail, but try anyway
+				http.Error(w, "Upload cancelled", 499)
+			} else {
+				http.Error(w, fmt.Sprintf("Error saving file: %v", err), http.StatusInternalServerError)
+			}
 			return
 		}
 
@@ -797,6 +1188,13 @@ func (h *UnifiedHandler) ClearFilePath() {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	h.FilePath = ""
+}
+
+// Shutdown cleans up resources
+func (h *UnifiedHandler) Shutdown() {
+	if h.WSHub != nil {
+		h.WSHub.Shutdown()
+	}
 }
 
 // NewUnifiedHandler creates a new unified handler

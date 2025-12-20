@@ -1,53 +1,72 @@
-import { useEffect, useState } from 'react';
-import './App.css';
-import { getMetaData, MetaData } from './api';
-import { DesktopView } from './views/DesktopView';
-import { MobileUnified } from './views/MobileUnified';
+import { useEffect, useState } from "react";
+import "./App.css";
+import { getMetaData, MetaData } from "./api";
+import { DesktopView } from "./views/DesktopView";
+import { MobileUnified } from "./views/MobileUnified";
 
-import { MobileUpload } from './views/MobileUpload';
-import { MobileDownload } from './views/MobileDownload';
+import { MobileUpload } from "./views/MobileUpload";
+import { MobileDownload } from "./views/MobileDownload";
 
 function App() {
-    const [loading, setLoading] = useState(true);
-    const [mobileState, setMobileState] = useState<MetaData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [mobileState, setMobileState] = useState<MetaData | null>(null);
 
-    useEffect(() => {
-        const checkMode = async () => {
-            // Check if we are in environment where /api/meta works
-            const meta = await getMetaData();
-            if (meta) {
-                setMobileState(meta);
-            }
-            setLoading(false);
-        };
-        checkMode();
-    }, []);
+  useEffect(() => {
+    const checkMode = async () => {
+      // Skip check if we are in Wails environment (desktop app)
+      if (
+        window.location.host.includes("wails.localhost") ||
+        (window as any).wails ||
+        (window as any).runtime
+      ) {
+        setLoading(false);
+        return;
+      }
 
-    if (loading) return <div className="loading-screen"><div className="spinner"></div></div>;
+      // Check if we are in environment where /api/meta works (mobile/web)
+      const meta = await getMetaData();
+      if (meta) {
+        setMobileState(meta);
+      }
+      setLoading(false);
+    };
+    checkMode();
+  }, []);
 
-    // Mobile/Web view
-    if (mobileState) {
-        // UI App (Unified View)
-        if (mobileState.app === 'ui') {
-            return <MobileUnified
-                downloadFilename={mobileState.filename}
-                downloadSize={mobileState.size}
-            />;
-        }
+  if (loading)
+    return (
+      <div className="loading-screen">
+        <div className="spinner"></div>
+      </div>
+    );
 
-        // CLI App (Split Views)
-        if (mobileState.mode === 'upload') {
-            return <MobileUpload />;
-        } else {
-            return <MobileDownload
-                filename={mobileState.filename || 'file'}
-                size={mobileState.size || 0}
-            />;
-        }
+  // Mobile/Web view
+  if (mobileState) {
+    // UI App (Unified View)
+    if (mobileState.app === "ui") {
+      return (
+        <MobileUnified
+          downloadFilename={mobileState.filename}
+          downloadSize={mobileState.size}
+        />
+      );
     }
 
-    // Desktop view
-    return <DesktopView />;
+    // CLI App (Split Views)
+    if (mobileState.mode === "upload") {
+      return <MobileUpload />;
+    } else {
+      return (
+        <MobileDownload
+          filename={mobileState.filename || "file"}
+          size={mobileState.size || 0}
+        />
+      );
+    }
+  }
+
+  // Desktop view
+  return <DesktopView />;
 }
 
 export default App;
