@@ -243,6 +243,11 @@ process.chdir(path.join(uiDir, 'build', 'windows', 'msi'));
 if (!exec('wix build product.wxs -ext WixToolset.UI.wixext -o ../../../../builds/peerhop_setup.msi', 'WiX MSI build')) {
     process.exit(1);
 }
+// Cleanup wixpdb
+try {
+    const wixpdb = path.join(__dirname, '..', 'builds', 'peerhop_setup.wixpdb');
+    if (fs.existsSync(wixpdb)) fs.unlinkSync(wixpdb);
+} catch (e) { }
 process.chdir(path.join(__dirname, '..'));
 success('Built Windows GUI MSI installer');
 

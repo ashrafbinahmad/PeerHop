@@ -52,7 +52,7 @@ try {
     log('  - Built for all platforms', 'white');
     log('  - Tagged in git', 'white');
     log('  - Published to npm (if confirmed)', 'white');
-    log('  - GitHub release will be created automatically', 'white');
+    log('  - GitHub release created and assets uploaded', 'white');
 
 } catch (err) {
     error('\nRelease process failed!');

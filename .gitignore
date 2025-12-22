@@ -13,6 +13,7 @@ builds_backup/
 test.txt
 *.zip
 *.log
+*.wixpdb
 
 # Node.js
 node_modules/
@@ -23,7 +24,10 @@ yarn-error.log
 ui/dist/
 ui/release/
 ui/dist-electron/
+ui/build/windows/msix_dist/
 
+# Certificates
+*.pfx
 
 # Go
 vendor/

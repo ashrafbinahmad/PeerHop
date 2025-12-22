@@ -165,29 +165,52 @@ async function main() {
     fs.copyFileSync('builds/peerhop_cli_linux', path.join(npmBinDir, 'peerhop-linux'));
     success('Copied CLI binaries to npm-package/bin\n');
 
-    // Step 5: Git commit and tag
-    step(5, 6, 'Creating git tag...');
+    // Step 5: Create Github Release and Upload Assets
+    step(5, 6, 'Publishing to GitHub Releases...');
+
+    // Check if gh CLI is installed
+    try {
+        execSync('gh --version', { stdio: 'ignore' });
+    } catch (e) {
+        error('GitHub CLI (gh) is not installed or not in PATH.');
+        log('Please install it: https://cli.github.com/', 'yellow');
+        process.exit(1);
+    }
+
+    const releaseRepo = 'ashrafbinahmad/PeerHop-releases';
+
+    // Get all files in builds/ to upload (excluding debug symbols)
+    const buildsDir = path.join(__dirname, '..', 'builds');
+    const allBuildFiles = fs.readdirSync(buildsDir)
+        .filter(file => !file.endsWith('.wixpdb') && !file.endsWith('mount_info') && fs.statSync(path.join(buildsDir, file)).isFile())
+        .map(file => `builds/${file}`);
+
+    const filesToUpload = allBuildFiles.join(' ');
+
+    // Create release and upload files using gh CLI
+    // We use the --repo flag to target the specific release repository
+    // We create the tag in that repo.
+    const cmd = `gh release create v${version} ${filesToUpload} --repo ${releaseRepo} --title "v${version}" --notes "Release v${version}"`;
+
+    info(`Uploading binaries to ${releaseRepo}...`);
+    if (!exec(cmd, 'GitHub Release Creation')) {
+        error('Failed to create GitHub release');
+        process.exit(1);
+    }
+    success(`Published release v${version} to GitHub\n`);
+
+    // We still push the tag to the source repo for version tracking, but without triggering the old workflow
+    step('5.5', 6, 'Tagging source repository...');
     exec('git add .', 'Git add');
     try {
         execSync(`git commit -m "Release v${version}"`, { stdio: 'inherit' });
-    } catch (err) {
-        info('No changes to commit (or commit failed)');
-    }
-    if (!exec(`git tag -a v${version} -m "Release v${version}"`, 'Git tag')) {
-        error('Failed to create git tag');
-        process.exit(1);
-    }
-    success(`Created git tag v${version}`);
+    } catch (err) { }
 
-    if (!exec('git push origin main', 'Git push')) {
-        error('Failed to push to git');
-        process.exit(1);
+    if (exec(`git tag -a v${version} -m "Release v${version}"`, 'Git tag')) {
+        exec('git push origin main', 'Git push');
+        exec(`git push origin v${version}`, 'Git push tag');
+        success('Source repository tagged');
     }
-    if (!exec(`git push origin v${version}`, 'Git push tag')) {
-        error('Failed to push tag');
-        process.exit(1);
-    }
-    success('Pushed to git\n');
 
     // Step 6: Publish to npm
     const answer = await askQuestion(`${colors.yellow}Do you want to publish PeerHop v${version} to npm? (y/N): ${colors.reset}`);
@@ -213,7 +236,7 @@ async function main() {
     } else {
         log('  - NPM package skipped', 'yellow');
     }
-    log('  - GitHub release will be created automatically', 'white');
+    log('  - GitHub release created and assets uploaded', 'white');
 }
 
 main().catch(err => {

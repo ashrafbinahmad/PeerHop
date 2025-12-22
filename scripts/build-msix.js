@@ -29,7 +29,7 @@ function exec(command) {
 
 // Configuration
 const APP_NAME = "PeerHop";
-const PUBLISHER_DISPLAY_NAME = "PeerHop Team"; // Change this to your actual publisher name if you buy a cert
+const PUBLISHER_DISPLAY_NAME = "Peerhop"; // Change this to your actual publisher name if you buy a cert
 const CERT_SUBJECT = "CN=PeerHop"; // Must match certificate subject
 const CERT_PASSWORD = "PeerHop123"; // Logic should probably accept this via env var
 const SCRIPT_DIR = __dirname;
@@ -102,7 +102,7 @@ function generateManifest(version) {
   </Dependencies>
 
   <Resources>
-    <Resource Language="x-generate"/>
+    <Resource Language="en-us"/>
   </Resources>
 
   <Applications>

@@ -6,13 +6,13 @@
 
   <Identity
     Name="PeerHop"
-    Version="2.3.3.0"
+    Version="2.3.4.0"
     Publisher="CN=PeerHop"
     ProcessorArchitecture="x64" />
 
   <Properties>
     <DisplayName>PeerHop</DisplayName>
-    <PublisherDisplayName>PeerHop Team</PublisherDisplayName>
+    <PublisherDisplayName>Peerhop</PublisherDisplayName>
     <Logo>Assets\StoreLogo.png</Logo>
   </Properties>
 
@@ -21,7 +21,7 @@
   </Dependencies>
 
   <Resources>
-    <Resource Language="x-generate"/>
+    <Resource Language="en-us"/>
   </Resources>
 
   <Applications>
