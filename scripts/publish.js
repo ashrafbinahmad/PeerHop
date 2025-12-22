@@ -116,7 +116,8 @@ async function main() {
         'builds/peerhop_setup.exe',
         'builds/peerhop_setup.msi',
         'builds/peerhop_cli_win.exe',
-        'builds/peerhop_cli_linux'
+        'builds/peerhop_cli_linux',
+        'builds/peerhop_store.msix'
     ];
 
     log('Checking for build files...', 'yellow');

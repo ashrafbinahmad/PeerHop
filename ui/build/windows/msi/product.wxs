@@ -6,7 +6,7 @@
   <!-- ===================== PACKAGE ===================== -->
   <Package
     Name="PeerHop"
-    Version="2.4.0"
+    Version="2.3.3"
     Manufacturer="Muhammed Ashraf"
     UpgradeCode="12345678-1234-1234-1234-123456789ABC"
     Language="1033"
@@ -69,7 +69,7 @@
             Id="StartMenuShortcut"
             Name="PeerHop"
             Description="Fast and secure file transfer"
-            Target="[INSTALLFOLDER]ui.exe"
+            Target="[INSTALLFOLDER]PeerHop.exe"
             WorkingDirectory="INSTALLFOLDER"
             Icon="PeerHopIcon" />
 
@@ -97,7 +97,7 @@
           Id="DesktopShortcut"
           Name="PeerHop"
           Description="Fast and secure file transfer"
-          Target="[INSTALLFOLDER]ui.exe"
+          Target="[INSTALLFOLDER]PeerHop.exe"
           WorkingDirectory="INSTALLFOLDER"
           Icon="PeerHopIcon" />
 
@@ -124,7 +124,7 @@
                  Guid="87654321-4321-4321-4321-CBA987654321">
 
         <File Id="PeerHopEXE"
-              Source="..\..\bin\ui.exe"
+              Source="..\..\bin\PeerHop.exe"
               KeyPath="yes"
               Checksum="yes" />
 

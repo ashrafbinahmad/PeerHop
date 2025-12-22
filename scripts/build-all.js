@@ -2,6 +2,7 @@
 const { execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
+const { buildMSIX } = require('./build-msix');
 
 // ANSI color codes
 const colors = {
@@ -239,7 +240,7 @@ if (!exec(`wails build -platform windows/amd64 ${buildFlags}`, 'Windows GUI buil
     process.exit(1);
 }
 process.chdir(path.join(uiDir, 'build', 'windows', 'msi'));
-if (!exec('wix build product.wxs -o ../../../../builds/peerhop_setup.msi', 'WiX MSI build')) {
+if (!exec('wix build product.wxs -ext WixToolset.UI.wixext -o ../../../../builds/peerhop_setup.msi', 'WiX MSI build')) {
     process.exit(1);
 }
 process.chdir(path.join(__dirname, '..'));
@@ -247,14 +248,14 @@ success('Built Windows GUI MSI installer');
 
 log('  Building Windows GUI executable...', 'white');
 process.chdir(uiDir);
-// Build to default location (ui/build/bin/ui.exe) - this ensures proper frontend embedding
+// Build to default location (ui/build/bin/PeerHop.exe) - this ensures proper frontend embedding
 if (!exec(`wails build -platform windows/amd64 ${buildFlags}`, 'Windows GUI build')) {
     process.exit(1);
 }
 process.chdir(path.join(__dirname, '..'));
 
 // Copy the built binary to builds directory
-const sourceBinary = path.join(uiDir, 'build', 'bin', 'ui.exe');
+const sourceBinary = path.join(uiDir, 'build', 'bin', 'PeerHop.exe');
 const targetBinary = path.join(__dirname, '..', 'builds', 'peerhop_win.exe');
 
 if (!fs.existsSync(sourceBinary)) {
@@ -275,8 +276,27 @@ try {
         process.exit(1);
     }
     success(`Built Windows GUI (${(targetSize / 1024 / 1024).toFixed(2)} MB)\n`);
+    success(`Built Windows GUI (${(targetSize / 1024 / 1024).toFixed(2)} MB)\n`);
 } catch (err) {
     error(`Failed to copy binary: ${err.message}`);
+    process.exit(1);
+}
+
+// Step 4.5: Build MSIX for Microsoft Store
+step('5.5', 6, 'Building MSIX package for Microsoft Store...');
+try {
+    const successMSIX = buildMSIX(version);
+    if (successMSIX) {
+        success('Built MSIX package for Microsoft Store\n');
+    } else {
+        error('Failed to build MSIX package');
+        // We don't exit(1) here to allow other artifacts to be verified/published if user wants, 
+        // but maybe we should? For now, let's keep it non-fatal or make it fatal?
+        // User said "do the build-msix", implies it's important. 
+        process.exit(1);
+    }
+} catch (err) {
+    error(`Failed to execute MSIX build: ${err.message}`);
     process.exit(1);
 }
 

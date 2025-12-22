@@ -36,6 +36,7 @@ jobs:
           files: |
             builds/*.exe
             builds/*.msi
+            builds/*.msix
             builds/*_linux
           fail_on_unmatched_files: false
           draft: false
