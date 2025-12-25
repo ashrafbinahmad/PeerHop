@@ -1,14 +1,14 @@
 Import-Module Microsoft.PowerShell.Security -ErrorAction SilentlyContinue
 Import-Module PKI -ErrorAction SilentlyContinue
 
-$certName = "PeerHop"
+$certName = "CN=CBE90A45-8594-4076-AEDB-BD3B88F1C249"
 $certPassword = ConvertTo-SecureString -String "PeerHop123" -Force -AsPlainText
 $outPath = Join-Path $PSScriptRoot "PeerHop_SelfSigned.pfx"
 
-Write-Host "Generating Self-Signed Certificate for '$certName'..." -ForegroundColor Cyan
+Write-Host "Generating Self-Signed Certificate with Subject '$certName'..." -ForegroundColor Cyan
 
 # Create Cert
-$cert = New-SelfSignedCertificate -CertStoreLocation Cert:\CurrentUser\My -Type CodeSigningCert -Subject "CN=$certName"
+$cert = New-SelfSignedCertificate -CertStoreLocation Cert:\CurrentUser\My -Type CodeSigningCert -Subject $certName
 
 # Export to PFX
 Export-PfxCertificate -Cert $cert -FilePath $outPath -Password $certPassword

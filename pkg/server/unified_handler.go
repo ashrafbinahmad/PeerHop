@@ -41,8 +41,7 @@ type transactionProgressWriter struct {
 	WSHub        *WebSocketHub // WebSocket hub for broadcasting updates
 	ClientStore  *ClientStore  // Check for blocked status
 	TxnID        int
-	ClientID     string // Client downloading the file
-	ClientIP     string // IP to check for blocking
+	ClientIP     string // Client IP for tracking and blocking
 	TotalBytes   int64
 	BytesWritten int64
 	LastUpdate   time.Time
@@ -59,7 +58,7 @@ func (w *transactionProgressWriter) Write(p []byte) (int, error) {
 		if w.TxStore.IsCancelled(w.TxnID) {
 			return 0, fmt.Errorf("transfer cancelled by user")
 		}
-		if w.ClientID != "" && w.TxStore.IsClientCancelled(w.TxnID, w.ClientID) {
+		if w.ClientIP != "" && w.TxStore.IsClientCancelled(w.TxnID, w.ClientIP) {
 			return 0, fmt.Errorf("transfer cancelled by client")
 		}
 	}
@@ -77,9 +76,9 @@ func (w *transactionProgressWriter) Write(p []byte) (int, error) {
 		if w.TxStore != nil && w.TxnID > 0 {
 			// Update if throttled interval passed OR if download completed
 			if w.BytesWritten >= w.TotalBytes || time.Since(w.LastUpdate) > 200*time.Millisecond {
-				// Use client-specific progress if we have a client ID
-				if w.ClientID != "" {
-					w.TxStore.UpdateClientProgress(w.TxnID, w.ClientID, w.BytesWritten, w.TotalBytes)
+				// Use client-specific progress if we have a client IP
+				if w.ClientIP != "" {
+					w.TxStore.UpdateClientProgress(w.TxnID, w.ClientIP, w.BytesWritten, w.TotalBytes)
 				} else {
 					w.TxStore.UpdateProgress(w.TxnID, w.BytesWritten, w.TotalBytes)
 				}
@@ -117,17 +116,27 @@ func (h *UnifiedHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Add CORS headers to allow requests from Wails desktop app
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Client-ID")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Client-Type")
 
-	// Track Client
-	clientID := r.Header.Get("X-Client-ID")
-	if clientID != "" && h.ClientStore != nil {
+	// Track Client by IP (no header required)
+	// Skip tracking for Wails desktop app (identified by X-Client-Type header, WebView2 in User-Agent, or wails.localhost hostname)
+	if h.ClientStore != nil {
+		userAgent := r.UserAgent()
+		clientType := r.Header.Get("X-Client-Type")
+		isWailsDesktop := clientType == "desktop" ||
+			strings.Contains(userAgent, "WebView2") ||
+			strings.Contains(userAgent, "Wails") ||
+			strings.Contains(r.Host, "wails.localhost")
+
 		ip := r.RemoteAddr
 		if idx := strings.LastIndex(ip, ":"); idx != -1 {
 			ip = ip[:idx] // Strip port
 		}
-		userAgent := r.UserAgent()
-		h.ClientStore.AddOrUpdateClient(clientID, userAgent, ip)
+
+		if !isWailsDesktop {
+			// Track client by IP
+			h.ClientStore.AddOrUpdateClient(userAgent, ip)
+		}
 	}
 
 	// Check if client is blocked
@@ -258,6 +267,19 @@ func (h *UnifiedHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		clients := h.ClientStore.GetClients()
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"clients": clients,
+		})
+		return
+	}
+
+	// API: Get client's own IP address
+	if r.URL.Path == "/api/my-ip" {
+		clientIP := r.RemoteAddr
+		if idx := strings.LastIndex(clientIP, ":"); idx != -1 {
+			clientIP = clientIP[:idx]
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]string{
+			"ip": clientIP,
 		})
 		return
 	}
@@ -444,10 +466,16 @@ func (h *UnifiedHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Create text transaction
+		// Get client IP from RemoteAddr (strip port)
+		clientIP := r.RemoteAddr
+		if idx := strings.LastIndex(clientIP, ":"); idx != -1 {
+			clientIP = clientIP[:idx]
+		}
+
+		// Use IP as sender ID for client-sent transactions
 		senderID := req.SenderID
 		if senderID == "" {
-			// Fallback try header
-			senderID = r.Header.Get("X-Client-ID")
+			senderID = clientIP
 		}
 		if senderID == "" {
 			senderID = "unknown_client"
@@ -459,9 +487,9 @@ func (h *UnifiedHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			TextContent:        req.Text,
 			TransactionPercent: 0,
 			Status:             "completed",
-			ClientID:           r.Header.Get("X-Client-ID"),
+			ClientIP:           clientIP,
 		}
-		fmt.Printf("[API] Created text txn from client: %s, ID: %s\n", senderID, txn.ClientID)
+		fmt.Printf("[API] Created text txn from client IP: %s\n", clientIP)
 
 		id := h.TxStore.AddTransaction(txn)
 
@@ -487,20 +515,31 @@ func (h *UnifiedHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		// Get client ID from header
-		clientID := r.Header.Get("X-Client-ID")
-		if clientID == "" {
-			clientID = "unknown"
+		// Try to get client IP from request body (for desktop-initiated cancellations)
+		var req struct {
+			ClientIP string `json:"clientIp"`
+		}
+		if r.Body != nil {
+			json.NewDecoder(r.Body).Decode(&req)
+		}
+
+		// Use provided clientIp from body, or fall back to RemoteAddr (for client cancelling their own)
+		clientIP := req.ClientIP
+		if clientIP == "" {
+			clientIP = r.RemoteAddr
+			if idx := strings.LastIndex(clientIP, ":"); idx != -1 {
+				clientIP = clientIP[:idx]
+			}
 		}
 
 		// Use client-specific cancellation
-		success := h.TxStore.CancelClientDownload(id, clientID)
+		success := h.TxStore.CancelClientDownload(id, clientIP)
 		if !success {
 			http.Error(w, "Transaction not found", http.StatusNotFound)
 			return
 		}
 
-		fmt.Printf("[API] Cancelled download for client %s on transaction %d (progress reset to 0%%)\n", clientID, id)
+		fmt.Printf("[API] Cancelled download for client %s on transaction %d (progress reset to 0%%)\n", clientIP, id)
 
 		// Broadcast the reset transaction state via WebSocket
 		if h.WSHub != nil {
@@ -883,11 +922,6 @@ func (h *UnifiedHandler) serveFile(w http.ResponseWriter, r *http.Request, fileP
 	// Find existing transaction to update progress
 	var txnID int
 	var txStore *TransactionStore
-	// Get client ID from header first, then from query parameter
-	clientID := r.Header.Get("X-Client-ID")
-	if clientID == "" {
-		clientID = r.URL.Query().Get("clientId")
-	}
 
 	if forceTxnID != -1 && h.TxStore != nil {
 		if forceTxnID > 0 {
@@ -927,8 +961,7 @@ func (h *UnifiedHandler) serveFile(w http.ResponseWriter, r *http.Request, fileP
 			WSHub:          h.WSHub, // Pass WSHub for broadcasting updates
 			ClientStore:    h.ClientStore,
 			TxnID:          txnID,
-			ClientID:       clientID, // Pass client ID for client-specific tracking
-			ClientIP:       clientIP,
+			ClientIP:       clientIP, // Use IP for client-specific tracking
 			TotalBytes:     stat.Size(),
 			BytesWritten:   0,
 		}
@@ -1001,12 +1034,18 @@ func (h *UnifiedHandler) handleUpload(w http.ResponseWriter, r *http.Request) {
 		// Get absolute path
 		absPath, _ := filepath.Abs(fullPath)
 
+		// Get client IP from RemoteAddr
+		uploadClientIP := r.RemoteAddr
+		if idx := strings.LastIndex(uploadClientIP, ":"); idx != -1 {
+			uploadClientIP = uploadClientIP[:idx]
+		}
+
 		// Create transaction for this file upload
 		var txnID int
 		if h.TxStore != nil {
 			txn := &Transaction{
 				Type:               TransactionTypeFile,
-				SenderID:           r.Header.Get("X-Client-ID"),
+				SenderID:           uploadClientIP,
 				Filename:           filename,
 				FileSize:           currentFileSize, // Use strict file size from client
 				UploadLink:         "/api/upload",
@@ -1014,7 +1053,7 @@ func (h *UnifiedHandler) handleUpload(w http.ResponseWriter, r *http.Request) {
 				ServerFilePath:     absPath, // NEW
 				TransactionPercent: 0,
 				Status:             "in_progress",
-				ClientID:           r.Header.Get("X-Client-ID"),
+				ClientIP:           uploadClientIP,
 			}
 			txnID = h.TxStore.AddTransaction(txn)
 			h.TxStore.SetDownloadLink(txnID, fmt.Sprintf("/api/download-file/%d", txnID)) // Enable download with progress

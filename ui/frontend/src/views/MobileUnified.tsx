@@ -35,9 +35,10 @@ export const MobileUnified: React.FC<Props> = ({
   const [showTextInput, setShowTextInput] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [showScrollButton, setShowScrollButton] = useState(false);
-  const [myClientId, setMyClientId] = useState<string>(() => {
-    return localStorage.getItem("peerhop_client_id") || "";
-  });
+  const [myIp, setMyIp] = useState<string>("");
+
+  // Grace period for initial connection (don't show "Connection failed" immediately)
+  const [isInitializing, setIsInitializing] = useState(true);
 
   // Drag State
   const [isDragging, setIsDragging] = useState(false);
@@ -108,7 +109,7 @@ export const MobileUnified: React.FC<Props> = ({
     textTransferEnabled,
   } = useTransactions(2000);
 
-  const myClient = clients.find((c) => c.id === myClientId);
+  const myClient = clients.find((c) => c.ip === myIp);
   const isBlocked = myClient?.blocked || false;
   // If fully blocked, sending is also implicitly blocked (in UI terms)
   // but strictly speaking SendingBlocked is a separate flag.
@@ -160,18 +161,25 @@ export const MobileUnified: React.FC<Props> = ({
   };
 
   useEffect(() => {
-    // Client ID identification
-    let clientId = localStorage.getItem("peerhop_client_id");
+    // Fetch client's own IP from server (server uses RemoteAddr for identification)
+    const fetchMyIP = async () => {
+      try {
+        const response = await axios.get("/api/my-ip");
+        if (response.data?.ip) {
+          setMyIp(response.data.ip);
+        }
+      } catch (err) {
+        console.error("[MobileUnified] Failed to fetch my IP:", err);
+      }
+    };
+    fetchMyIP();
 
-    if (!clientId) {
-      clientId =
-        Math.random().toString(36).substring(2) + Date.now().toString(36);
-    }
+    // Grace period before showing connection issues
+    const timer = setTimeout(() => {
+      setIsInitializing(false);
+    }, 3000);
 
-    localStorage.setItem("peerhop_client_id", clientId);
-
-    setMyClientId(clientId);
-    axios.defaults.headers.common["X-Client-ID"] = clientId;
+    return () => clearTimeout(timer);
   }, []);
 
   useEffect(() => {
@@ -188,8 +196,8 @@ export const MobileUnified: React.FC<Props> = ({
         // Check both global status and client-specific status
         const isCompleted = transaction.status === "completed";
         const clientStatus =
-          myClientId && transaction.clientStatus
-            ? transaction.clientStatus[myClientId]
+          myIp && transaction.clientStatus
+            ? transaction.clientStatus[myIp]
             : undefined;
         const isClientDone =
           clientStatus === "completed" || clientStatus === "in_progress";
@@ -199,10 +207,10 @@ export const MobileUnified: React.FC<Props> = ({
         }
       }
     }
-  }, [transactions, downloadingTransactionId, myClientId]);
+  }, [transactions, downloadingTransactionId, myIp]);
 
   // Hook for download speeds (WebSocket)
-  const downloadSpeeds = useTransferSpeed(transactions, myClientId);
+  const downloadSpeeds = useTransferSpeed(transactions, myIp);
 
   // State for upload speeds (Local Axios)
   const [uploadSpeeds, setUploadSpeeds] = useState<Record<string, string>>({});
@@ -276,8 +284,8 @@ export const MobileUnified: React.FC<Props> = ({
     // Identify active upload transactions to cancel on server
     const activeUploads = transactions.filter(
       (t) =>
-        (t.senderId === myClientId || t.senderId === "server") &&
-        t.senderId === myClientId &&
+        (t.senderId === myIp || t.senderId === "server") &&
+        t.senderId === myIp &&
         t.status === "in_progress" &&
         uploadProgress[t.filename || ""] !== undefined
     );
@@ -310,13 +318,9 @@ export const MobileUnified: React.FC<Props> = ({
     setDownloadingTransactionId(transaction.id);
 
     if (transaction.downloadLink) {
-      // Append client ID as query parameter to the download link
-      const downloadUrl = `${transaction.downloadLink}${
-        transaction.downloadLink.includes("?") ? "&" : "?"
-      }clientId=${myClientId}`;
-
+      // Server identifies client by IP from request
       const link = document.createElement("a");
-      link.href = downloadUrl;
+      link.href = transaction.downloadLink;
       link.download = transaction.filename || "file";
       document.body.appendChild(link);
       link.click();
@@ -364,7 +368,7 @@ export const MobileUnified: React.FC<Props> = ({
     if (!textInput.trim()) return;
     try {
       isUserAtBottomRef.current = true;
-      await sendText(textInput, myClientId);
+      await sendText(textInput, myIp);
       setTextInput("");
       setTimeout(scrollToBottom, 100);
     } catch (err) {
@@ -432,7 +436,7 @@ export const MobileUnified: React.FC<Props> = ({
               "isUploading:",
               isUploading
             );
-            console.log("[MobileUnified] My Client ID:", myClientId);
+            console.log("[MobileUnified] My IP:", myIp);
             console.log("[MobileUnified] Upload Progress:", uploadProgress);
             return null;
           })()}
@@ -459,7 +463,7 @@ export const MobileUnified: React.FC<Props> = ({
                 </div>
                 <div className="flex flex-col items-center gap-1">
                   <span className="text-lg font-medium tracking-tight opacity-90">
-                    {isSendingDisabled ? "Sending Disabled" : "Share a file"}
+                    {isSendingDisabled ? "Sending Disabled" : "Share a file..."}
                   </span>
                   <span className={`text-xs opacity-50`}>
                     Tap to browse files
@@ -496,7 +500,7 @@ export const MobileUnified: React.FC<Props> = ({
             </div>
           ) : (
             visibleTransactions.map((transaction) => {
-              const isMe = transaction.senderId === myClientId;
+              const isMe = transaction.senderId === myIp;
               const isRightSide = isMe;
               const isFile = transaction.type === "file";
               const bubbleClass = isRightSide
@@ -517,13 +521,12 @@ export const MobileUnified: React.FC<Props> = ({
               let clientStatus = transaction.status;
               if (
                 !isMe &&
-                myClientId &&
+                myIp &&
                 transaction.clientProgress &&
                 transaction.clientStatus
               ) {
-                clientProgress = transaction.clientProgress[myClientId] || 0;
-                clientStatus =
-                  transaction.clientStatus[myClientId] || "pending";
+                clientProgress = transaction.clientProgress[myIp] || 0;
+                clientStatus = transaction.clientStatus[myIp] || "pending";
               }
 
               const rawPercent =
@@ -983,30 +986,22 @@ export const MobileUnified: React.FC<Props> = ({
             </div>
           )}
           {/* Connection Status */}
-          {/* Status Message */}
-          {(isBlocked || isSendingBlockedOnly || !isConnected) && (
+          {/* Status Message - only show if blocked */}
+          {(isBlocked || isSendingBlockedOnly) && (
             <div className="flex items-center justify-center gap-2 mt-2 py-1.5 pb-safe-bottom">
               {!isBlocked && isSendingBlockedOnly ? (
                 // Orange dot for sending blocked
                 <div className="w-2 h-2 rounded-full bg-orange-400"></div>
               ) : (
-                // Pulse for connection issues or full block (yellow/orange instead of red)
-                <div
-                  className={`w-2 h-2 rounded-full ${
-                    isBlocked ? "bg-orange-500" : "bg-yellow-500"
-                  } ${!isBlocked ? "animate-pulse" : ""}`}
-                ></div>
+                // Orange dot for full block
+                <div className="w-2 h-2 rounded-full bg-orange-500"></div>
               )}
               <span
                 className={`text-xs font-medium ${
                   isDarkMode ? "text-orange-300" : "text-orange-600"
                 }`}
               >
-                {isBlocked
-                  ? "You are blocked"
-                  : isSendingBlockedOnly
-                  ? "Sending is blocked"
-                  : "Connection failed"}
+                {isBlocked ? "You are blocked" : "Sending is blocked"}
               </span>
             </div>
           )}

@@ -338,7 +338,6 @@ const TransactionActions = ({
           Open with <MoreVertical size={10} />
         </button>
       </div>
-
       {isOpen && (
         <div
           className={`fixed w-48 rounded-lg shadow-xl border overflow-hidden z-[100] animate-in fade-in zoom-in-95 duration-200 ${
@@ -690,10 +689,15 @@ export const DesktopView = () => {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   // Hook: WebSocket for transactions
-  const { transactions, sendText } = useTransactions(2000, serverInfo?.url);
+  const { transactions, sendText } = useTransactions(
+    2000,
+    serverInfo?.url,
+    false,
+    true
+  );
 
   // Hook: WebSocket for devices/clients
-  const { clients } = useDevices(serverInfo?.url);
+  const { clients } = useDevices(serverInfo?.url, true);
   const speeds = useTransferSpeed(transactions);
 
   const handleBlockClient = async (client: Client) => {
@@ -732,14 +736,10 @@ export const DesktopView = () => {
     }
   };
 
-  // Auto-switch to chat tab on mobile when a client connects
+  // Auto-switch to chat tab (desktop/mobile) when a client connects
   useEffect(() => {
-    if (clients.length > 0 && activeTab !== "chat") {
-      // Check if screen is mobile size
-      const isMobile = window.innerWidth < 768; // md breakpoint is 768px
-      if (isMobile) {
-        setActiveTab("chat");
-      }
+    if (clients.length > 0 && activeTab === "qr") {
+      setActiveTab("chat");
     }
   }, [clients.length]);
 
@@ -1044,7 +1044,6 @@ export const DesktopView = () => {
           </h3>
         </div>
       )}
-
       {/* Network Notification */}
       {notification.show && (
         <div className="absolute top-16 left-1/2 -translate-x-1/2 z-[100] animate-in slide-in-from-top-4 duration-300">
@@ -1065,7 +1064,6 @@ export const DesktopView = () => {
           </div>
         </div>
       )}
-
       {/* PERSISTENT HEADER - Always visible */}
       <div
         className={`absolute top-0 left-0 right-0 z-40 h-[48px] flex items-center px-4 ${theme.panelBg}`}
@@ -1073,7 +1071,6 @@ export const DesktopView = () => {
       >
         <h2 className={`text-[17px] font-semibold ${theme.text}`}>PeerHop</h2>
       </div>
-
       {/* WINDOW CONTROLS - FIXED TOP RIGHT */}
       <div
         className="absolute top-0 right-0 z-50 p-2 flex items-center gap-1"
@@ -1164,7 +1161,6 @@ export const DesktopView = () => {
           <X size={18} />
         </button>
       </div>
-
       {/* --- LEFT SIDE: CHAT INTERFACE --- */}
       <div
         className={`flex flex-col flex-1 h-full relative transition-all duration-300 ${
@@ -1177,7 +1173,8 @@ export const DesktopView = () => {
           className={`shrink-0 h-[48px] backdrop-blur-xl flex items-center px-4 justify-between z-20 transition-colors duration-300 relative ${theme.headerBg}`}
           style={{ "--wails-draggable": "drag" } as React.CSSProperties}
         ></div>
-
+        {/* TODO: add ad */}
+        {/* <p className="text-white">ad to be added</p> */}
         {/* MESSAGES AREA */}
         <div
           ref={scrollContainerRef}
@@ -1249,9 +1246,9 @@ export const DesktopView = () => {
 
                 // Lookup client platform if message is from client
                 let clientPlatform: Client["platform"] | undefined;
-                if (!isMe && transaction.clientId) {
+                if (!isMe && transaction.clientIp) {
                   const client = clients.find(
-                    (c) => c.id === transaction.clientId
+                    (c) => c.ip === transaction.clientIp
                   );
                   if (client) clientPlatform = client.platform;
                 }
@@ -1471,11 +1468,11 @@ export const DesktopView = () => {
                                     <div className="mt-2 space-y-1.5">
                                       {Object.entries(
                                         transaction.clientProgress
-                                      ).map(([clientId, progress]) => {
+                                      ).map(([clientIp, progress]) => {
                                         const clientSt =
-                                          transaction.clientStatus?.[clientId];
+                                          transaction.clientStatus?.[clientIp];
                                         const client = clients.find(
-                                          (c) => c.id === clientId
+                                          (c) => c.ip === clientIp
                                         );
 
                                         // Only show if in progress
@@ -1484,7 +1481,7 @@ export const DesktopView = () => {
 
                                         return (
                                           <div
-                                            key={clientId}
+                                            key={clientIp}
                                             className="flex items-center gap-2"
                                           >
                                             <div
@@ -1523,13 +1520,7 @@ export const DesktopView = () => {
                                                   try {
                                                     await axios.post(
                                                       `/api/cancel-download/${transaction.id}`,
-                                                      {},
-                                                      {
-                                                        headers: {
-                                                          "X-Client-ID":
-                                                            clientId,
-                                                        },
-                                                      }
+                                                      { clientIp: clientIp }
                                                     );
                                                   } catch (err) {
                                                     console.error(
@@ -1663,7 +1654,6 @@ export const DesktopView = () => {
             <div ref={messagesEndRef} className="h-2" />
           </div>
         </div>
-
         {/* INPUT AREA */}
         {(visibleTransactions.length > 0 || showTextInput) && (
           <div
@@ -1741,7 +1731,6 @@ export const DesktopView = () => {
           </div>
         )}
       </div>
-
       {/* --- RIGHT SIDE: SERVER INFO & QR --- */}
       {/* On Mobile: Absolute positioning covers the entire chat area (respects header).
          On Desktop: Static positioning sits side-by-side.
@@ -1984,7 +1973,7 @@ export const DesktopView = () => {
                       <div className="space-y-2">
                         {clients.map((client) => (
                           <EditableDeviceName
-                            key={client.id}
+                            key={client.ip}
                             client={client}
                             isDarkMode={isDarkMode}
                             theme={theme}
@@ -2129,7 +2118,7 @@ export const DesktopView = () => {
                     <div className="flex flex-col gap-2">
                       {clients.map((client) => (
                         <EditableDeviceName
-                          key={client.id}
+                          key={client.ip}
                           client={client}
                           isDarkMode={isDarkMode}
                           theme={theme}
@@ -2155,7 +2144,6 @@ export const DesktopView = () => {
           </div>
         </div>
       </div>
-
       <ConfirmDialog
         isOpen={!!transactionToCancel}
         title="Cancel Transfer"

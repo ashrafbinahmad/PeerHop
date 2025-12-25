@@ -3,7 +3,7 @@ import { Transaction } from "./useTransactions";
 
 export const useTransferSpeed = (
   transactions: Transaction[],
-  myClientId?: string
+  myIp?: string
 ) => {
   const [speeds, setSpeeds] = useState<Record<number, string>>({});
   const prevBytesRef = useRef<Record<number, number>>({});
@@ -17,13 +17,9 @@ export const useTransferSpeed = (
       // Determine bytes
       let currentBytes = 0;
 
-      // If myClientId is provided, try to use client-specific bytes
-      if (
-        myClientId &&
-        txn.clientBytes &&
-        txn.clientBytes[myClientId] !== undefined
-      ) {
-        currentBytes = txn.clientBytes[myClientId];
+      // If myIp is provided, try to use client-specific bytes
+      if (myIp && txn.clientBytes && txn.clientBytes[myIp] !== undefined) {
+        currentBytes = txn.clientBytes[myIp];
       } else {
         // Fallback to global bytes
         currentBytes = txn.bytesTransferred || 0;
@@ -63,7 +59,7 @@ export const useTransferSpeed = (
     if (Object.keys(newSpeeds).length > 0) {
       setSpeeds((prev) => ({ ...prev, ...newSpeeds }));
     }
-  }, [transactions, myClientId]);
+  }, [transactions, myIp]);
 
   return speeds;
 };

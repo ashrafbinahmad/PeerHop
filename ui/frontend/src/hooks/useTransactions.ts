@@ -1,12 +1,13 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import axios from "axios";
 import { THEME_PRESETS } from "../themeConstants";
+import WebSocketClient from "../utils/WebSocketClient";
 
 export interface Transaction {
   id: number;
-  clientId?: string;
+  clientIp?: string;
   type: "file" | "text";
-  senderId: string; // 'server' or client ID
+  senderId: string; // 'server' or client IP
   transactionPercent: number;
   downloadLink?: string;
   uploadLink?: string;
@@ -19,24 +20,23 @@ export interface Transaction {
   bytesTransferred?: number;
   status: "pending" | "in_progress" | "completed" | "failed" | "cancelled";
 
-  // Client-specific tracking
-  clientProgress?: Record<string, number>; // clientId -> progress %
+  // Client-specific tracking (keyed by IP)
+  clientProgress?: Record<string, number>; // clientIP -> progress %
   clientStatus?: Record<
     string,
     "pending" | "in_progress" | "completed" | "failed"
   >;
-  clientBytes?: Record<string, number>; // clientId -> bytes transferred
+  clientBytes?: Record<string, number>; // clientIP -> bytes transferred
 }
 
 interface Client {
-  id: string;
   name: string;
   userAgent: string;
   ip: string;
   lastSeen: string;
   platform: string;
   blocked: boolean;
-  sendingBlocked: boolean; // Add sendingBlocked field
+  sendingBlocked: boolean;
 }
 
 interface UseTransactionsResult {
@@ -57,7 +57,8 @@ interface UseTransactionsResult {
 export const useTransactions = (
   _pollingInterval: number = 2000, // Kept for backwards compatibility but not used
   baseURL?: string,
-  isSample = false
+  isSample = false,
+  isDesktop: boolean = false
 ): UseTransactionsResult => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
@@ -66,7 +67,7 @@ export const useTransactions = (
   const [isDarkMode, setIsDarkMode] = useState(true); // Default Dark
   const [activeThemeId, setActiveThemeId] = useState("night");
   const [activeAccentId, setActiveAccentId] = useState("blue");
-  const [isConnected, setIsConnected] = useState(false);
+  const [isConnected, setIsConnected] = useState(true); // Optimistic - assume connected until proven otherwise
   const [deviceName, setDeviceName] = useState("PeerHop"); // Default to "PeerHop"
   const [textTransferEnabled, setTextTransferEnabled] = useState(false); // Default to false
 
@@ -232,31 +233,7 @@ export const useTransactions = (
     [baseURL]
   );
 
-  // WebSocket connection via Singleton
-  useEffect(() => {
-    // Determine WebSocket URL
-    let wsURL: string = "";
-    if (baseURL) {
-      // Convert http://host:port to ws://host:port
-      wsURL = baseURL.replace(/^http/, "ws") + "/api/ws";
-    } else {
-      // Skip connection if in Wails but no baseURL yet
-      if (window.location.host.includes("wails.localhost")) {
-        return;
-      }
-      // Use current location
-      const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-      wsURL = `${protocol}//${window.location.host}/api/ws`;
-    }
-
-    if (wsURL) {
-      import("../utils/WebSocketClient").then((mod) => {
-        mod.default.connect(wsURL);
-      });
-    }
-  }, [baseURL]);
-
-  // WebSocket Message Listener
+  // WebSocket connection and listener - MUST be in same effect to ensure listener is added before connect
   useEffect(() => {
     const handleMessage = (message: any) => {
       // Handle connection status messages from the Client
@@ -270,6 +247,7 @@ export const useTransactions = (
 
       switch (message.type) {
         case "pong":
+          console.log("[useTransactions] Received pong from server");
           break;
 
         case "transactions_init":
@@ -346,16 +324,43 @@ export const useTransactions = (
       }
     };
 
-    import("../utils/WebSocketClient").then((mod) => {
-      mod.default.addListener(handleMessage);
-    });
+    // Determine WebSocket URL
+    let wsURL: string = "";
+    if (baseURL) {
+      // Convert http://host:port to ws://host:port
+      wsURL = baseURL.replace(/^http/, "ws") + "/api/ws";
+    } else {
+      // Skip connection if in Wails but no baseURL yet
+      if (window.location.host.includes("wails.localhost")) {
+        return;
+      }
+      // Use current location
+      const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+      wsURL = `${protocol}//${window.location.host}/api/ws`;
+    }
+
+    if (wsURL) {
+      // Append desktop flag to skip client tracking for desktop app
+      const wsURLWithFlag = isDesktop ? `${wsURL}?desktop=true` : wsURL;
+
+      console.log(
+        `[useTransactions] Setting up WebSocket. URL: ${wsURLWithFlag}, isDesktop: ${isDesktop}`
+      );
+
+      // CRITICAL: Add listener FIRST, then connect
+      // Using static import to eliminate async delay
+      WebSocketClient.addListener(handleMessage);
+      console.log("[useTransactions] Listener added, now connecting...");
+      WebSocketClient.connect(wsURLWithFlag);
+    } else {
+      console.log("[useTransactions] No wsURL, skipping WebSocket setup");
+    }
 
     return () => {
-      import("../utils/WebSocketClient").then((mod) => {
-        mod.default.removeListener(handleMessage);
-      });
+      console.log("[useTransactions] Cleaning up - removing listener");
+      WebSocketClient.removeListener(handleMessage);
     };
-  }, []);
+  }, [baseURL, isDesktop]);
 
   return {
     transactions,

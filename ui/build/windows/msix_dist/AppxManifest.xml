@@ -5,9 +5,9 @@
   xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities">
 
   <Identity
-    Name="PeerHop"
-    Version="2.3.4.0"
-    Publisher="CN=PeerHop"
+    Name="Transender.PeerHop"
+    Version="2.3.5.0"
+    Publisher="CN=CBE90A45-8594-4076-AEDB-BD3B88F1C249"
     ProcessorArchitecture="x64" />
 
   <Properties>

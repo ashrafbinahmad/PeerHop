@@ -6,8 +6,8 @@ class WebSocketClient {
   private url: string | null = null;
   private listeners: Set<MessageHandler> = new Set();
   private reconnectTimeout: NodeJS.Timeout | null = null;
-  private pingInterval: NodeJS.Timeout | null = null;
   private isConnected: boolean = false;
+  private initialMessagesBuffer: any[] = []; // Buffer messages until first listener is added
 
   private constructor() {}
 
@@ -21,13 +21,20 @@ class WebSocketClient {
   public connect(url: string) {
     if (!url) return;
 
-    // If we are already connected or connecting to the same URL, do nothing
+    // If we are already connected or connecting to the same URL
     if (
       this.url === url &&
       this.ws &&
       (this.ws.readyState === WebSocket.OPEN ||
         this.ws.readyState === WebSocket.CONNECTING)
     ) {
+      // Already connected - notify listeners in case they missed the initial message
+      if (this.ws.readyState === WebSocket.OPEN && this.isConnected) {
+        this.notifyListeners({
+          type: "connection_status",
+          status: "connected",
+        });
+      }
       return;
     }
 
@@ -52,14 +59,25 @@ class WebSocketClient {
     this.ws.onopen = () => {
       console.log("[WebSocketClient] Connected");
       this.isConnected = true;
-      this.startPing();
+      // Note: Backend sends WebSocket-level ping frames every 30s
+      // Browser automatically responds with pong frames (no JS needed)
+      // This works reliably even on iOS Safari when timers are throttled
       this.notifyListeners({ type: "connection_status", status: "connected" });
     };
 
     this.ws.onmessage = (event) => {
       try {
         const message = JSON.parse(event.data);
-        this.notifyListeners(message);
+        // If no listeners yet, buffer the message (likely initial server messages)
+        if (this.listeners.size === 0) {
+          console.log(
+            "[WebSocketClient] Buffering message (no listeners yet):",
+            message.type
+          );
+          this.initialMessagesBuffer.push(message);
+        } else {
+          this.notifyListeners(message);
+        }
       } catch (e) {
         console.error("[WebSocketClient] Parse error", e);
       }
@@ -73,11 +91,7 @@ class WebSocketClient {
         status: "disconnected",
       });
 
-      // Clear ping interval immediately
-      if (this.pingInterval) {
-        clearInterval(this.pingInterval);
-        this.pingInterval = null;
-      }
+      // Connection closed - cleanup handled by scheduleReconnect
 
       this.ws = null;
       this.scheduleReconnect();
@@ -97,28 +111,12 @@ class WebSocketClient {
     }, 3000);
   }
 
-  private startPing() {
-    if (this.pingInterval) clearInterval(this.pingInterval);
-    this.pingInterval = setInterval(() => {
-      if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-        try {
-          this.ws.send(JSON.stringify({ type: "ping" }));
-        } catch (e) {
-          console.error("[WebSocketClient] Failed to send ping", e);
-        }
-      }
-    }, 5000);
-  }
-
   private cleanup(clearUrl = true) {
     if (this.reconnectTimeout) {
       clearTimeout(this.reconnectTimeout);
       this.reconnectTimeout = null;
     }
-    if (this.pingInterval) {
-      clearInterval(this.pingInterval);
-      this.pingInterval = null;
-    }
+
     if (this.ws) {
       // Unbind handlers to prevent zombie calls
       this.ws.onclose = null;
@@ -134,7 +132,26 @@ class WebSocketClient {
   }
 
   public addListener(handler: MessageHandler) {
+    const isFirstListener = this.listeners.size === 0;
     this.listeners.add(handler);
+
+    // If this is the first listener and we have buffered messages, replay them
+    if (isFirstListener && this.initialMessagesBuffer.length > 0) {
+      console.log(
+        `[WebSocketClient] Replaying ${this.initialMessagesBuffer.length} buffered messages to first listener`
+      );
+      this.initialMessagesBuffer.forEach((msg) => {
+        this.notifyListeners(msg);
+      });
+      // Clear buffer after replay
+      this.initialMessagesBuffer = [];
+    }
+
+    // Immediately notify the new listener of current connection status
+    // This fixes race condition where listener is added after connection is established
+    if (this.isConnected) {
+      handler({ type: "connection_status", status: "connected" });
+    }
   }
 
   public removeListener(handler: MessageHandler) {

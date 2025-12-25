@@ -28,9 +28,10 @@ function exec(command) {
 }
 
 // Configuration
-const APP_NAME = "PeerHop";
+const APP_DISPLAY_NAME = "PeerHop";
+const APP_IDENTITY_NAME = "Transender.PeerHop"; // From Partner Center
 const PUBLISHER_DISPLAY_NAME = "Peerhop"; // Change this to your actual publisher name if you buy a cert
-const CERT_SUBJECT = "CN=PeerHop"; // Must match certificate subject
+const CERT_SUBJECT = "CN=CBE90A45-8594-4076-AEDB-BD3B88F1C249"; // From Partner Center
 const CERT_PASSWORD = "PeerHop123"; // Logic should probably accept this via env var
 const SCRIPT_DIR = __dirname;
 const ROOT_DIR = path.join(SCRIPT_DIR, '..');
@@ -86,13 +87,13 @@ function generateManifest(version) {
   xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities">
 
   <Identity
-    Name="${APP_NAME}"
+    Name="${APP_IDENTITY_NAME}"
     Version="${storeVersion}"
     Publisher="${CERT_SUBJECT}"
     ProcessorArchitecture="x64" />
 
   <Properties>
-    <DisplayName>${APP_NAME}</DisplayName>
+    <DisplayName>${APP_DISPLAY_NAME}</DisplayName>
     <PublisherDisplayName>${PUBLISHER_DISPLAY_NAME}</PublisherDisplayName>
     <Logo>Assets\\StoreLogo.png</Logo>
   </Properties>
@@ -110,7 +111,7 @@ function generateManifest(version) {
       Executable="PeerHop.exe"
       EntryPoint="Windows.FullTrustApplication">
       <uap:VisualElements
-        DisplayName="${APP_NAME}"
+        DisplayName="${APP_DISPLAY_NAME}"
         Description="Fast local file transfer"
         BackgroundColor="transparent"
         Square150x150Logo="Assets\\Square150x150Logo.png"

@@ -3,8 +3,8 @@ package server
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
+	"peerhop/pkg/logger"
 	"strings"
 	"sync"
 	"time"
@@ -26,9 +26,10 @@ type WSMessage struct {
 
 // SafeConn wraps websocket.Conn to ensure thread-safe writes
 type SafeConn struct {
-	conn     *websocket.Conn
-	mu       sync.Mutex
-	clientIP string // Track client IP for blocking
+	conn      *websocket.Conn
+	mu        sync.Mutex
+	clientIP  string // Track client IP for blocking
+	isDesktop bool   // Whether this is a desktop app connection
 }
 
 // WriteMessage sends a message to the connection in a thread-safe manner
@@ -94,7 +95,7 @@ func (hub *WebSocketHub) AddConnection(conn *SafeConn) {
 	hub.mu.Lock()
 	defer hub.mu.Unlock()
 	hub.connections[conn] = true
-	log.Printf("[WebSocket] New connection added. Total connections: %d", len(hub.connections))
+	logger.Info("[WebSocket] New connection added. Total connections: %d", len(hub.connections))
 }
 
 // RemoveConnection removes a WebSocket connection
@@ -104,7 +105,7 @@ func (hub *WebSocketHub) RemoveConnection(conn *SafeConn) {
 	if _, ok := hub.connections[conn]; ok {
 		delete(hub.connections, conn)
 		conn.Close()
-		log.Printf("[WebSocket] Connection removed. Total connections: %d", len(hub.connections))
+		logger.Info("[WebSocket] Connection removed. Total connections: %d", len(hub.connections))
 	}
 }
 
@@ -120,7 +121,7 @@ func (hub *WebSocketHub) Broadcast(msgType string, data interface{}) {
 
 	jsonData, err := json.Marshal(message)
 	if err != nil {
-		log.Printf("[WebSocket] Error marshaling message: %v", err)
+		logger.Error("[WebSocket] Error marshaling message: %v", err)
 		return
 	}
 
@@ -135,7 +136,7 @@ func (hub *WebSocketHub) Broadcast(msgType string, data interface{}) {
 
 		err := conn.WriteMessage(websocket.TextMessage, jsonData)
 		if err != nil {
-			log.Printf("[WebSocket] Error writing to connection: %v", err)
+			logger.Warn("[WebSocket] Error writing to connection: %v", err)
 			// Connection will be cleaned up by the read loop or keep-alive
 		}
 	}
@@ -165,7 +166,7 @@ func (hub *WebSocketHub) BroadcastTransactionUpdate(txn *Transaction) {
 		hub.lastSentPercent[txn.ID] = currentPercent
 		// Reduce log noise for frequent progress updates, log only status changes or 100%
 		if txn.Status == "completed" || txn.Status == "pending" || txn.Status == "cancelled" || currentPercent%10 == 0 {
-			log.Printf("[WebSocket] Broadcasting txn %d: %s %.0f%% (status: %s)",
+			logger.Debug("[WebSocket] Broadcasting txn %d: %s %.0f%% (status: %s)",
 				txn.ID, txn.Filename, txn.TransactionPercent, txn.Status)
 		}
 	}
@@ -327,7 +328,7 @@ func (hub *WebSocketHub) Shutdown() {
 	hub.mu.Lock()
 	defer hub.mu.Unlock()
 
-	log.Printf("[WebSocket] Shutting down hub. Closing %d connections...", len(hub.connections))
+	logger.Info("[WebSocket] Shutting down hub. Closing %d connections...", len(hub.connections))
 	for conn := range hub.connections {
 		conn.Close()
 		delete(hub.connections, conn)
@@ -342,7 +343,7 @@ func (hub *WebSocketHub) DisconnectClient(ip string) {
 		if conn.clientIP == ip {
 			conn.Close()
 			delete(hub.connections, conn)
-			log.Printf("[WebSocket] Disconnected blocked client: %s", ip)
+			logger.Info("[WebSocket] Disconnected blocked client: %s", ip)
 		}
 	}
 }
@@ -355,19 +356,32 @@ func (hub *WebSocketHub) HandleWebSocket(w http.ResponseWriter, r *http.Request)
 		clientIP = clientIP[:idx] // Strip port
 	}
 
+	// Check if this is a desktop app connection (skip client tracking)
+	isDesktop := r.URL.Query().Get("desktop") == "true"
+
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		log.Printf("[WebSocket] Upgrade error: %v", err)
+		logger.Error("[WebSocket] Upgrade error: %v", err)
 		return
 	}
 
 	// Create thread-safe connection wrapper with client IP
 	safeConn := &SafeConn{
-		conn:     conn,
-		clientIP: clientIP,
+		conn:      conn,
+		clientIP:  clientIP,
+		isDesktop: isDesktop,
 	}
 
 	hub.AddConnection(safeConn)
+
+	// Track client (only for non-desktop connections)
+	if !isDesktop && hub.clientStore != nil {
+		userAgent := r.UserAgent()
+		logger.Info("[WebSocket] Adding client - IP: %s, UA: %s, isDesktop: %v", clientIP, userAgent, isDesktop)
+		hub.clientStore.AddOrUpdateClient(userAgent, clientIP)
+	} else if isDesktop {
+		logger.Info("[WebSocket] SKIPPING desktop app - IP: %s, isDesktop: %v", clientIP, isDesktop)
+	}
 
 	// Send initial data
 	if hub.txStore != nil {
@@ -460,7 +474,7 @@ func (hub *WebSocketHub) HandleWebSocket(w http.ResponseWriter, r *http.Request)
 			_, msg, err := safeConn.ReadMessage()
 			if err != nil {
 				if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-					log.Printf("[WebSocket] Error: %v", err)
+					logger.Error("[WebSocket] Error: %v", err)
 				}
 				break
 			}
@@ -471,10 +485,7 @@ func (hub *WebSocketHub) HandleWebSocket(w http.ResponseWriter, r *http.Request)
 			}
 			if json.Unmarshal(msg, &incomingMsg) == nil {
 				switch incomingMsg.Type {
-				case "ping":
-					// Respond with pong
-					pongMsg, _ := json.Marshal(WSMessage{Type: "pong", Data: nil})
-					safeConn.WriteMessage(websocket.TextMessage, pongMsg)
+
 				}
 			}
 		}

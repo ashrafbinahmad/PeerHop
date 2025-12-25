@@ -23,7 +23,7 @@ const (
 // Transaction represents a file or text transfer transaction
 type Transaction struct {
 	ID                 int             `json:"id"`
-	ClientID           string          `json:"clientId,omitempty"` // ID of the client involved
+	ClientIP           string          `json:"clientIp,omitempty"` // IP of the client involved
 	Type               TransactionType `json:"type"`
 	SenderID           string          `json:"senderId"` // "server" or client ID
 	TransactionPercent float64         `json:"transactionPercent"`
@@ -38,10 +38,10 @@ type Transaction struct {
 	BytesTransferred   int64           `json:"bytesTransferred,omitempty"` // for tracking progress
 	Status             string          `json:"status"`                     // "pending", "in_progress", "completed", "failed"
 
-	// Client-specific progress tracking for downloads
-	ClientProgress map[string]float64 `json:"clientProgress,omitempty"` // clientID -> progress percentage
-	ClientStatus   map[string]string  `json:"clientStatus,omitempty"`   // clientID -> status
-	ClientBytes    map[string]int64   `json:"clientBytes,omitempty"`    // clientID -> bytes transferred
+	// Client-specific progress tracking for downloads (keyed by IP)
+	ClientProgress map[string]float64 `json:"clientProgress,omitempty"` // clientIP -> progress percentage
+	ClientStatus   map[string]string  `json:"clientStatus,omitempty"`   // clientIP -> status
+	ClientBytes    map[string]int64   `json:"clientBytes,omitempty"`    // clientIP -> bytes transferred
 }
 
 // TransactionStore manages all transactions in memory
@@ -50,7 +50,7 @@ type TransactionStore struct {
 	transactions    map[int]*Transaction
 	nextID          int
 	cancelled       map[int]bool    // Track cancelled transactions (global)
-	clientCancelled map[string]bool // Track cancelled client downloads (key: "txnID_clientID")
+	clientCancelled map[string]bool // Track cancelled client downloads (key: "txnID_clientIP")
 }
 
 // NewTransactionStore creates a new transaction store
@@ -164,18 +164,18 @@ func (ts *TransactionStore) UpdateProgress(id int, bytesTransferred int64, total
 	}
 }
 
-// UpdateClientProgress updates the progress for a specific client downloading a file
-func (ts *TransactionStore) UpdateClientProgress(id int, clientID string, bytesTransferred int64, totalBytes int64) {
+// UpdateClientProgress updates the progress for a specific client (by IP) downloading a file
+func (ts *TransactionStore) UpdateClientProgress(id int, clientIP string, bytesTransferred int64, totalBytes int64) {
 	ts.mu.Lock()
 	defer ts.mu.Unlock()
 
 	if txn, exists := ts.transactions[id]; exists {
 		// Check for cancellation
-		if txn.ClientStatus != nil && txn.ClientStatus[clientID] == "cancelled" {
+		if txn.ClientStatus != nil && txn.ClientStatus[clientIP] == "cancelled" {
 			return
 		}
 		// Also check valid cancellation map
-		cancelKey := fmt.Sprintf("%d_%s", id, clientID)
+		cancelKey := fmt.Sprintf("%d_%s", id, clientIP)
 		if ts.clientCancelled[cancelKey] {
 			return
 		}
@@ -192,16 +192,16 @@ func (ts *TransactionStore) UpdateClientProgress(id int, clientID string, bytesT
 		}
 
 		// Update client-specific progress
-		txn.ClientBytes[clientID] = bytesTransferred
+		txn.ClientBytes[clientIP] = bytesTransferred
 		if totalBytes > 0 {
 			progress := (float64(bytesTransferred) / float64(totalBytes)) * 100
 			if progress >= 100 {
 				progress = 100
-				txn.ClientStatus[clientID] = "completed"
+				txn.ClientStatus[clientIP] = "completed"
 			} else {
-				txn.ClientStatus[clientID] = "in_progress"
+				txn.ClientStatus[clientIP] = "in_progress"
 			}
-			txn.ClientProgress[clientID] = progress
+			txn.ClientProgress[clientIP] = progress
 		}
 	}
 }
@@ -333,15 +333,15 @@ func (ts *TransactionStore) CancelTransaction(id int) bool {
 	return false
 }
 
-// CancelClientDownload cancels a download for a specific client
-func (ts *TransactionStore) CancelClientDownload(id int, clientID string) bool {
+// CancelClientDownload cancels a download for a specific client (by IP)
+func (ts *TransactionStore) CancelClientDownload(id int, clientIP string) bool {
 	ts.mu.Lock()
 	defer ts.mu.Unlock()
 
 	if txn, exists := ts.transactions[id]; exists {
-		// Mark as cancelled for this specific client
+		// Mark as cancelled for this specific client (by IP)
 		// We use a specific map key to track client cancellations
-		cancelKey := fmt.Sprintf("%d_%s", id, clientID)
+		cancelKey := fmt.Sprintf("%d_%s", id, clientIP)
 		if ts.clientCancelled == nil {
 			ts.clientCancelled = make(map[string]bool)
 		}
@@ -349,13 +349,13 @@ func (ts *TransactionStore) CancelClientDownload(id int, clientID string) bool {
 
 		// Reset client-specific progress
 		if txn.ClientProgress != nil {
-			txn.ClientProgress[clientID] = 0
+			txn.ClientProgress[clientIP] = 0
 		}
 		if txn.ClientStatus != nil {
-			txn.ClientStatus[clientID] = "cancelled"
+			txn.ClientStatus[clientIP] = "cancelled"
 		}
 		if txn.ClientBytes != nil {
-			txn.ClientBytes[clientID] = 0
+			txn.ClientBytes[clientIP] = 0
 		}
 
 		// Keep the cancellation flag active for 2 seconds to prevent browser auto-retry
@@ -374,13 +374,13 @@ func (ts *TransactionStore) CancelClientDownload(id int, clientID string) bool {
 	return false
 }
 
-// IsClientCancelled checks if a specific client download has been cancelled
-func (ts *TransactionStore) IsClientCancelled(id int, clientID string) bool {
+// IsClientCancelled checks if a specific client (by IP) download has been cancelled
+func (ts *TransactionStore) IsClientCancelled(id int, clientIP string) bool {
 	ts.mu.RLock()
 	defer ts.mu.RUnlock()
 
 	if ts.clientCancelled != nil {
-		cancelKey := fmt.Sprintf("%d_%s", id, clientID)
+		cancelKey := fmt.Sprintf("%d_%s", id, clientIP)
 		if ts.clientCancelled[cancelKey] {
 			return true
 		}

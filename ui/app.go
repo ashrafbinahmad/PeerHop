@@ -14,6 +14,7 @@ import (
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 
+	"peerhop/pkg/logger"
 	"peerhop/pkg/network"
 	"peerhop/pkg/server"
 	"peerhop/pkg/utils"
@@ -37,9 +38,31 @@ func NewApp() *App {
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
 
+	// Initialize logger
+	logDir := filepath.Join(os.Getenv("APPDATA"), "PeerHop", "logs")
+	if logDir == "" {
+		// Fallback for non-Windows or if APPDATA not set
+		home, _ := os.UserHomeDir()
+		logDir = filepath.Join(home, ".peerhop", "logs")
+	}
+
+	loggerConfig := logger.Config{
+		LogDir:        logDir,
+		MinLevel:      logger.INFO,
+		EnableConsole: true, // Enable console in dev mode
+		MaxSizeMB:     10,   // Rotate after 10MB
+	}
+
+	if err := logger.Init(loggerConfig); err != nil {
+		fmt.Printf("Failed to initialize logger: %v\n", err)
+	} else {
+		logger.Info("PeerHop desktop application started")
+		logger.Info("Log directory: %s", logDir)
+	}
+
 	// Start persistent server on startup
 	if err := a.startPersistentServer(); err != nil {
-		fmt.Printf("Failed to start server: %v\n", err)
+		logger.Error("Failed to start server: %v", err)
 	}
 
 	// Start monitoring network changes
@@ -51,7 +74,7 @@ func (a *App) startPersistentServer() error {
 	// Get network info
 	ip, err := network.GetLocalIP()
 	if err != nil {
-		fmt.Printf("Failed to get local IP: %v - falling back to loopback\n", err)
+		logger.Warn("Failed to get local IP: %v - falling back to loopback", err)
 		ip = "127.0.0.1"
 	}
 
@@ -65,7 +88,7 @@ func (a *App) startPersistentServer() error {
 	if resp, err := http.Get("http://localhost:5173"); err == nil {
 		resp.Body.Close()
 		devServerURL = "http://localhost:5173"
-		fmt.Println("Development mode detected - proxying to Vite dev server")
+		logger.Info("Development mode detected - proxying to Vite dev server")
 	}
 
 	// Create unified handler with optional dev server URL
@@ -91,18 +114,18 @@ func (a *App) startPersistentServer() error {
 	// Run server in goroutine
 	go func() {
 		if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			fmt.Printf("Server error: %v\n", err)
+			logger.Error("Server error: %v", err)
 		}
 	}()
 
-	fmt.Printf("Server started at %s\n", a.serverInfo.URL)
+	logger.Info("Server started at %s", a.serverInfo.URL)
 
 	// Asynchronously fetch WiFi name to avoid blocking startup
 	go func() {
 		ssid := network.GetWiFiName()
 		if a.serverInfo != nil {
 			a.serverInfo.SSID = ssid
-			fmt.Printf("WiFi SSID detected: %s\n", ssid)
+			logger.Info("WiFi SSID detected: %s", ssid)
 		}
 	}()
 
@@ -129,7 +152,7 @@ func (a *App) RestartServer() (*ServerInfo, error) {
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 		defer cancel()
 		if err := a.httpServer.Shutdown(ctx); err != nil {
-			fmt.Printf("Server forced to shutdown: %v\n", err)
+			logger.Warn("Server forced to shutdown: %v", err)
 		}
 		a.serverInfo = nil
 		a.httpServer = nil
@@ -187,12 +210,12 @@ func (a *App) monitorNetwork() {
 			}
 
 			if (currentIP != savedIP) || (currentSSID != savedSSID) {
-				fmt.Printf("[Network] Change detected! IP: %s -> %s, SSID: %s -> %s\n", savedIP, currentIP, savedSSID, currentSSID)
+				logger.Info("[Network] Change detected! IP: %s -> %s, SSID: %s -> %s", savedIP, currentIP, savedSSID, currentSSID)
 
 				// Restart server
 				newInfo, err := a.RestartServer()
 				if err != nil {
-					fmt.Printf("[Network] Failed to restart server: %v\n", err)
+					logger.Error("[Network] Failed to restart server: %v", err)
 					continue
 				}
 

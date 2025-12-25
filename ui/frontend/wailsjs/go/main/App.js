@@ -6,12 +6,24 @@ export function ClearTransfer() {
   return window['go']['main']['App']['ClearTransfer']();
 }
 
+export function ExportLogs() {
+  return window['go']['main']['App']['ExportLogs']();
+}
+
 export function GetClipboardFiles() {
   return window['go']['main']['App']['GetClipboardFiles']();
 }
 
+export function GetLogPath() {
+  return window['go']['main']['App']['GetLogPath']();
+}
+
 export function GetOpenableApps(arg1) {
   return window['go']['main']['App']['GetOpenableApps'](arg1);
+}
+
+export function GetRecentLogs(arg1) {
+  return window['go']['main']['App']['GetRecentLogs'](arg1);
 }
 
 export function GetServerInfo() {
@@ -20,6 +32,10 @@ export function GetServerInfo() {
 
 export function OpenFileWith(arg1, arg2) {
   return window['go']['main']['App']['OpenFileWith'](arg1, arg2);
+}
+
+export function OpenLogFolder() {
+  return window['go']['main']['App']['OpenLogFolder']();
 }
 
 export function OpenSourceFile(arg1) {

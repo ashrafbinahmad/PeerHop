@@ -1,6 +1,7 @@
 package server
 
 import (
+	"net"
 	"strings"
 	"sync"
 	"time"
@@ -8,7 +9,6 @@ import (
 
 // Client represents a connected device
 type Client struct {
-	ID             string    `json:"id"`
 	Name           string    `json:"name"` // User-editable name
 	UserAgent      string    `json:"userAgent"`
 	IP             string    `json:"ip"`
@@ -36,7 +36,7 @@ func NewClientStore() *ClientStore {
 }
 
 // AddOrUpdateClient adds a new client or updates an existing one (grouped by IP)
-func (cs *ClientStore) AddOrUpdateClient(id, userAgent, ip string) *Client {
+func (cs *ClientStore) AddOrUpdateClient(userAgent, ip string) *Client {
 	cs.mu.Lock()
 	defer cs.mu.Unlock()
 
@@ -45,7 +45,6 @@ func (cs *ClientStore) AddOrUpdateClient(id, userAgent, ip string) *Client {
 	if !exists {
 		platform := parsePlatform(userAgent)
 		client = &Client{
-			ID:             id,
 			Name:           platform, // Default name is platform
 			UserAgent:      userAgent,
 			IP:             ip,
@@ -57,8 +56,7 @@ func (cs *ClientStore) AddOrUpdateClient(id, userAgent, ip string) *Client {
 	}
 
 	client.LastSeen = time.Now()
-	// Update UA/Platform if changed, and store the latest Client ID
-	client.ID = id
+	// Update UA/Platform if changed
 	client.UserAgent = userAgent
 	client.Platform = parsePlatform(userAgent)
 
@@ -84,7 +82,7 @@ func (cs *ClientStore) UpdateClientName(ip, name string) bool {
 	return false
 }
 
-// GetClients returns all active clients (seen in last 5 minutes)
+// GetClients returns all active clients (seen in last 5 minutes), excluding the server's own IPs
 func (cs *ClientStore) GetClients() []*Client {
 	cs.mu.RLock()
 	defer cs.mu.RUnlock()
@@ -92,12 +90,61 @@ func (cs *ClientStore) GetClients() []*Client {
 	var active []*Client
 	cutoff := time.Now().Add(-5 * time.Minute)
 
+	// Get ALL server local IPs to filter them out
+	serverIPs := getLocalIPs()
+
 	for _, client := range cs.clients {
+
+		// Check if client IP matches ANY of the server's IPs
+		isServer := false
+		for _, ip := range serverIPs {
+			if client.IP == ip {
+				isServer = true
+				break
+			}
+		}
+		// Also check strictly for localhost
+		if client.IP == "127.0.0.1" || client.IP == "::1" || client.IP == "localhost" {
+			isServer = true
+		}
+
+		if isServer {
+
+			continue
+		}
+
 		if client.LastSeen.After(cutoff) {
 			active = append(active, client)
 		}
 	}
+
 	return active
+}
+
+// getLocalIPs returns ALL local IP addresses of the server
+func getLocalIPs() []string {
+	var ips []string
+	// Try to get IP from network interfaces
+	addrs, err := net.InterfaceAddrs()
+	if err != nil {
+		return ips
+	}
+
+	for _, addr := range addrs {
+		if ipnet, ok := addr.(*net.IPNet); ok { // Accept loopback too just in case
+			if ipnet.IP.To4() != nil {
+				ips = append(ips, ipnet.IP.String())
+			}
+		}
+	}
+	return ips
+}
+
+// RemoveClient removes a client by IP
+func (cs *ClientStore) RemoveClient(ip string) {
+	cs.mu.Lock()
+	defer cs.mu.Unlock()
+	delete(cs.clients, ip)
 }
 
 // Helper to deduce platform from User-Agent
