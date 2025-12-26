@@ -12,6 +12,7 @@ import {
   ShowInFolder,
   SaveTempFile,
   GetClipboardFiles,
+  GetSecureSettings,
 } from "../../wailsjs/go/main/App";
 import { main, utils } from "../../wailsjs/go/models";
 import {
@@ -23,7 +24,6 @@ import {
   EventsOn,
   EventsOff,
 } from "../../wailsjs/runtime/runtime";
-import logo from "../assets/images/logo-universal.png";
 import { useTransactions } from "../hooks/useTransactions";
 import { useTransferSpeed, formatBytes } from "../hooks/useTransferSpeed";
 import { useDevices, type Client } from "../hooks/useDevices";
@@ -33,28 +33,20 @@ import {
   Upload,
   File,
   Check,
-  Copy,
   ArrowUp,
   Minus,
   Maximize2,
-  Sun,
-  Moon,
-  PanelRightClose,
-  PanelRightOpen,
   QrCode,
   RefreshCw,
-  Smartphone,
   Monitor,
-  User,
   MoreVertical,
   ExternalLink,
   FolderOpen,
   Play,
   Pencil,
-  Edit2,
   Settings,
-  Flame,
 } from "lucide-react";
+import logo from "../assets/images/appicon.png";
 import { PlatformIcon } from "../components/PlatformIcon";
 
 import { ACCENT_COLORS, THEME_PRESETS } from "../themeConstants";
@@ -425,6 +417,7 @@ const EditableDeviceName = ({
   isDarkMode,
   theme,
   serverUrl,
+  adminToken,
   onBlock,
   onBlockSending,
 }: {
@@ -432,6 +425,7 @@ const EditableDeviceName = ({
   isDarkMode: boolean;
   theme: any;
   serverUrl: string;
+  adminToken: string;
   onBlock: (client: Client) => void;
   onBlockSending: (client: Client) => void;
 }) => {
@@ -453,7 +447,10 @@ const EditableDeviceName = ({
     }
 
     try {
-      await axios.post(`${serverUrl}/api/update-client-name`, {
+      const url = adminToken
+        ? `${serverUrl}/api/update-client-name?admin=${adminToken}`
+        : `${serverUrl}/api/update-client-name`;
+      await axios.post(url, {
         ip: client.ip,
         name: name.trim(),
       });
@@ -684,6 +681,14 @@ export const DesktopView = () => {
     return saved !== null ? saved === "true" : false; // Default to false
   });
 
+  const [securityEnabled, setSecurityEnabled] = useState(() => {
+    const saved = localStorage.getItem("securityEnabled");
+    return saved !== null ? saved === "true" : false; // Default to false
+  });
+
+  const [securityToken, setSecurityToken] = useState<string>("");
+  const [adminToken, setAdminToken] = useState<string>("");
+
   // Scroll and Refs
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -693,25 +698,29 @@ export const DesktopView = () => {
     2000,
     serverInfo?.url,
     false,
-    true
+    true,
+    adminToken, // Desktop uses admin token
+    securityEnabled
   );
 
   // Hook: WebSocket for devices/clients
-  const { clients } = useDevices(serverInfo?.url, true);
+  // Get clients list - Pass admin token for desktop client tracking/UI
+  const { clients } = useDevices(serverInfo?.url, true, adminToken);
   const speeds = useTransferSpeed(transactions);
 
   const handleBlockClient = async (client: Client) => {
     if (!serverInfo?.url) return;
     try {
-      if (client.blocked) {
-        await axios.post(`${serverInfo.url}/api/unblock-client`, {
-          ip: client.ip,
-        });
-      } else {
-        await axios.post(`${serverInfo.url}/api/block-client`, {
-          ip: client.ip,
-        });
-      }
+      const url = adminToken
+        ? `${serverInfo.url}/api/${
+            client.blocked ? "unblock" : "block"
+          }-client?admin=${adminToken}`
+        : `${serverInfo.url}/api/${
+            client.blocked ? "unblock" : "block"
+          }-client`;
+      await axios.post(url, {
+        ip: client.ip,
+      });
     } catch (err) {
       console.error("Failed to block/unblock client:", err);
       alert("Failed to update client status");
@@ -721,15 +730,16 @@ export const DesktopView = () => {
   const handleBlockSending = async (client: Client) => {
     if (!serverInfo?.url) return;
     try {
-      if (client.sendingBlocked) {
-        await axios.post(`${serverInfo.url}/api/unblock-sending`, {
-          ip: client.ip,
-        });
-      } else {
-        await axios.post(`${serverInfo.url}/api/block-sending`, {
-          ip: client.ip,
-        });
-      }
+      const url = adminToken
+        ? `${serverInfo.url}/api/${
+            client.sendingBlocked ? "unblock" : "block"
+          }-sending?admin=${adminToken}`
+        : `${serverInfo.url}/api/${
+            client.sendingBlocked ? "unblock" : "block"
+          }-sending`;
+      await axios.post(url, {
+        ip: client.ip,
+      });
     } catch (err) {
       console.error("Failed to block/unblock sending for client:", err);
       alert("Failed to update client status");
@@ -849,14 +859,47 @@ export const DesktopView = () => {
     if (!serverInfo?.url) return;
 
     // We still sync isDarkMode for basic compatibility with clients if needed
+    // We still sync isDarkMode for basic compatibility with clients if needed
+    const url = adminToken
+      ? `${serverInfo.url}/api/theme?admin=${adminToken}`
+      : `${serverInfo.url}/api/theme`;
     axios
-      .post(`${serverInfo.url}/api/theme`, {
+      .post(url, {
         isDarkMode: activeTheme.isDark,
         themeId: activeThemeId,
         accentId: activeAccentId,
       })
       .catch((e) => console.error("Failed to sync theme:", e));
-  }, [activeThemeId, activeAccentId, serverInfo?.url]);
+  }, [activeThemeId, activeAccentId, serverInfo?.url, adminToken]);
+
+  // Fetch security settings from server on mount
+  // Fetch security settings from server on mount
+  useEffect(() => {
+    // Fetch tokens securely from Wails backend (internal IPC)
+    GetSecureSettings()
+      .then((settings) => {
+        if (settings) {
+          if (settings.adminToken) setAdminToken(settings.adminToken);
+          if (settings.securityToken) setSecurityToken(settings.securityToken);
+          setSecurityEnabled(settings.securityEnabled);
+          localStorage.setItem(
+            "securityEnabled",
+            String(settings.securityEnabled)
+          );
+        }
+      })
+      .catch((e) => console.error("Failed to fetch secure settings:", e));
+
+    if (!serverInfo?.url) return;
+
+    // Fetch other settings from API (fallback for textTransferEnabled, etc)
+    axios
+      .get(`${serverInfo.url}/api/settings`)
+      .then((res) => {
+        // We rely on Wails binding for tokens now
+      })
+      .catch((e) => console.error("Failed to fetch settings:", e));
+  }, [serverInfo?.url]);
 
   // Save text transfer setting to localStorage and sync with server
   useEffect(() => {
@@ -865,10 +908,23 @@ export const DesktopView = () => {
     if (!serverInfo?.url) return;
 
     // Send setting to server so mobile clients can receive it
+    // This is an admin endpoint, so we include admin token (desktop is auto-exempted but good practice)
+    const url = adminToken
+      ? `${serverInfo.url}/api/settings?admin=${adminToken}`
+      : `${serverInfo.url}/api/settings`;
+
     axios
-      .post(`${serverInfo.url}/api/settings`, { textTransferEnabled })
+      .post(url, {
+        textTransferEnabled,
+        securityEnabled,
+      })
       .catch((e) => console.error("Failed to sync settings:", e));
-  }, [textTransferEnabled, serverInfo?.url]);
+  }, [textTransferEnabled, securityEnabled, serverInfo?.url, adminToken]);
+
+  // Save security enabled setting to localStorage
+  useEffect(() => {
+    localStorage.setItem("securityEnabled", String(securityEnabled));
+  }, [securityEnabled]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -1066,9 +1122,10 @@ export const DesktopView = () => {
       )}
       {/* PERSISTENT HEADER - Always visible */}
       <div
-        className={`absolute top-0 left-0 right-0 z-40 h-[48px] flex items-center px-4 ${theme.panelBg}`}
+        className={`absolute top-0 left-0 right-0 z-40 h-[48px] flex items-center px-4 gap-2 ${theme.panelBg}`}
         style={{ "--wails-draggable": "drag" } as React.CSSProperties}
       >
+        <img src={logo} alt="Logo" className="w-6 h-6 object-contain" />
         <h2 className={`text-[17px] font-semibold ${theme.text}`}>PeerHop</h2>
       </div>
       {/* WINDOW CONTROLS - FIXED TOP RIGHT */}
@@ -1174,11 +1231,34 @@ export const DesktopView = () => {
           style={{ "--wails-draggable": "drag" } as React.CSSProperties}
         ></div>
         {/* TODO: add ad */}
-        {/* <p className="text-white">ad to be added</p> */}
+
+        <iframe
+          src={`${
+            import.meta.env.DEV
+              ? "http://localhost:5174"
+              : "https://www.peerhop.in"
+          }/desktop-ad?bg=${encodeURIComponent(
+            theme.bg.replace("bg-[", "").replace("]", "")
+          )}&theme=${encodeURIComponent(activeThemeId)}&isDark=${String(
+            isDarkMode
+          )}`}
+          width="100%"
+          height="55"
+          frameBorder="0"
+          allowTransparency={true}
+          className="absolute top-10 left-0 w-screen h-14 z-50"
+          style={{
+            maxWidth: "100dvw",
+            backgroundColor: "transparent",
+            border: "none",
+            display: "block",
+          }}
+        ></iframe>
+
         {/* MESSAGES AREA */}
         <div
           ref={scrollContainerRef}
-          className="flex-1 overflow-y-auto px-4 py-4 flex flex-col scroll-smooth custom-scrollbar"
+          className="flex-1 overflow-y-auto px-4 py-4 pt-16 flex flex-col scroll-smooth custom-scrollbar w-screen overflow-hidden"
         >
           <div className="mt-auto flex flex-col gap-3">
             {visibleTransactions.length === 0 ? (
@@ -1242,7 +1322,7 @@ export const DesktopView = () => {
 
                 const widthClass = isFile
                   ? "w-[calc(99%-100px)] max-w-[500px]"
-                  : "w-fit max-w-[500px] text-left";
+                  : "w-fit max-w-[min(calc(99%-100px),500px)] text-left overflow-hidden";
 
                 // Lookup client platform if message is from client
                 let clientPlatform: Client["platform"] | undefined;
@@ -1297,21 +1377,23 @@ export const DesktopView = () => {
 
                       <div className="relative z-10">
                         {transaction.type === "text" && (
-                          <div className="flex items-start gap-2 min-w-[120px]">
-                            <div className="text-[15px] leading-relaxed break-words flex-1">
+                          <div className="relative min-w-[120px] max-h-[300px] overflow-y-auto">
+                            <div className="sticky top-0 right-0 float-right z-10 ml-2">
+                              <CopyButton
+                                text={transaction.textContent || ""}
+                                className={`p-1 rounded-full ${
+                                  isMe
+                                    ? "text-white/70 hover:bg-white/20"
+                                    : isDarkMode
+                                    ? "text-slate-400 hover:bg-slate-700 hover:text-slate-300"
+                                    : "text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                                }`}
+                                iconSize={12}
+                              />
+                            </div>
+                            <div className="text-[15px] leading-relaxed break-words">
                               {transaction.textContent}
                             </div>
-                            <CopyButton
-                              text={transaction.textContent || ""}
-                              className={`p-1 rounded-full ${
-                                isMe
-                                  ? "text-white/70 hover:bg-white/20"
-                                  : isDarkMode
-                                  ? "text-slate-400 hover:bg-slate-700 hover:text-slate-300"
-                                  : "text-gray-400 hover:bg-gray-100 hover:text-gray-600"
-                              }`}
-                              iconSize={12}
-                            />
                           </div>
                         )}
 
@@ -1357,7 +1439,11 @@ export const DesktopView = () => {
                                       <img
                                         src={`${mediaUrl}${
                                           mediaUrl.includes("?") ? "&" : "?"
-                                        }preview=true`}
+                                        }preview=true${
+                                          adminToken
+                                            ? `&admin=${adminToken}`
+                                            : ""
+                                        }`}
                                         alt="preview"
                                         className="w-full h-full object-cover"
                                       />
@@ -1379,7 +1465,11 @@ export const DesktopView = () => {
                                       <video
                                         src={`${mediaUrl}${
                                           mediaUrl.includes("?") ? "&" : "?"
-                                        }preview=true`}
+                                        }preview=true${
+                                          adminToken
+                                            ? `&admin=${adminToken}`
+                                            : ""
+                                        }`}
                                         className="w-full h-full object-cover absolute inset-0 pointer-events-none"
                                         preload="metadata"
                                       />
@@ -1888,6 +1978,37 @@ export const DesktopView = () => {
                           />
                         </button>
                       </div>
+
+                      {/* Security Toggle */}
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1">
+                          <p className={`text-sm font-medium ${theme.text}`}>
+                            Enable Security
+                          </p>
+                          <p className={`text-xs mt-0.5 ${theme.subText}`}>
+                            Require security token for API access
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => setSecurityEnabled(!securityEnabled)}
+                          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors shrink-0 ${
+                            securityEnabled ? "" : theme.iconBg
+                          }`}
+                          style={{
+                            backgroundColor: securityEnabled
+                              ? theme.accentColor
+                              : undefined,
+                          }}
+                        >
+                          <span
+                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                              securityEnabled
+                                ? "translate-x-6"
+                                : "translate-x-1"
+                            }`}
+                          />
+                        </button>
+                      </div>
                     </div>
                   </div>
 
@@ -1910,10 +2031,20 @@ export const DesktopView = () => {
                             <code
                               className={`text-xs font-mono flex-1 ${theme.text}`}
                             >
-                              {serverInfo.url}
+                              {serverInfo.url
+                                ? securityEnabled && securityToken
+                                  ? `${serverInfo.url}?security=${securityToken}`
+                                  : serverInfo.url
+                                : ""}
                             </code>
                             <CopyButton
-                              text={serverInfo.url}
+                              text={
+                                serverInfo.url
+                                  ? securityEnabled && securityToken
+                                    ? `${serverInfo.url}?security=${securityToken}`
+                                    : serverInfo.url
+                                  : ""
+                              }
                               className={`p-1.5 rounded-md ${
                                 isDarkMode
                                   ? "hover:bg-slate-700 text-slate-400 hover:text-slate-300"
@@ -1978,6 +2109,7 @@ export const DesktopView = () => {
                             isDarkMode={isDarkMode}
                             theme={theme}
                             serverUrl={serverInfo?.url || ""}
+                            adminToken={adminToken}
                             onBlock={handleBlockClient}
                             onBlockSending={handleBlockSending}
                           />
@@ -2057,7 +2189,13 @@ export const DesktopView = () => {
                       >
                         <div className="w-[180px] h-[180px]">
                           <QRCode
-                            value={serverInfo?.url || ""}
+                            value={
+                              serverInfo?.url
+                                ? securityEnabled && securityToken
+                                  ? `${serverInfo.url}?security=${securityToken}`
+                                  : serverInfo.url
+                                : ""
+                            }
                             style={{ height: "100%", width: "100%" }}
                             viewBox={`0 0 256 256`}
                           />
@@ -2069,10 +2207,16 @@ export const DesktopView = () => {
                     {serverInfo?.ssid ? (
                       <div className="flex items-center justify-center gap-2">
                         <code className={`text-xs font-mono ${theme.subText}`}>
-                          {serverInfo.url}
+                          {securityEnabled && securityToken
+                            ? `${serverInfo.url}?security=${securityToken}`
+                            : serverInfo.url}
                         </code>
                         <CopyButton
-                          text={serverInfo.url}
+                          text={
+                            securityEnabled && securityToken
+                              ? `${serverInfo.url}?security=${securityToken}`
+                              : serverInfo.url
+                          }
                           className={`p-1.5 rounded-md transition-colors ${theme.ghostHover} ${theme.subText}`}
                           iconSize={12}
                           isDarkMode={isDarkMode}
@@ -2123,6 +2267,7 @@ export const DesktopView = () => {
                           isDarkMode={isDarkMode}
                           theme={theme}
                           serverUrl={serverInfo?.url || ""}
+                          adminToken={adminToken}
                           onBlock={handleBlockClient}
                           onBlockSending={handleBlockSending}
                         />
@@ -2159,9 +2304,10 @@ export const DesktopView = () => {
         onConfirm={async () => {
           if (transactionToCancel) {
             try {
-              await axios.post(
-                `/api/cancel-transaction/${transactionToCancel.id}`
-              );
+              const url = adminToken
+                ? `/api/cancel-transaction/${transactionToCancel.id}?admin=${adminToken}`
+                : `/api/cancel-transaction/${transactionToCancel.id}`;
+              await axios.post(url);
             } catch (err) {
               console.error("Failed to cancel transaction:", err);
             }

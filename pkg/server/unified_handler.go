@@ -1,6 +1,8 @@
 package server
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -31,6 +33,16 @@ func getDownloadsDir() string {
 	}
 
 	return downloadsDir
+}
+
+// generateSecurityToken generates a random security token
+func generateSecurityToken() string {
+	bytes := make([]byte, 16) // 16 bytes = 32 hex characters
+	if _, err := rand.Read(bytes); err != nil {
+		// Fallback to timestamp-based token if crypto/rand fails
+		return fmt.Sprintf("%d", time.Now().UnixNano())
+	}
+	return hex.EncodeToString(bytes)
 }
 
 // transactionProgressWriter wraps http.ResponseWriter to track download progress
@@ -110,6 +122,27 @@ type UnifiedHandler struct {
 	WSHub             *WebSocketHub     // WebSocket hub for real-time updates
 	IsDarkMode        bool              // Track current theme
 	DesktopDeviceName string            // Desktop device name (editable)
+	SecurityToken     string            // Random security token for client API authentication (file transfer, viewing)
+	SecurityEnabled   bool              // Whether security token validation is enabled
+	AdminToken        string            // Random admin token for desktop control operations (settings, theme, blocking)
+}
+
+// SecuritySettings holds tokens and status
+type SecuritySettings struct {
+	SecurityToken   string `json:"securityToken"`
+	AdminToken      string `json:"adminToken"`
+	SecurityEnabled bool   `json:"securityEnabled"`
+}
+
+// GetSecuritySettings returns the current security tokens and status safely
+func (h *UnifiedHandler) GetSecuritySettings() SecuritySettings {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	return SecuritySettings{
+		SecurityToken:   h.SecurityToken,
+		AdminToken:      h.AdminToken,
+		SecurityEnabled: h.SecurityEnabled,
+	}
 }
 
 func (h *UnifiedHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -164,6 +197,107 @@ func (h *UnifiedHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "OPTIONS" {
 		w.WriteHeader(http.StatusOK)
 		return
+	}
+
+	// Security token validation - only when enabled
+	h.mu.RLock()
+	securityEnabled := h.SecurityEnabled
+	securityToken := h.SecurityToken
+	adminToken := h.AdminToken
+	h.mu.RUnlock()
+
+	// Only validate if security is enabled
+	if securityEnabled {
+		// Allow certain endpoints without token (for UI loading and initial connection)
+		// - / and /assets/ for serving the web UI
+		// - /src/ for Vite dev server source files
+		// - /node_modules/ for Vite dev server dependencies
+		// - /@vite/, /@react-refresh for Vite dev server
+		// - /favicon.ico and other static assets
+		// - /api/settings (GET only) for mobile to fetch the security token
+		// - /api/theme (GET only) for mobile to get theme settings for UI
+		// - /api/meta for initial connection check
+		isPublicEndpoint := false
+		if r.URL.Path == "/" ||
+			strings.HasPrefix(r.URL.Path, "/assets/") ||
+			strings.HasPrefix(r.URL.Path, "/src/") ||
+			strings.HasPrefix(r.URL.Path, "/node_modules/") ||
+			strings.HasPrefix(r.URL.Path, "/@vite/") ||
+			strings.HasPrefix(r.URL.Path, "/@react-refresh") ||
+			strings.HasPrefix(r.URL.Path, "/@id/") ||
+			strings.HasPrefix(r.URL.Path, "/wailsjs/") || // Wails runtime files
+			r.URL.Path == "/favicon.ico" ||
+			strings.HasSuffix(r.URL.Path, ".js") ||
+			strings.HasSuffix(r.URL.Path, ".mjs") ||
+			strings.HasSuffix(r.URL.Path, ".css") ||
+			strings.HasSuffix(r.URL.Path, ".tsx") ||
+			strings.HasSuffix(r.URL.Path, ".ts") ||
+			strings.HasSuffix(r.URL.Path, ".jsx") ||
+			strings.HasSuffix(r.URL.Path, ".map") {
+			isPublicEndpoint = true
+		} else if r.URL.Path == "/api/settings" && r.Method == http.MethodGet {
+			isPublicEndpoint = true
+		} else if r.URL.Path == "/api/theme" && r.Method == http.MethodGet {
+			isPublicEndpoint = true // Theme GET is public for UI rendering
+		} else if r.URL.Path == "/api/meta" {
+			isPublicEndpoint = true
+		}
+
+		// Admin-only endpoints (require admin token)
+		// These endpoints allow desktop to control settings, theme, and client management
+		isAdminEndpoint := false
+		if r.URL.Path == "/api/settings" && r.Method == http.MethodPost {
+			isAdminEndpoint = true
+		} else if r.URL.Path == "/api/theme" && r.Method == http.MethodPost {
+			isAdminEndpoint = true // Only theme POST requires admin token
+		} else if r.URL.Path == "/api/desktop-name" {
+			isAdminEndpoint = true
+		} else if r.URL.Path == "/api/update-client-name" && r.Method == http.MethodPost {
+			isAdminEndpoint = true
+		} else if r.URL.Path == "/api/block-client" && r.Method == http.MethodPost {
+			isAdminEndpoint = true
+		} else if r.URL.Path == "/api/unblock-client" && r.Method == http.MethodPost {
+			isAdminEndpoint = true
+		} else if r.URL.Path == "/api/block-sending" && r.Method == http.MethodPost {
+			isAdminEndpoint = true
+		} else if r.URL.Path == "/api/unblock-sending" && r.Method == http.MethodPost {
+			isAdminEndpoint = true
+		}
+
+		// Validate tokens for ALL clients on protected endpoints (no desktop exemption)
+		if !isPublicEndpoint {
+			providedToken := r.URL.Query().Get("security")
+			providedAdminToken := r.URL.Query().Get("admin")
+
+			fmt.Printf("[Security] Validating request: %s %s, isAdmin: %v, providedToken: %s, providedAdminToken: %s\n",
+				r.Method, r.URL.Path, isAdminEndpoint, providedToken, providedAdminToken)
+
+			// Admin endpoints require admin token
+			if isAdminEndpoint {
+				if providedAdminToken != adminToken || adminToken == "" {
+					fmt.Printf("[Security] REJECTED - Invalid admin token\n")
+					http.Error(w, "Invalid or missing admin token", http.StatusForbidden)
+					return
+				}
+			} else {
+				// Regular endpoints accept either client token OR admin token
+				// (admin token has higher privileges and can access everything)
+				validClientToken := providedToken == securityToken && securityToken != ""
+				validAdminToken := providedAdminToken == adminToken && adminToken != ""
+
+				if !validClientToken && !validAdminToken {
+					fmt.Printf("[Security] REJECTED - Invalid token for %s (client: %s, admin: %s)\n",
+						r.URL.Path, providedToken, providedAdminToken)
+					http.Error(w, "Invalid or missing security token", http.StatusUnauthorized)
+					return
+				}
+			}
+			fmt.Printf("[Security] ALLOWED - Valid token\n")
+		} else {
+			fmt.Printf("[Security] ALLOWED - Public endpoint: %s %s\n", r.Method, r.URL.Path)
+		}
+	} else {
+		fmt.Printf("[Security] DISABLED - Allowing all requests: %s %s\n", r.Method, r.URL.Path)
 	}
 
 	// API: Metadata - returns current state (upload mode or download mode with file info)
@@ -340,15 +474,29 @@ func (h *UnifiedHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPost {
 			var req struct {
 				TextTransferEnabled bool `json:"textTransferEnabled"`
+				SecurityEnabled     bool `json:"securityEnabled"`
 			}
 			if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 				http.Error(w, "Invalid body", http.StatusBadRequest)
 				return
 			}
 
-			// Update in WebSocket hub and broadcast
+			// Update text transfer in WebSocket hub and broadcast
 			if h.WSHub != nil {
 				h.WSHub.SetTextTransferEnabled(req.TextTransferEnabled)
+			}
+
+			// Update security enabled setting
+			h.mu.Lock()
+			h.SecurityEnabled = req.SecurityEnabled
+			h.mu.Unlock()
+
+			// Broadcast security settings update
+			if h.WSHub != nil {
+				h.WSHub.Broadcast("security_update", map[string]interface{}{
+					"securityEnabled": req.SecurityEnabled,
+					"securityToken":   h.SecurityToken,
+				})
 			}
 
 			json.NewEncoder(w).Encode(map[string]bool{"success": true})
@@ -361,9 +509,29 @@ func (h *UnifiedHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			enabled = h.WSHub.GetTextTransferEnabled()
 		}
 
-		json.NewEncoder(w).Encode(map[string]bool{
+		h.mu.RLock()
+		securityEnabled := h.SecurityEnabled
+		// Tokens (Client/Admin) are NOT exposed here for security
+		h.mu.RUnlock()
+
+		// Check if this is a desktop client
+		userAgent := r.UserAgent()
+		clientType := r.Header.Get("X-Client-Type")
+		isWailsDesktop := clientType == "desktop" ||
+			strings.Contains(userAgent, "WebView2") ||
+			strings.Contains(userAgent, "Wails") ||
+			strings.Contains(r.Host, "wails.localhost")
+
+		// Return settings status only (all tokens removed for security)
+		response := map[string]interface{}{
 			"textTransferEnabled": enabled,
-		})
+			"securityEnabled":     securityEnabled,
+			"isDesktop":           isWailsDesktop, // Helper flag
+		}
+		// Security Token is NO LONGER returned here
+		// Mobile clients MUST obtain token via QR Code URL
+
+		json.NewEncoder(w).Encode(response)
 		return
 	}
 
@@ -1247,10 +1415,13 @@ func NewUnifiedHandler(devServerURL string) *UnifiedHandler {
 	wsHub.StartMonitoring()
 
 	return &UnifiedHandler{
-		DevServerURL: devServerURL,
-		TxStore:      txStore,
-		ClientStore:  clientStore,
-		WSHub:        wsHub,
-		IsDarkMode:   true, // Default to Dark Mode
+		DevServerURL:    devServerURL,
+		TxStore:         txStore,
+		ClientStore:     clientStore,
+		WSHub:           wsHub,
+		IsDarkMode:      true, // Default to Dark Mode
+		SecurityToken:   generateSecurityToken(),
+		AdminToken:      generateSecurityToken(), // Separate token for admin operations
+		SecurityEnabled: false,                   // Disabled by default
 	}
 }

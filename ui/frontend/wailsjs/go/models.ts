@@ -21,6 +21,27 @@ export namespace main {
 
 }
 
+export namespace server {
+	
+	export class SecuritySettings {
+	    securityToken: string;
+	    adminToken: string;
+	    securityEnabled: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new SecuritySettings(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.securityToken = source["securityToken"];
+	        this.adminToken = source["adminToken"];
+	        this.securityEnabled = source["securityEnabled"];
+	    }
+	}
+
+}
+
 export namespace utils {
 	
 	export class AppInfo {

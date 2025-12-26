@@ -58,7 +58,9 @@ export const useTransactions = (
   _pollingInterval: number = 2000, // Kept for backwards compatibility but not used
   baseURL?: string,
   isSample = false,
-  isDesktop: boolean = false
+  isDesktop: boolean = false,
+  securityToken?: string,
+  securityEnabled?: boolean
 ): UseTransactionsResult => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
@@ -70,6 +72,18 @@ export const useTransactions = (
   const [isConnected, setIsConnected] = useState(true); // Optimistic - assume connected until proven otherwise
   const [deviceName, setDeviceName] = useState("PeerHop"); // Default to "PeerHop"
   const [textTransferEnabled, setTextTransferEnabled] = useState(false); // Default to false
+
+  // Helper function to add security token to URL
+  const addSecurityToken = useCallback(
+    (url: string) => {
+      if (!securityToken) return url;
+      const separator = url.includes("?") ? "&" : "?";
+      // Desktop uses admin token, mobile uses security token
+      const paramName = isDesktop ? "admin" : "security";
+      return `${url}${separator}${paramName}=${securityToken}`;
+    },
+    [securityToken, isDesktop]
+  );
 
   if (isSample) {
     return {
@@ -122,7 +136,7 @@ export const useTransactions = (
     }
     try {
       const url = baseURL ? `${baseURL}/api/transactions` : "/api/transactions";
-      const response = await axios.get(url);
+      const response = await axios.get(addSecurityToken(url));
       const txns = response.data.transactions || [];
       setTransactions(txns);
       setError(null);
@@ -132,7 +146,7 @@ export const useTransactions = (
     } finally {
       setLoading(false);
     }
-  }, [baseURL]);
+  }, [baseURL, addSecurityToken]);
 
   // Need to fetch devices initially via HTTP too just in case WS takes time?
   // Actually unified_handler doesn't seem to expose devices via public API easily maybe?
@@ -143,13 +157,13 @@ export const useTransactions = (
     }
     try {
       const url = baseURL ? `${baseURL}/api/clients` : "/api/clients";
-      const response = await axios.get(url);
+      const response = await axios.get(addSecurityToken(url));
       const clis = response.data.clients || [];
       setClients(clis);
     } catch (err) {
       // console.error("[useTransactions] Failed to fetch clients:", err);
     }
-  }, [baseURL]);
+  }, [baseURL, addSecurityToken]);
 
   useEffect(() => {
     fetchTransactions();
@@ -176,7 +190,7 @@ export const useTransactions = (
       }
       try {
         const url = baseURL ? `${baseURL}/api/theme` : "/api/theme";
-        const response = await axios.get(url);
+        const response = await axios.get(url); // Theme is public endpoint
         if (response.data) {
           if (typeof response.data.isDarkMode === "boolean") {
             setIsDarkMode(response.data.isDarkMode);
@@ -220,7 +234,7 @@ export const useTransactions = (
     async (text: string, senderId: string) => {
       try {
         const url = baseURL ? `${baseURL}/api/send-text` : "/api/send-text";
-        await axios.post(url, {
+        await axios.post(addSecurityToken(url), {
           text,
           senderId,
         });
@@ -230,7 +244,7 @@ export const useTransactions = (
         throw err;
       }
     },
-    [baseURL]
+    [baseURL, addSecurityToken]
   );
 
   // WebSocket connection and listener - MUST be in same effect to ensure listener is added before connect
@@ -340,18 +354,31 @@ export const useTransactions = (
     }
 
     if (wsURL) {
-      // Append desktop flag to skip client tracking for desktop app
-      const wsURLWithFlag = isDesktop ? `${wsURL}?desktop=true` : wsURL;
+      // Build WebSocket URL with appropriate parameters
+      let wsURLWithParams = wsURL;
+
+      if (isDesktop) {
+        // Desktop: add desktop flag and admin token
+        wsURLWithParams = `${wsURL}?desktop=true`;
+        if (securityToken) {
+          wsURLWithParams = `${wsURLWithParams}&admin=${securityToken}`;
+        }
+      } else {
+        // Mobile: add security token
+        if (securityToken) {
+          wsURLWithParams = `${wsURL}?security=${securityToken}`;
+        }
+      }
 
       console.log(
-        `[useTransactions] Setting up WebSocket. URL: ${wsURLWithFlag}, isDesktop: ${isDesktop}`
+        `[useTransactions] Setting up WebSocket. URL: ${wsURLWithParams}, isDesktop: ${isDesktop}`
       );
 
       // CRITICAL: Add listener FIRST, then connect
       // Using static import to eliminate async delay
       WebSocketClient.addListener(handleMessage);
       console.log("[useTransactions] Listener added, now connecting...");
-      WebSocketClient.connect(wsURLWithFlag);
+      WebSocketClient.connect(wsURLWithParams);
     } else {
       console.log("[useTransactions] No wsURL, skipping WebSocket setup");
     }
@@ -360,7 +387,7 @@ export const useTransactions = (
       console.log("[useTransactions] Cleaning up - removing listener");
       WebSocketClient.removeListener(handleMessage);
     };
-  }, [baseURL, isDesktop]);
+  }, [baseURL, isDesktop, securityToken, securityEnabled]);
 
   return {
     transactions,

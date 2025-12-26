@@ -19,7 +19,8 @@ interface UseDevicesResult {
 
 export const useDevices = (
   baseURL?: string,
-  isDesktop: boolean = false
+  isDesktop: boolean = false,
+  token?: string // Optional security/admin token
 ): UseDevicesResult => {
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
@@ -51,19 +52,32 @@ export const useDevices = (
     }
 
     if (wsURL) {
-      // Append desktop flag to skip client tracking for desktop app
-      const wsURLWithFlag = isDesktop ? `${wsURL}?desktop=true` : wsURL;
+      // Append desktop flag and token
+      let wsURLWithParams = wsURL;
+      const params = new URLSearchParams();
+
+      if (isDesktop) {
+        params.append("desktop", "true");
+        if (token) params.append("admin", token);
+      } else if (token) {
+        params.append("security", token);
+      }
+
+      const queryString = params.toString();
+      if (queryString) {
+        wsURLWithParams += `?${queryString}`;
+      }
 
       // CRITICAL: Add listener FIRST, then connect
       // Using static import to eliminate async delay
       WebSocketClient.addListener(handleMessage);
-      WebSocketClient.connect(wsURLWithFlag);
+      WebSocketClient.connect(wsURLWithParams);
     }
 
     return () => {
       WebSocketClient.removeListener(handleMessage);
     };
-  }, [baseURL, isDesktop]);
+  }, [baseURL, isDesktop, token]);
 
   return {
     clients,

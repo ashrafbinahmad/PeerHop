@@ -359,6 +359,9 @@ func (hub *WebSocketHub) HandleWebSocket(w http.ResponseWriter, r *http.Request)
 	// Check if this is a desktop app connection (skip client tracking)
 	isDesktop := r.URL.Query().Get("desktop") == "true"
 
+	// Security token validation is handled in ServeHTTP middleware before this handler
+	// Mobile clients must include ?security=<token> in the WebSocket URL
+
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		logger.Error("[WebSocket] Upgrade error: %v", err)

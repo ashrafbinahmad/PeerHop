@@ -97,6 +97,60 @@ export const MobileUnified: React.FC<Props> = ({
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const isUserAtBottomRef = useRef(true);
 
+  const [securityToken, setSecurityToken] = useState<string>(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get("security") || "";
+  });
+
+  const [isUnauthorized, setIsUnauthorized] = useState(false);
+
+  useEffect(() => {
+    // Check security status on mount
+    const checkSecurity = async () => {
+      try {
+        const res = await axios.get("/api/settings");
+        // If security is enabled on server BUT we don't have a token -> Unauthorized
+        if (res.data?.securityEnabled && !securityToken) {
+          setIsUnauthorized(true);
+        }
+      } catch (err) {
+        console.error("Failed to check security settings:", err);
+      }
+    };
+    checkSecurity();
+  }, [securityToken]);
+
+  if (isUnauthorized) {
+    return (
+      <div className="fixed inset-0 bg-gray-50 dark:bg-slate-900 flex flex-col items-center justify-center p-6 text-center z-50">
+        <div className="w-20 h-20 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mb-6">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="40"
+            height="40"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="text-red-500 dark:text-red-400"
+          >
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+            <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+          </svg>
+        </div>
+        <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+          Access Denied
+        </h2>
+        <p className="text-gray-600 dark:text-gray-400 max-w-sm">
+          This PeerHop server is protected. Please scan the QR code from the
+          desktop application to access files.
+        </p>
+      </div>
+    );
+  }
+
   const {
     transactions,
     clients,
@@ -107,7 +161,7 @@ export const MobileUnified: React.FC<Props> = ({
     isConnected,
     deviceName,
     textTransferEnabled,
-  } = useTransactions(2000);
+  } = useTransactions(2000, undefined, false, false, securityToken, true); // Pass security token and enable security
 
   const myClient = clients.find((c) => c.ip === myIp);
   const isBlocked = myClient?.blocked || false;
@@ -164,7 +218,10 @@ export const MobileUnified: React.FC<Props> = ({
     // Fetch client's own IP from server (server uses RemoteAddr for identification)
     const fetchMyIP = async () => {
       try {
-        const response = await axios.get("/api/my-ip");
+        const url = securityToken
+          ? `/api/my-ip?security=${securityToken}`
+          : "/api/my-ip";
+        const response = await axios.get(url);
         if (response.data?.ip) {
           setMyIp(response.data.ip);
         }
@@ -237,7 +294,12 @@ export const MobileUnified: React.FC<Props> = ({
     });
 
     try {
-      await axios.post("/api/upload", formData, {
+      // Build upload URL with security token
+      const uploadUrl = securityToken
+        ? `/api/upload?security=${securityToken}`
+        : "/api/upload";
+
+      await axios.post(uploadUrl, formData, {
         headers: { "Content-Type": "multipart/form-data" },
         signal: controller.signal,
         onUploadProgress: (progressEvent) => {
@@ -320,7 +382,12 @@ export const MobileUnified: React.FC<Props> = ({
     if (transaction.downloadLink) {
       // Server identifies client by IP from request
       const link = document.createElement("a");
-      link.href = transaction.downloadLink;
+      const downloadUrl = securityToken
+        ? `${transaction.downloadLink}${
+            transaction.downloadLink.includes("?") ? "&" : "?"
+          }security=${securityToken}`
+        : transaction.downloadLink;
+      link.href = downloadUrl;
       link.download = transaction.filename || "file";
       document.body.appendChild(link);
       link.click();
@@ -338,7 +405,10 @@ export const MobileUnified: React.FC<Props> = ({
     if (!transactionToCancel) return;
 
     try {
-      await axios.post(`/api/cancel-download/${transactionToCancel.id}`);
+      const url = securityToken
+        ? `/api/cancel-download/${transactionToCancel.id}?security=${securityToken}`
+        : `/api/cancel-download/${transactionToCancel.id}`;
+      await axios.post(url);
       console.log(
         `Cancelled download for transaction ${transactionToCancel.id}`
       );
@@ -647,22 +717,28 @@ export const MobileUnified: React.FC<Props> = ({
                                   <img
                                     src={`${mediaUrl}${
                                       mediaUrl.includes("?") ? "&" : "?"
-                                    }preview=true`}
+                                    }preview=true${
+                                      securityToken
+                                        ? `&security=${securityToken}`
+                                        : ""
+                                    }`}
                                     alt="preview"
                                     className="w-full h-full object-cover"
                                     onError={(e) => {
                                       // Fallback on error (e.g., auth issue or 404)
-                                      (
-                                        e.target as HTMLImageElement
-                                      ).style.display = "none";
-                                      (
-                                        e.target as HTMLImageElement
-                                      ).nextElementSibling?.classList.remove(
-                                        "hidden"
-                                      );
+                                      const img = e.target as HTMLImageElement;
+                                      img.style.display = "none";
+                                      if (img.nextElementSibling) {
+                                        img.nextElementSibling.classList.remove(
+                                          "hidden"
+                                        );
+                                        img.nextElementSibling.classList.add(
+                                          "flex"
+                                        );
+                                      }
                                     }}
                                   />
-                                  <div className="hidden w-full h-full flex items-center justify-center bg-gray-100 dark:bg-slate-700">
+                                  <div className="hidden w-full h-full items-center justify-center bg-gray-100 dark:bg-slate-700">
                                     <File size={20} />
                                   </div>
                                 </div>
@@ -675,7 +751,11 @@ export const MobileUnified: React.FC<Props> = ({
                                   <video
                                     src={`${mediaUrl}${
                                       mediaUrl.includes("?") ? "&" : "?"
-                                    }preview=true#t=0.1`}
+                                    }preview=true${
+                                      securityToken
+                                        ? `&security=${securityToken}`
+                                        : ""
+                                    }#t=0.1`}
                                     className="w-full h-full object-cover absolute inset-0 pointer-events-none"
                                     preload="metadata"
                                     playsInline

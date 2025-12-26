@@ -22,15 +22,25 @@ import (
 
 // App struct
 type App struct {
-	ctx            context.Context
-	unifiedHandler *server.UnifiedHandler
-	serverInfo     *ServerInfo
-	httpServer     *http.Server
+	ctx             context.Context
+	unifiedHandler  *server.UnifiedHandler
+	serverInfo      *ServerInfo
+	httpServer      *http.Server
+	serverStartTime time.Time
 }
 
 // NewApp creates a new App application struct
 func NewApp() *App {
 	return &App{}
+}
+
+// GetSecureSettings allows the frontend to securely retrieve tokens
+// This method is only accessible via Wails IPC, not via HTTP network
+func (a *App) GetSecureSettings() server.SecuritySettings {
+	if a.unifiedHandler == nil {
+		return server.SecuritySettings{}
+	}
+	return a.unifiedHandler.GetSecuritySettings()
 }
 
 // startup is called when the app starts. The context is saved
@@ -119,6 +129,7 @@ func (a *App) startPersistentServer() error {
 	}()
 
 	logger.Info("Server started at %s", a.serverInfo.URL)
+	a.serverStartTime = time.Now()
 
 	// Asynchronously fetch WiFi name to avoid blocking startup
 	go func() {
@@ -209,7 +220,20 @@ func (a *App) monitorNetwork() {
 				}
 			}
 
-			if (currentIP != savedIP) || (currentSSID != savedSSID) {
+			// Detect specific changes
+			ipChanged := currentIP != savedIP
+			ssidChanged := currentSSID != savedSSID
+
+			// Special handling for SSID:
+			// If savedSSID is empty (startup or offline) and currentSSID is valid (online),
+			// ONLY ignore this change if we are still within the startup grace period (e.g. 5 seconds).
+			// This prevents false positives during async SSID fetch on startup,
+			// but ALLOWS valid detection when reconnecting after being offline for a while.
+			if ssidChanged && savedSSID == "" && time.Since(a.serverStartTime) < 5*time.Second {
+				ssidChanged = false
+			}
+
+			if ipChanged || ssidChanged {
 				logger.Info("[Network] Change detected! IP: %s -> %s, SSID: %s -> %s", savedIP, currentIP, savedSSID, currentSSID)
 
 				// Restart server

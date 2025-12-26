@@ -26,6 +26,10 @@ export function GetRecentLogs(arg1) {
   return window['go']['main']['App']['GetRecentLogs'](arg1);
 }
 
+export function GetSecureSettings() {
+  return window['go']['main']['App']['GetSecureSettings']();
+}
+
 export function GetServerInfo() {
   return window['go']['main']['App']['GetServerInfo']();
 }

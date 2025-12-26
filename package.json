@@ -1,6 +1,6 @@
 {
   "name": "peerhop-root",
-  "version": "2.3.5",
+  "version": "2.3.6",
   "description": "Root package for PeerHop build scripts",
   "scripts": {
     "prebuild:frontend": "cd ui/frontend && npm run build && cd ../.. && rm -rf pkg/server/dist && cp -r ui/frontend/dist pkg/server/dist",
