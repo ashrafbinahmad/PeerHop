@@ -6,7 +6,7 @@
   <!-- ===================== PACKAGE ===================== -->
   <Package
     Name="PeerHop"
-    Version="2.3.6"
+    Version="2.3.7"
     Manufacturer="Muhammed Ashraf"
     UpgradeCode="12345678-1234-1234-1234-123456789ABC"
     Language="1033"

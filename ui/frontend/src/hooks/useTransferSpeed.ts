@@ -14,6 +14,11 @@ export const useTransferSpeed = (
     const newSpeeds: Record<number, string> = {};
 
     transactions.forEach((txn) => {
+      // Skip if transaction is not in progress
+      if (txn.status !== "in_progress") {
+        return;
+      }
+
       // Determine bytes
       let currentBytes = 0;
 
@@ -40,18 +45,30 @@ export const useTransferSpeed = (
       const timeDiff = (now - prevTime) / 1000;
       const bytesDiff = currentBytes - prevBytes;
 
-      // Only update speed if meaningful time has passed (e.g. 500ms) or bytes changed
+      // Only update speed if meaningful time has passed (e.g. 500ms)
       if (timeDiff >= 0.5) {
-        if (bytesDiff >= 0) {
+        // Only calculate speed if bytes actually increased
+        if (bytesDiff > 0) {
           const speed = bytesDiff / timeDiff; // B/s
           const mb = speed / (1024 * 1024);
-          newSpeeds[txn.id] = `${mb.toFixed(1)} MB/s`;
+          // Clamp to reasonable values (0 to 10000 MB/s)
+          const clampedMb = Math.max(0, Math.min(10000, mb));
+          newSpeeds[txn.id] = `${clampedMb.toFixed(1)} MB/s`;
+        } else if (bytesDiff === 0) {
+          // No progress - show 0 speed but keep tracking
+          newSpeeds[txn.id] = "0.0 MB/s";
         }
+        // If bytesDiff is negative (shouldn't happen but handle it), keep previous speed
+
         // Update refs only when we consume the diff for speed calc
         prevBytesRef.current[txn.id] = currentBytes;
         prevTimeRef.current[txn.id] = now;
       } else {
-        // Keep existing speed
+        // Not enough time has passed - keep the existing speed from state
+        // This prevents speed from disappearing between updates
+        if (speeds[txn.id]) {
+          newSpeeds[txn.id] = speeds[txn.id];
+        }
       }
     });
 
@@ -59,7 +76,7 @@ export const useTransferSpeed = (
     if (Object.keys(newSpeeds).length > 0) {
       setSpeeds((prev) => ({ ...prev, ...newSpeeds }));
     }
-  }, [transactions, myIp]);
+  }, [transactions, myIp, speeds]);
 
   return speeds;
 };

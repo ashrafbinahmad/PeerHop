@@ -20,6 +20,12 @@ const (
 	SenderServer = "server"
 )
 
+// ByteRange represents a range of bytes that have been downloaded
+type ByteRange struct {
+	Start int64
+	End   int64
+}
+
 // Transaction represents a file or text transfer transaction
 type Transaction struct {
 	ID                 int             `json:"id"`
@@ -39,9 +45,10 @@ type Transaction struct {
 	Status             string          `json:"status"`                     // "pending", "in_progress", "completed", "failed"
 
 	// Client-specific progress tracking for downloads (keyed by IP)
-	ClientProgress map[string]float64 `json:"clientProgress,omitempty"` // clientIP -> progress percentage
-	ClientStatus   map[string]string  `json:"clientStatus,omitempty"`   // clientIP -> status
-	ClientBytes    map[string]int64   `json:"clientBytes,omitempty"`    // clientIP -> bytes transferred
+	ClientProgress map[string]float64     `json:"clientProgress,omitempty"` // clientIP -> progress percentage
+	ClientStatus   map[string]string      `json:"clientStatus,omitempty"`   // clientIP -> status
+	ClientBytes    map[string]int64       `json:"clientBytes,omitempty"`    // clientIP -> bytes transferred
+	ClientRanges   map[string][]ByteRange `json:"clientRanges,omitempty"`   // clientIP -> list of downloaded ranges (for parallel requests)
 }
 
 // TransactionStore manages all transactions in memory
@@ -118,6 +125,15 @@ func (ts *TransactionStore) GetTransactionCopy(id int) (*Transaction, bool) {
 			cpy.ClientBytes[k] = v
 		}
 	}
+	if txn.ClientRanges != nil {
+		cpy.ClientRanges = make(map[string][]ByteRange)
+		for k, v := range txn.ClientRanges {
+			// Deep copy the slice of ranges
+			rangesCopy := make([]ByteRange, len(v))
+			copy(rangesCopy, v)
+			cpy.ClientRanges[k] = rangesCopy
+		}
+	}
 
 	return &cpy, true
 }
@@ -191,10 +207,117 @@ func (ts *TransactionStore) UpdateClientProgress(id int, clientIP string, bytesT
 			txn.ClientBytes = make(map[string]int64)
 		}
 
-		// Update client-specific progress
-		txn.ClientBytes[clientIP] = bytesTransferred
+		// CRITICAL FIX: Ensure bytes and progress are monotonic (only increase)
+		// This prevents progress from going backwards due to browser range requests or retries
+		previousBytes := txn.ClientBytes[clientIP]
+		previousProgress := txn.ClientProgress[clientIP]
+
+		// Only update if we're making forward progress
+		if bytesTransferred > previousBytes {
+			txn.ClientBytes[clientIP] = bytesTransferred
+
+			if totalBytes > 0 {
+				progress := (float64(bytesTransferred) / float64(totalBytes)) * 100
+
+				// Ensure progress only increases
+				if progress > previousProgress {
+					// Clamp to maximum of 100%
+					if progress >= 100 {
+						progress = 100
+						txn.ClientStatus[clientIP] = "completed"
+					} else {
+						txn.ClientStatus[clientIP] = "in_progress"
+					}
+					txn.ClientProgress[clientIP] = progress
+				}
+			}
+		} else if bytesTransferred == totalBytes && totalBytes > 0 {
+			// Special case: download completed, always set to 100%
+			txn.ClientBytes[clientIP] = bytesTransferred
+			txn.ClientProgress[clientIP] = 100
+			txn.ClientStatus[clientIP] = "completed"
+		}
+		// If bytesTransferred <= previousBytes, don't update (ignore backwards movement)
+	}
+}
+
+// UpdateClientRangeProgress updates progress for a specific client using byte ranges
+// This properly handles parallel range requests from Android browsers
+func (ts *TransactionStore) UpdateClientRangeProgress(id int, clientIP string, rangeStart int64, rangeEnd int64, totalBytes int64) {
+	ts.mu.Lock()
+	defer ts.mu.Unlock()
+
+	if txn, exists := ts.transactions[id]; exists {
+		// Check for cancellation
+		if txn.ClientStatus != nil && txn.ClientStatus[clientIP] == "cancelled" {
+			return
+		}
+		cancelKey := fmt.Sprintf("%d_%s", id, clientIP)
+		if ts.clientCancelled[cancelKey] {
+			return
+		}
+
+		// Initialize maps if needed
+		if txn.ClientProgress == nil {
+			txn.ClientProgress = make(map[string]float64)
+		}
+		if txn.ClientStatus == nil {
+			txn.ClientStatus = make(map[string]string)
+		}
+		if txn.ClientBytes == nil {
+			txn.ClientBytes = make(map[string]int64)
+		}
+		if txn.ClientRanges == nil {
+			txn.ClientRanges = make(map[string][]ByteRange)
+		}
+
+		// Add or update the range
+		ranges := txn.ClientRanges[clientIP]
+		newRange := ByteRange{Start: rangeStart, End: rangeEnd}
+
+		// Merge overlapping or adjacent ranges
+		merged := false
+		for i, r := range ranges {
+			// Check if ranges overlap or are adjacent
+			if newRange.Start <= r.End+1 && newRange.End+1 >= r.Start {
+				// Merge ranges
+				ranges[i].Start = min(r.Start, newRange.Start)
+				ranges[i].End = max(r.End, newRange.End)
+				merged = true
+
+				// Check if we can merge with any other ranges now
+				for j := len(ranges) - 1; j >= 0; j-- {
+					if j != i && ranges[i].Start <= ranges[j].End+1 && ranges[i].End+1 >= ranges[j].Start {
+						ranges[i].Start = min(ranges[i].Start, ranges[j].Start)
+						ranges[i].End = max(ranges[i].End, ranges[j].End)
+						// Remove the merged range
+						ranges = append(ranges[:j], ranges[j+1:]...)
+						if j < i {
+							i--
+						}
+					}
+				}
+				break
+			}
+		}
+
+		if !merged {
+			ranges = append(ranges, newRange)
+		}
+
+		txn.ClientRanges[clientIP] = ranges
+
+		// Calculate total bytes downloaded from all ranges
+		totalDownloaded := int64(0)
+		for _, r := range ranges {
+			totalDownloaded += (r.End - r.Start + 1)
+		}
+
+		// Update client bytes and progress
+		txn.ClientBytes[clientIP] = totalDownloaded
+
 		if totalBytes > 0 {
-			progress := (float64(bytesTransferred) / float64(totalBytes)) * 100
+			progress := (float64(totalDownloaded) / float64(totalBytes)) * 100
 			if progress >= 100 {
 				progress = 100
 				txn.ClientStatus[clientIP] = "completed"
@@ -202,8 +325,39 @@ func (ts *TransactionStore) UpdateClientProgress(id int, clientIP string, bytesT
 				txn.ClientStatus[clientIP] = "in_progress"
 			}
 			txn.ClientProgress[clientIP] = progress
+
+			// Clean debug logs with MB units
+			downloadedMB := float64(totalDownloaded) / (1024 * 1024)
+			totalMB := float64(totalBytes) / (1024 * 1024)
+
+			// Show progress with visual indicator
+			if progress >= 100 {
+				fmt.Printf("[✅ COMPLETE] TxID=%d %.1fMB/%.1fMB (100%%)\n",
+					id, downloadedMB, totalMB)
+			} else if len(ranges) > 1 {
+				fmt.Printf("[📊 PROGRESS] TxID=%d %.1fMB/%.1fMB (%.1f%%) - %d parallel ranges\n",
+					id, downloadedMB, totalMB, progress, len(ranges))
+			} else {
+				fmt.Printf("[📊 PROGRESS] TxID=%d %.1fMB/%.1fMB (%.1f%%)\n",
+					id, downloadedMB, totalMB, progress)
+			}
 		}
 	}
+}
+
+// Helper functions for min/max
+func min(a, b int64) int64 {
+	if a < b {
+		return a
+	}
+	return b
+}
+
+func max(a, b int64) int64 {
+	if a > b {
+		return a
+	}
+	return b
 }
 
 // UpdateStatus updates the status of a transaction

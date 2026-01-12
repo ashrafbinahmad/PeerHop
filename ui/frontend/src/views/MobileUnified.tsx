@@ -97,6 +97,9 @@ export const MobileUnified: React.FC<Props> = ({
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const isUserAtBottomRef = useRef(true);
 
+  // Track highest progress seen for each transaction to prevent backwards jumps
+  const highestProgressRef = useRef<Record<number, number>>({});
+
   const [securityToken, setSecurityToken] = useState<string>(() => {
     const params = new URLSearchParams(window.location.search);
     return params.get("security") || "";
@@ -161,6 +164,7 @@ export const MobileUnified: React.FC<Props> = ({
     isConnected,
     deviceName,
     textTransferEnabled,
+    multiClientEnabled,
   } = useTransactions(2000, undefined, false, false, securityToken, true); // Pass security token and enable security
 
   const myClient = clients.find((c) => c.ip === myIp);
@@ -171,6 +175,9 @@ export const MobileUnified: React.FC<Props> = ({
   const isSendingDisabled = isBlocked || myClient?.sendingBlocked || false;
   const isSendingBlockedOnly =
     !isBlocked && (myClient?.sendingBlocked || false);
+
+  // Track downloaded transaction IDs to prevent re-downloading
+  const downloadedIdsRef = useRef<Set<number>>(new Set());
 
   const activeTheme =
     THEME_PRESETS.find((t) => t.id === activeThemeId) ||
@@ -191,6 +198,115 @@ export const MobileUnified: React.FC<Props> = ({
     selectBtn:
       activeTheme.panelCard + " " + activeTheme.border + " " + activeTheme.text,
   };
+
+  // Auto-download when multi-client is disabled
+  useEffect(() => {
+    console.log(
+      `[Auto-Download] Effect triggered - multiClientEnabled: ${multiClientEnabled}, myIp: ${myIp}, transactions: ${transactions.length}`
+    );
+
+    if (multiClientEnabled) {
+      console.log(
+        "[Auto-Download] Multi-client enabled - skipping auto-download"
+      );
+      return;
+    }
+
+    if (!myIp) {
+      console.log("[Auto-Download] No myIp yet - skipping auto-download");
+      return;
+    }
+
+    // Find pending downloads (not sent by me, file type, pending or not yet started)
+    const pendingDownloads = transactions.filter((txn) => {
+      if (txn.type !== "file") return false;
+      if (txn.senderId === myIp) return false; // Skip my own uploads
+
+      // Check if already downloaded
+      if (downloadedIdsRef.current.has(txn.id)) {
+        console.log(
+          `[Auto-Download] Skipping txn ${txn.id} - already downloaded`
+        );
+        return false;
+      }
+
+      // Check client-specific status
+      const clientStatus =
+        myIp && txn.clientStatus ? txn.clientStatus[myIp] : undefined;
+      const clientProgress =
+        myIp && txn.clientProgress ? txn.clientProgress[myIp] : undefined;
+
+      console.log(
+        `[Auto-Download] Txn ${txn.id}: status=${clientStatus}, progress=${clientProgress}, globalStatus=${txn.status}`
+      );
+
+      // Auto-download if:
+      // 1. No client status yet (new transaction)
+      // 2. Client status is "pending"
+      // 3. Client status doesn't exist but global status is pending
+      const shouldDownload =
+        !clientStatus ||
+        clientStatus === "pending" ||
+        (clientStatus === undefined && txn.status === "pending");
+
+      if (shouldDownload) {
+        console.log(
+          `[Auto-Download] Txn ${txn.id} (${txn.filename}) is eligible for download`
+        );
+      }
+
+      return shouldDownload;
+    });
+
+    console.log(
+      `[Auto-Download] Found ${pendingDownloads.length} pending downloads`
+    );
+
+    // Sort by ID to download in order
+    pendingDownloads.sort((a, b) => a.id - b.id);
+
+    // Download the first pending file
+    if (pendingDownloads.length > 0) {
+      const txn = pendingDownloads[0];
+      if (txn.downloadLink) {
+        console.log(
+          `[Auto-Download] ✅ Starting download for transaction ${txn.id}: ${txn.filename}`
+        );
+
+        // Mark as downloaded to prevent re-trigger
+        downloadedIdsRef.current.add(txn.id);
+
+        // Capture downloadLink and filename to preserve type narrowing in setTimeout
+        const downloadLink = txn.downloadLink;
+        const filename = txn.filename || "file";
+
+        // Trigger download - use setTimeout to ensure it's in a clean execution context
+        setTimeout(() => {
+          const link = document.createElement("a");
+          const downloadUrl = securityToken
+            ? `${downloadLink}${
+                downloadLink.includes("?") ? "&" : "?"
+              }security=${securityToken}`
+            : downloadLink;
+          link.href = downloadUrl;
+          link.download = filename;
+          link.target = "_blank"; // iOS compatibility
+          document.body.appendChild(link);
+
+          console.log(`[Auto-Download] Clicking download link: ${downloadUrl}`);
+          link.click();
+
+          setTimeout(() => {
+            document.body.removeChild(link);
+          }, 100);
+        }, 100);
+      } else {
+        console.log(
+          `[Auto-Download] ❌ No download link for transaction ${txn.id}`
+        );
+      }
+    }
+  }, [transactions, multiClientEnabled, myIp, securityToken]);
 
   // Update document title when device name changes
   useEffect(() => {
@@ -252,19 +368,54 @@ export const MobileUnified: React.FC<Props> = ({
       if (transaction) {
         // Check both global status and client-specific status
         const isCompleted = transaction.status === "completed";
+        const isCancelled = transaction.status === "cancelled";
         const clientStatus =
           myIp && transaction.clientStatus
             ? transaction.clientStatus[myIp]
             : undefined;
         const isClientDone =
           clientStatus === "completed" || clientStatus === "in_progress";
+        const isClientCancelled = clientStatus === "cancelled";
 
-        if (isCompleted || isClientDone) {
+        // Clear if completed, in progress, cancelled, or no longer exists
+        if (isCompleted || isClientDone || isCancelled || isClientCancelled) {
+          console.log(
+            `[Download State] Clearing downloadingTransactionId for txn ${downloadingTransactionId} - status: ${transaction.status}, clientStatus: ${clientStatus}`
+          );
           setDownloadingTransactionId(null);
         }
+      } else {
+        // Transaction no longer exists - clear the state
+        console.log(
+          `[Download State] Clearing downloadingTransactionId for txn ${downloadingTransactionId} - transaction not found`
+        );
+        setDownloadingTransactionId(null);
       }
     }
   }, [transactions, downloadingTransactionId, myIp]);
+
+  // Clear highestProgressRef when downloads are cancelled or reset
+  useEffect(() => {
+    transactions.forEach((txn) => {
+      // Clear progress tracking for cancelled transactions
+      if (txn.status === "cancelled") {
+        delete highestProgressRef.current[txn.id];
+      }
+
+      // Clear progress tracking if client-specific status is pending or cancelled
+      if (myIp && txn.clientStatus) {
+        const clientStatus = txn.clientStatus[myIp];
+        if (clientStatus === "pending" || clientStatus === "cancelled") {
+          delete highestProgressRef.current[txn.id];
+        }
+      }
+
+      // Also clear if client progress or bytes are reset to 0
+      if (myIp && txn.clientProgress && txn.clientProgress[myIp] === 0) {
+        delete highestProgressRef.current[txn.id];
+      }
+    });
+  }, [transactions, myIp]);
 
   // Hook for download speeds (WebSocket)
   const downloadSpeeds = useTransferSpeed(transactions, myIp);
@@ -599,6 +750,11 @@ export const MobileUnified: React.FC<Props> = ({
                 clientStatus = transaction.clientStatus[myIp] || "pending";
               }
 
+              // Use client-specific status for downloads (declare early)
+              const effectiveStatus =
+                !isMe && clientStatus ? clientStatus : transaction.status;
+
+              // Determine the raw progress value
               const rawPercent =
                 localProgress !== undefined &&
                 transaction.status === "in_progress"
@@ -606,13 +762,93 @@ export const MobileUnified: React.FC<Props> = ({
                   : !isMe && clientProgress > 0
                   ? clientProgress // Download progress (client-specific)
                   : transaction.transactionPercent; // Fallback to global
-              const displayPercent = isNaN(Number(rawPercent))
+
+              // Convert to number and validate
+              let currentProgress = isNaN(Number(rawPercent))
                 ? 0
                 : Number(rawPercent);
 
-              // Use client-specific status for downloads
-              const effectiveStatus =
-                !isMe && clientStatus ? clientStatus : transaction.status;
+              // Ensure progress is in valid range
+              currentProgress = Math.max(0, Math.min(100, currentProgress));
+
+              // Debug logging for progress
+              if (!isMe && transaction.id) {
+                console.log(
+                  `[Progress Debug] Txn ${transaction.id}: rawPercent=${rawPercent}, currentProgress=${currentProgress}, effectiveStatus=${effectiveStatus}, clientProgress=${clientProgress}, isMe=${isMe}`
+                );
+              }
+
+              // Prevent progress from going backwards (common issue on mobile)
+              // Only enforce this for in-progress downloads
+              if (
+                effectiveStatus === "in_progress" ||
+                transaction.status === "in_progress"
+              ) {
+                const previousHighest =
+                  highestProgressRef.current[transaction.id] || 0;
+
+                // Detect download restart: if current progress is very low but we had high progress before,
+                // this is likely a restart after cancellation - reset tracking
+                if (currentProgress < 5 && previousHighest > 10) {
+                  console.log(
+                    `[Progress] Detected download restart for txn ${transaction.id}: resetting from ${previousHighest}% to ${currentProgress}%`
+                  );
+                  delete highestProgressRef.current[transaction.id];
+                  // Update with the new (low) progress value
+                  if (currentProgress > 0) {
+                    highestProgressRef.current[transaction.id] =
+                      currentProgress;
+                  }
+                  // Allow the new progress to be shown
+                } else if (
+                  currentProgress < previousHighest &&
+                  currentProgress > 0
+                ) {
+                  // Don't let it go backwards (unless it's a restart)
+                  console.log(
+                    `[Progress] Preventing backwards: txn ${transaction.id} from ${currentProgress}% to ${previousHighest}%`
+                  );
+                  currentProgress = previousHighest;
+                } else if (currentProgress > previousHighest) {
+                  // Update the highest seen
+                  highestProgressRef.current[transaction.id] = currentProgress;
+                }
+              } else if (
+                effectiveStatus === "completed" ||
+                transaction.status === "completed"
+              ) {
+                // For completed transactions, always show 100%
+                currentProgress = 100;
+                highestProgressRef.current[transaction.id] = 100;
+              } else if (
+                effectiveStatus === "cancelled" ||
+                transaction.status === "cancelled"
+              ) {
+                // For cancelled, clean up tracking
+                delete highestProgressRef.current[transaction.id];
+              } else if (effectiveStatus === "pending") {
+                // Also clear tracking when returning to pending state (preparing for restart)
+                if (highestProgressRef.current[transaction.id] !== undefined) {
+                  console.log(
+                    `[Progress] Clearing tracking for txn ${transaction.id} - status is pending`
+                  );
+                  delete highestProgressRef.current[transaction.id];
+                }
+              }
+
+              const displayPercent = currentProgress;
+
+              // Final debug log
+              if (!isMe && transaction.id) {
+                console.log(
+                  `[Progress Final] Txn ${
+                    transaction.id
+                  }: displayPercent=${displayPercent}, will show progress UI: ${
+                    effectiveStatus === "in_progress" ||
+                    downloadingTransactionId === transaction.id
+                  }`
+                );
+              }
 
               return (
                 <div
@@ -801,10 +1037,32 @@ export const MobileUnified: React.FC<Props> = ({
                                       "0.0 MB/s"}
                                   </span>
                                   <span>
-                                    {formatBytes(
-                                      (transaction.fileSize || 0) *
-                                        (displayPercent / 100)
-                                    )}{" "}
+                                    {(() => {
+                                      // Use actual client bytes if available for downloads
+                                      let downloadedBytes = 0;
+                                      if (
+                                        !isMe &&
+                                        myIp &&
+                                        transaction.clientBytes &&
+                                        transaction.clientBytes[myIp] !==
+                                          undefined
+                                      ) {
+                                        downloadedBytes =
+                                          transaction.clientBytes[myIp];
+                                      } else if (
+                                        !isMe &&
+                                        transaction.bytesTransferred
+                                      ) {
+                                        downloadedBytes =
+                                          transaction.bytesTransferred;
+                                      } else {
+                                        // Calculate from percentage as fallback
+                                        downloadedBytes =
+                                          (transaction.fileSize || 0) *
+                                          (displayPercent / 100);
+                                      }
+                                      return formatBytes(downloadedBytes);
+                                    })()}{" "}
                                     / {formatBytes(transaction.fileSize)}
                                   </span>
                                   <span className="font-medium flex justify-between w-full">

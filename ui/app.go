@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"os/exec"
@@ -93,12 +94,31 @@ func (a *App) startPersistentServer() error {
 		return err
 	}
 
-	// Detect development mode by checking if Vite dev server is running
+	// Detect development mode by checking if PeerHop's Vite dev server is running
+	// We need to verify it's actually PeerHop's dev server, not another Vite app on port 5173
 	devServerURL := ""
 	if resp, err := http.Get("http://localhost:5173"); err == nil {
+		// Read response to check if it's PeerHop's dev server
+		// PeerHop's dev server should return HTML with "PeerHop" or typical Vite dev server response
+		body, readErr := io.ReadAll(resp.Body)
 		resp.Body.Close()
-		devServerURL = "http://localhost:5173"
-		logger.Info("Development mode detected - proxying to Vite dev server")
+
+		if readErr == nil {
+			bodyStr := string(body)
+			// Check if response contains PeerHop-specific markers or Vite dev server markers
+			// Vite dev server typically returns HTML with script tags for /@vite/client
+			isPeerHopDevServer := strings.Contains(bodyStr, "/@vite/client") ||
+				strings.Contains(bodyStr, "PeerHop") ||
+				strings.Contains(bodyStr, "/src/main.tsx") ||
+				strings.Contains(bodyStr, "/src/main.jsx")
+
+			if isPeerHopDevServer {
+				devServerURL = "http://localhost:5173"
+				logger.Info("Development mode detected - proxying to PeerHop Vite dev server")
+			} else {
+				logger.Info("Port 5173 is in use but not by PeerHop - serving embedded dist")
+			}
+		}
 	}
 
 	// Create unified handler with optional dev server URL

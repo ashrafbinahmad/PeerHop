@@ -683,7 +683,14 @@ export const DesktopView = () => {
 
   const [securityEnabled, setSecurityEnabled] = useState(() => {
     const saved = localStorage.getItem("securityEnabled");
-    return saved !== null ? saved === "true" : false; // Default to false
+    // Default to true if not set
+    return saved !== null ? saved === "true" : true;
+  });
+
+  const [multiClientEnabled, setMultiClientEnabled] = useState(() => {
+    const saved = localStorage.getItem("multiClientEnabled");
+    // Default to false (disabled)
+    return saved !== null ? saved === "true" : false;
   });
 
   const [securityToken, setSecurityToken] = useState<string>("");
@@ -901,9 +908,10 @@ export const DesktopView = () => {
       .catch((e) => console.error("Failed to fetch settings:", e));
   }, [serverInfo?.url]);
 
-  // Save text transfer setting to localStorage and sync with server
+  // Save text transfer and multi-client settings to localStorage and sync with server
   useEffect(() => {
     localStorage.setItem("textTransferEnabled", String(textTransferEnabled));
+    localStorage.setItem("multiClientEnabled", String(multiClientEnabled));
 
     if (!serverInfo?.url) return;
 
@@ -917,9 +925,16 @@ export const DesktopView = () => {
       .post(url, {
         textTransferEnabled,
         securityEnabled,
+        multiClientEnabled,
       })
       .catch((e) => console.error("Failed to sync settings:", e));
-  }, [textTransferEnabled, securityEnabled, serverInfo?.url, adminToken]);
+  }, [
+    textTransferEnabled,
+    securityEnabled,
+    multiClientEnabled,
+    serverInfo?.url,
+    adminToken,
+  ]);
 
   // Save security enabled setting to localStorage
   useEffect(() => {
@@ -1258,7 +1273,7 @@ export const DesktopView = () => {
         {/* MESSAGES AREA */}
         <div
           ref={scrollContainerRef}
-          className="flex-1 overflow-y-auto px-4 py-4 pt-16 flex flex-col scroll-smooth custom-scrollbar w-screen overflow-hidden"
+          className="flex-1 overflow-y-auto px-4 py-4 pt-16 flex flex-col scroll-smooth custom-scrollbar w-full overflow-hidden"
         >
           <div className="mt-auto flex flex-col gap-3">
             {visibleTransactions.length === 0 ? (
@@ -1828,8 +1843,8 @@ export const DesktopView = () => {
       <div
         className={`
             absolute top-[48px] bottom-0 right-0 w-full z-40 
-            md:static md:w-[350px] md:border-l md:z-30 md:pr-1
-            flex flex-col shadow-xl transition-all duration-300 
+            md:static md:w-[350px] md:border-l md:z-30 md:pr-1 md:shrink-0
+            flex-col shadow-xl transition-all duration-300 
             ${theme.panelBg}
             ${
               activeTab === "qr" || activeTab === "settings"
@@ -2009,6 +2024,39 @@ export const DesktopView = () => {
                           />
                         </button>
                       </div>
+
+                      {/* Multi-Client Toggle */}
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1">
+                          <p className={`text-sm font-medium ${theme.text}`}>
+                            Enable Multi-Client
+                          </p>
+                          <p className={`text-xs mt-0.5 ${theme.subText}`}>
+                            Allow multiple devices to connect simultaneously
+                          </p>
+                        </div>
+                        <button
+                          onClick={() =>
+                            setMultiClientEnabled(!multiClientEnabled)
+                          }
+                          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors shrink-0 ${
+                            multiClientEnabled ? "" : theme.iconBg
+                          }`}
+                          style={{
+                            backgroundColor: multiClientEnabled
+                              ? theme.accentColor
+                              : undefined,
+                          }}
+                        >
+                          <span
+                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                              multiClientEnabled
+                                ? "translate-x-6"
+                                : "translate-x-1"
+                            }`}
+                          />
+                        </button>
+                      </div>
                     </div>
                   </div>
 
@@ -2093,8 +2141,8 @@ export const DesktopView = () => {
                     </div>
                   )}
 
-                  {/* Connected Devices */}
-                  {clients.length > 0 && (
+                  {/* Connected Devices - Only show when multi-client is enabled */}
+                  {multiClientEnabled && clients.length > 0 && (
                     <div>
                       <h3
                         className={`text-sm font-semibold mb-4 ${theme.text}`}
@@ -2166,66 +2214,106 @@ export const DesktopView = () => {
                     )}
                   </div>
 
-                  {/* Step 2: QR Code */}
+                  {/* Step 2: QR Code or Connected Status */}
                   <div className="text-center space-y-4">
-                    <p
-                      className={`text-xs font-semibold uppercase tracking-wider ${theme.subText}`}
-                    >
-                      Step 2: Scan QR
-                    </p>
+                    {!multiClientEnabled && clients.length > 0 ? (
+                      <>
+                        {/* Connected Status - shown when multi-client is disabled and device connected */}
+                        <p
+                          className={`text-xs font-semibold uppercase tracking-wider ${theme.subText}`}
+                        >
+                          Status
+                        </p>
+                        <div className="flex flex-col items-center gap-6 py-8">
+                          <div
+                            className="w-24 h-24 rounded-full flex items-center justify-center"
+                            style={{
+                              backgroundColor: theme.accentColor + "20",
+                            }}
+                          >
+                            <Check
+                              size={48}
+                              style={{ color: theme.accentColor }}
+                              strokeWidth={2.5}
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <p className={`text-lg font-bold ${theme.text}`}>
+                              Connected
+                            </p>
+                            <p className={`text-sm ${theme.subText}`}>
+                              {clients[0].name || clients[0].platform} device
+                            </p>
+                          </div>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        {/* QR Code - shown when multi-client is enabled OR no device connected */}
+                        <p
+                          className={`text-xs font-semibold uppercase tracking-wider ${theme.subText}`}
+                        >
+                          Step 2: Scan QR
+                        </p>
 
-                    <div className="flex justify-center">
-                      <div
-                        className={`p-3 rounded-2xl ${
-                          isDarkMode
-                            ? "bg-white shadow-lg"
-                            : "bg-white shadow-[0_8px_30px_rgba(0,0,0,0.12)] border border-gray-100"
-                        }`}
-                        style={{
-                          opacity: serverInfo?.ssid ? 1 : 0.5,
-                          filter: serverInfo?.ssid ? "none" : "grayscale(100%)",
-                          transition: "all 0.3s ease",
-                        }}
-                      >
-                        <div className="w-[180px] h-[180px]">
-                          <QRCode
-                            value={
-                              serverInfo?.url
-                                ? securityEnabled && securityToken
+                        <div className="flex justify-center">
+                          <div
+                            className={`p-3 rounded-2xl ${
+                              isDarkMode
+                                ? "bg-white shadow-lg"
+                                : "bg-white shadow-[0_8px_30px_rgba(0,0,0,0.12)] border border-gray-100"
+                            }`}
+                            style={{
+                              opacity: serverInfo?.ssid ? 1 : 0.5,
+                              filter: serverInfo?.ssid
+                                ? "none"
+                                : "grayscale(100%)",
+                              transition: "all 0.3s ease",
+                            }}
+                          >
+                            <div className="w-[180px] h-[180px]">
+                              <QRCode
+                                value={
+                                  serverInfo?.url
+                                    ? securityEnabled && securityToken
+                                      ? `${serverInfo.url}?security=${securityToken}`
+                                      : serverInfo.url
+                                    : ""
+                                }
+                                style={{ height: "100%", width: "100%" }}
+                                viewBox={`0 0 256 256`}
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* URL Fallback */}
+                        {serverInfo?.ssid ? (
+                          <div className="flex items-center justify-center gap-2">
+                            <code
+                              className={`text-xs font-mono ${theme.subText}`}
+                            >
+                              {securityEnabled && securityToken
+                                ? `${serverInfo.url}?security=${securityToken}`
+                                : serverInfo.url}
+                            </code>
+                            <CopyButton
+                              text={
+                                securityEnabled && securityToken
                                   ? `${serverInfo.url}?security=${securityToken}`
                                   : serverInfo.url
-                                : ""
-                            }
-                            style={{ height: "100%", width: "100%" }}
-                            viewBox={`0 0 256 256`}
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* URL Fallback */}
-                    {serverInfo?.ssid ? (
-                      <div className="flex items-center justify-center gap-2">
-                        <code className={`text-xs font-mono ${theme.subText}`}>
-                          {securityEnabled && securityToken
-                            ? `${serverInfo.url}?security=${securityToken}`
-                            : serverInfo.url}
-                        </code>
-                        <CopyButton
-                          text={
-                            securityEnabled && securityToken
-                              ? `${serverInfo.url}?security=${securityToken}`
-                              : serverInfo.url
-                          }
-                          className={`p-1.5 rounded-md transition-colors ${theme.ghostHover} ${theme.subText}`}
-                          iconSize={12}
-                          isDarkMode={isDarkMode}
-                        />
-                      </div>
-                    ) : (
-                      <p className={`text-xs ${theme.subText}`}>
-                        Waiting for network connection...
-                      </p>
+                              }
+                              className={`p-1.5 rounded-md transition-colors ${theme.ghostHover} ${theme.subText}`}
+                              iconSize={12}
+                              isDarkMode={isDarkMode}
+                            />
+                          </div>
+                        ) : (
+                          <p className={`text-xs ${theme.subText}`}>
+                            Waiting for network connection...
+                          </p>
+                        )}
+                      </>
                     )}
                   </div>
 
@@ -2249,8 +2337,8 @@ export const DesktopView = () => {
                   </div>
                 </div>
 
-                {/* Connected Clients */}
-                {clients.length > 0 && (
+                {/* Connected Clients - Only show when multi-client is enabled */}
+                {multiClientEnabled && clients.length > 0 && (
                   <div
                     className={`mt-10 w-full px-4 animate-in slide-in-from-bottom-2 fade-in duration-500`}
                   >

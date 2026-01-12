@@ -55,7 +55,8 @@ type transactionProgressWriter struct {
 	TxnID        int
 	ClientIP     string // Client IP for tracking and blocking
 	TotalBytes   int64
-	BytesWritten int64
+	BytesWritten int64 // Bytes written in THIS request
+	BytesOffset  int64 // Starting offset for range requests
 	LastUpdate   time.Time
 }
 
@@ -79,6 +80,9 @@ func (w *transactionProgressWriter) Write(p []byte) (int, error) {
 	if n > 0 {
 		w.BytesWritten += int64(n)
 
+		// Calculate cumulative bytes (including offset for range requests)
+		cumulativeBytes := w.BytesOffset + w.BytesWritten
+
 		// Update progress bar if available
 		if w.ProgressBar != nil {
 			w.ProgressBar.Add(n)
@@ -87,12 +91,24 @@ func (w *transactionProgressWriter) Write(p []byte) (int, error) {
 		// Update transaction progress (Throttled)
 		if w.TxStore != nil && w.TxnID > 0 {
 			// Update if throttled interval passed OR if download completed
-			if w.BytesWritten >= w.TotalBytes || time.Since(w.LastUpdate) > 200*time.Millisecond {
-				// Use client-specific progress if we have a client IP
+			if cumulativeBytes >= w.TotalBytes || time.Since(w.LastUpdate) > 200*time.Millisecond {
+				// Use client-specific range-based progress if we have a client IP
+				// This properly handles parallel range requests from Android browsers
 				if w.ClientIP != "" {
-					w.TxStore.UpdateClientProgress(w.TxnID, w.ClientIP, w.BytesWritten, w.TotalBytes)
+					// Calculate the range end (current position)
+					rangeStart := w.BytesOffset
+					rangeEnd := cumulativeBytes - 1 // End is inclusive
+
+					// CRITICAL: Cap range end at file size to prevent extending beyond file boundaries
+					// This fixes the issue where ranges continue beyond 100% completion
+					if rangeEnd >= w.TotalBytes {
+						rangeEnd = w.TotalBytes - 1
+					}
+
+					w.TxStore.UpdateClientRangeProgress(w.TxnID, w.ClientIP, rangeStart, rangeEnd, w.TotalBytes)
 				} else {
-					w.TxStore.UpdateProgress(w.TxnID, w.BytesWritten, w.TotalBytes)
+					// Fallback to global progress (desktop downloads)
+					w.TxStore.UpdateProgress(w.TxnID, cumulativeBytes, w.TotalBytes)
 				}
 				w.LastUpdate = time.Now()
 
@@ -103,6 +119,11 @@ func (w *transactionProgressWriter) Write(p []byte) (int, error) {
 					if exists {
 						w.WSHub.BroadcastTransactionUpdate(txn)
 					}
+				}
+
+				// Stop processing if we've reached the total file size
+				if cumulativeBytes >= w.TotalBytes {
+					return n, err
 				}
 			}
 		}
@@ -475,6 +496,7 @@ func (h *UnifiedHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			var req struct {
 				TextTransferEnabled bool `json:"textTransferEnabled"`
 				SecurityEnabled     bool `json:"securityEnabled"`
+				MultiClientEnabled  bool `json:"multiClientEnabled"`
 			}
 			if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 				http.Error(w, "Invalid body", http.StatusBadRequest)
@@ -484,6 +506,11 @@ func (h *UnifiedHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			// Update text transfer in WebSocket hub and broadcast
 			if h.WSHub != nil {
 				h.WSHub.SetTextTransferEnabled(req.TextTransferEnabled)
+			}
+
+			// Update multi-client mode setting
+			if h.WSHub != nil {
+				h.WSHub.SetMultiClientEnabled(req.MultiClientEnabled)
 			}
 
 			// Update security enabled setting
@@ -505,8 +532,10 @@ func (h *UnifiedHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 		// GET
 		enabled := false
+		multiClientEnabled := false
 		if h.WSHub != nil {
 			enabled = h.WSHub.GetTextTransferEnabled()
+			multiClientEnabled = h.WSHub.GetMultiClientEnabled()
 		}
 
 		h.mu.RLock()
@@ -526,6 +555,7 @@ func (h *UnifiedHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		response := map[string]interface{}{
 			"textTransferEnabled": enabled,
 			"securityEnabled":     securityEnabled,
+			"multiClientEnabled":  multiClientEnabled,
 			"isDesktop":           isWailsDesktop, // Helper flag
 		}
 		// Security Token is NO LONGER returned here
@@ -1122,6 +1152,27 @@ func (h *UnifiedHandler) serveFile(w http.ResponseWriter, r *http.Request, fileP
 		if idx := strings.LastIndex(clientIP, ":"); idx != -1 {
 			clientIP = clientIP[:idx]
 		}
+
+		// Parse Range header to get starting byte offset
+		var bytesOffset int64 = 0
+		rangeHeader := r.Header.Get("Range")
+		if rangeHeader != "" {
+			// Range header format: "bytes=start-end"
+			// Example: "bytes=0-1023" or "bytes=1024-"
+			if strings.HasPrefix(rangeHeader, "bytes=") {
+				rangeSpec := strings.TrimPrefix(rangeHeader, "bytes=")
+				parts := strings.Split(rangeSpec, "-")
+				if len(parts) > 0 && parts[0] != "" {
+					if offset, err := strconv.ParseInt(parts[0], 10, 64); err == nil {
+						bytesOffset = offset
+						// DEBUG: Log range requests (simplified, in MB)
+						offsetMB := float64(bytesOffset) / (1024 * 1024)
+						fmt.Printf("[📥 RANGE] TxID=%d Offset=%.1fMB\n", txnID, offsetMB)
+					}
+				}
+			}
+		}
+
 		pw := &transactionProgressWriter{
 			ResponseWriter: w,
 			ProgressBar:    h.Bar,
@@ -1132,6 +1183,7 @@ func (h *UnifiedHandler) serveFile(w http.ResponseWriter, r *http.Request, fileP
 			ClientIP:       clientIP, // Use IP for client-specific tracking
 			TotalBytes:     stat.Size(),
 			BytesWritten:   0,
+			BytesOffset:    bytesOffset, // Set offset from Range header
 		}
 		writer = pw
 	}
@@ -1422,6 +1474,6 @@ func NewUnifiedHandler(devServerURL string) *UnifiedHandler {
 		IsDarkMode:      true, // Default to Dark Mode
 		SecurityToken:   generateSecurityToken(),
 		AdminToken:      generateSecurityToken(), // Separate token for admin operations
-		SecurityEnabled: false,                   // Disabled by default
+		SecurityEnabled: true,                    // Enabled by default
 	}
 }
