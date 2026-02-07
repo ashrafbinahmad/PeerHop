@@ -146,6 +146,7 @@ type UnifiedHandler struct {
 	SecurityToken     string            // Random security token for client API authentication (file transfer, viewing)
 	SecurityEnabled   bool              // Whether security token validation is enabled
 	AdminToken        string            // Random admin token for desktop control operations (settings, theme, blocking)
+	SettingsManager   *SettingsManager  // Settings manager for persisting settings
 }
 
 // SecuritySettings holds tokens and status
@@ -468,6 +469,19 @@ func (h *UnifiedHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 
+			// Save settings to disk
+			if h.SettingsManager != nil {
+				settings := h.SettingsManager.LoadSettings()
+				settings.IsDarkMode = req.IsDarkMode
+				if req.ThemeID != "" {
+					settings.ThemeID = req.ThemeID
+				}
+				if req.AccentID != "" {
+					settings.AccentID = req.AccentID
+				}
+				h.SettingsManager.SaveSettings(settings)
+			}
+
 			json.NewEncoder(w).Encode(map[string]bool{"success": true})
 			return
 		}
@@ -524,6 +538,15 @@ func (h *UnifiedHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 					"securityEnabled": req.SecurityEnabled,
 					"securityToken":   h.SecurityToken,
 				})
+			}
+
+			// Save settings to disk
+			if h.SettingsManager != nil {
+				settings := h.SettingsManager.LoadSettings()
+				settings.TextTransferEnabled = req.TextTransferEnabled
+				settings.SecurityEnabled = req.SecurityEnabled
+				settings.MultiClientEnabled = req.MultiClientEnabled
+				h.SettingsManager.SaveSettings(settings)
 			}
 
 			json.NewEncoder(w).Encode(map[string]bool{"success": true})
@@ -583,6 +606,13 @@ func (h *UnifiedHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			// Broadcast to all clients via WebSocket
 			if h.WSHub != nil {
 				h.WSHub.SetDesktopName(req.Name)
+			}
+
+			// Save settings to disk
+			if h.SettingsManager != nil {
+				settings := h.SettingsManager.LoadSettings()
+				settings.DesktopDeviceName = req.Name
+				h.SettingsManager.SaveSettings(settings)
 			}
 
 			json.NewEncoder(w).Encode(map[string]bool{"success": true})
@@ -1466,14 +1496,30 @@ func NewUnifiedHandler(devServerURL string) *UnifiedHandler {
 	// Start WebSocket monitoring in background
 	wsHub.StartMonitoring()
 
+	// Create settings manager and load persisted settings
+	settingsManager := NewSettingsManager()
+	savedSettings := settingsManager.LoadSettings()
+
+	// Apply saved settings to WebSocket hub
+	wsHub.SetTextTransferEnabled(savedSettings.TextTransferEnabled)
+	wsHub.SetMultiClientEnabled(savedSettings.MultiClientEnabled)
+	if savedSettings.ThemeID != "" && savedSettings.AccentID != "" {
+		wsHub.SetTheme(savedSettings.ThemeID, savedSettings.AccentID)
+	}
+	if savedSettings.DesktopDeviceName != "" {
+		wsHub.SetDesktopName(savedSettings.DesktopDeviceName)
+	}
+
 	return &UnifiedHandler{
-		DevServerURL:    devServerURL,
-		TxStore:         txStore,
-		ClientStore:     clientStore,
-		WSHub:           wsHub,
-		IsDarkMode:      true, // Default to Dark Mode
-		SecurityToken:   generateSecurityToken(),
-		AdminToken:      generateSecurityToken(), // Separate token for admin operations
-		SecurityEnabled: true,                    // Enabled by default
+		DevServerURL:      devServerURL,
+		TxStore:           txStore,
+		ClientStore:       clientStore,
+		WSHub:             wsHub,
+		IsDarkMode:        savedSettings.IsDarkMode,
+		DesktopDeviceName: savedSettings.DesktopDeviceName,
+		SecurityToken:     generateSecurityToken(),
+		AdminToken:        generateSecurityToken(), // Separate token for admin operations
+		SecurityEnabled:   savedSettings.SecurityEnabled,
+		SettingsManager:   settingsManager,
 	}
 }

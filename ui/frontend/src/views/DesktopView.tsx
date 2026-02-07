@@ -294,8 +294,8 @@ const TransactionActions = ({
   const buttonClass = isOnBlueBubble
     ? "bg-white/20 hover:bg-white/30 text-white"
     : isDarkMode
-    ? "bg-slate-700/50 hover:bg-slate-700 text-slate-300"
-    : "bg-gray-100 hover:bg-gray-200 text-gray-600";
+      ? "bg-slate-700/50 hover:bg-slate-700 text-slate-300"
+      : "bg-gray-100 hover:bg-gray-200 text-gray-600";
 
   return (
     <div className="relative" ref={dropdownRef}>
@@ -541,8 +541,8 @@ const EditableDeviceName = ({
           client.blocked
             ? "bg-red-500"
             : client.sendingBlocked
-            ? "bg-yellow-500"
-            : "bg-green-500"
+              ? "bg-yellow-500"
+              : "bg-green-500"
         }`}
       ></div>
     </div>
@@ -707,7 +707,7 @@ export const DesktopView = () => {
     false,
     true,
     adminToken, // Desktop uses admin token
-    securityEnabled
+    securityEnabled,
   );
 
   // Hook: WebSocket for devices/clients
@@ -867,9 +867,7 @@ export const DesktopView = () => {
 
     // We still sync isDarkMode for basic compatibility with clients if needed
     // We still sync isDarkMode for basic compatibility with clients if needed
-    const url = adminToken
-      ? `${serverInfo.url}/api/theme?admin=${adminToken}`
-      : `${serverInfo.url}/api/theme`;
+    const url = `${serverInfo.url}/api/theme?admin=${adminToken}`;
     axios
       .post(url, {
         isDarkMode: activeTheme.isDark,
@@ -891,7 +889,7 @@ export const DesktopView = () => {
           setSecurityEnabled(settings.securityEnabled);
           localStorage.setItem(
             "securityEnabled",
-            String(settings.securityEnabled)
+            String(settings.securityEnabled),
           );
         }
       })
@@ -901,7 +899,7 @@ export const DesktopView = () => {
 
     // Fetch other settings from API (fallback for textTransferEnabled, etc)
     axios
-      .get(`${serverInfo.url}/api/settings`)
+      .get(`${serverInfo.url}/api/settings?admin=${adminToken}`)
       .then((res) => {
         // We rely on Wails binding for tokens now
       })
@@ -1013,7 +1011,7 @@ export const DesktopView = () => {
                   console.error("Failed to save pasted file:", err);
                 }
               }
-            })()
+            })(),
           );
         }
 
@@ -1253,9 +1251,9 @@ export const DesktopView = () => {
               ? "http://localhost:5174"
               : "https://www.peerhop.in"
           }/desktop-ad?bg=${encodeURIComponent(
-            theme.bg.replace("bg-[", "").replace("]", "")
+            theme.bg.replace("bg-[", "").replace("]", ""),
           )}&theme=${encodeURIComponent(activeThemeId)}&isDark=${String(
-            isDarkMode
+            isDarkMode,
           )}`}
           width="100%"
           height="55"
@@ -1343,7 +1341,7 @@ export const DesktopView = () => {
                 let clientPlatform: Client["platform"] | undefined;
                 if (!isMe && transaction.clientIp) {
                   const client = clients.find(
-                    (c) => c.ip === transaction.clientIp
+                    (c) => c.ip === transaction.clientIp,
                   );
                   if (client) clientPlatform = client.platform;
                 }
@@ -1400,8 +1398,8 @@ export const DesktopView = () => {
                                   isMe
                                     ? "text-white/70 hover:bg-white/20"
                                     : isDarkMode
-                                    ? "text-slate-400 hover:bg-slate-700 hover:text-slate-300"
-                                    : "text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                                      ? "text-slate-400 hover:bg-slate-700 hover:text-slate-300"
+                                      : "text-gray-400 hover:bg-gray-100 hover:text-gray-600"
                                 }`}
                                 iconSize={12}
                               />
@@ -1446,7 +1444,7 @@ export const DesktopView = () => {
                                       className="w-12 h-12 rounded-lg bg-black/5 overflow-hidden shrink-0 cursor-pointer hover:opacity-80 transition-opacity relative group"
                                       onClick={() =>
                                         OpenSourceFile(
-                                          transaction.filename || ""
+                                          transaction.filename || "",
                                         )
                                       }
                                       title="Open Image"
@@ -1472,7 +1470,7 @@ export const DesktopView = () => {
                                       className="w-12 h-12 rounded-lg bg-black/10 overflow-hidden shrink-0 cursor-pointer hover:opacity-80 transition-opacity relative group flex items-center justify-center border border-black/5"
                                       onClick={() =>
                                         OpenSourceFile(
-                                          transaction.filename || ""
+                                          transaction.filename || "",
                                         )
                                       }
                                       title="Open Video"
@@ -1522,8 +1520,8 @@ export const DesktopView = () => {
                                     isMe
                                       ? "text-white/80"
                                       : isDarkMode
-                                      ? "text-slate-400"
-                                      : "text-gray-500"
+                                        ? "text-slate-400"
+                                        : "text-gray-500"
                                   }`}
                                 >
                                   {transaction.status === "in_progress" ? (
@@ -1535,7 +1533,7 @@ export const DesktopView = () => {
                                         {formatBytes(
                                           (transaction.fileSize || 0) *
                                             (transaction.transactionPercent /
-                                              100)
+                                              100),
                                         )}{" "}
                                         / {formatBytes(transaction.fileSize)}
                                       </span>
@@ -1550,7 +1548,7 @@ export const DesktopView = () => {
                                         }}
                                       >
                                         {Math.round(
-                                          transaction.transactionPercent
+                                          transaction.transactionPercent,
                                         )}
                                         %
                                       </span>
@@ -1572,12 +1570,12 @@ export const DesktopView = () => {
                                     .length > 0 && (
                                     <div className="mt-2 space-y-1.5">
                                       {Object.entries(
-                                        transaction.clientProgress
+                                        transaction.clientProgress,
                                       ).map(([clientIp, progress]) => {
                                         const clientSt =
                                           transaction.clientStatus?.[clientIp];
                                         const client = clients.find(
-                                          (c) => c.ip === clientIp
+                                          (c) => c.ip === clientIp,
                                         );
 
                                         // Only show if in progress
@@ -1625,12 +1623,12 @@ export const DesktopView = () => {
                                                   try {
                                                     await axios.post(
                                                       `/api/cancel-download/${transaction.id}`,
-                                                      { clientIp: clientIp }
+                                                      { clientIp: clientIp },
                                                     );
                                                   } catch (err) {
                                                     console.error(
                                                       "Failed to cancel:",
-                                                      err
+                                                      err,
                                                     );
                                                   }
                                                 }}
@@ -2264,10 +2262,8 @@ export const DesktopView = () => {
                                 : "bg-white shadow-[0_8px_30px_rgba(0,0,0,0.12)] border border-gray-100"
                             }`}
                             style={{
-                              opacity: serverInfo?.ssid ? 1 : 0.5,
-                              filter: serverInfo?.ssid
-                                ? "none"
-                                : "grayscale(100%)",
+                              opacity: serverInfo?.ssid ? 1 : 0.7,
+                              filter: serverInfo?.ssid ? "none" : "blur(8px)",
                               transition: "all 0.3s ease",
                             }}
                           >
@@ -2318,21 +2314,22 @@ export const DesktopView = () => {
                   </div>
 
                   {/* Server Controls */}
-                  <div className="flex justify-center pt-2">
+                  <div className="flex justify-center pt-4">
                     <button
                       onClick={handleRestartServer}
                       disabled={isCheckingNetwork}
-                      className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs transition-colors ${
-                        theme.ghostHover
-                      } ${theme.subText} ${
+                      className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium transition-all text-white shadow-md hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] ${
                         isCheckingNetwork ? "opacity-50 cursor-not-allowed" : ""
                       }`}
+                      style={{
+                        backgroundColor: activeAccent.color,
+                      }}
                     >
                       <RefreshCw
-                        size={12}
+                        size={18}
                         className={isCheckingNetwork ? "animate-spin" : ""}
                       />
-                      {isCheckingNetwork ? "Restarting..." : "Restart"}
+                      {isCheckingNetwork ? "Restarting..." : "Restart Server"}
                     </button>
                   </div>
                 </div>
