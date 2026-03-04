@@ -18,10 +18,6 @@ export function GetLogPath() {
   return window['go']['main']['App']['GetLogPath']();
 }
 
-export function GetOpenableApps(arg1) {
-  return window['go']['main']['App']['GetOpenableApps'](arg1);
-}
-
 export function GetRecentLogs(arg1) {
   return window['go']['main']['App']['GetRecentLogs'](arg1);
 }
@@ -32,10 +28,6 @@ export function GetSecureSettings() {
 
 export function GetServerInfo() {
   return window['go']['main']['App']['GetServerInfo']();
-}
-
-export function OpenFileWith(arg1, arg2) {
-  return window['go']['main']['App']['OpenFileWith'](arg1, arg2);
 }
 
 export function OpenLogFolder() {
@@ -60,6 +52,10 @@ export function SelectFiles() {
 
 export function ShowInFolder(arg1) {
   return window['go']['main']['App']['ShowInFolder'](arg1);
+}
+
+export function ShowOpenWithDialog(arg1) {
+  return window['go']['main']['App']['ShowOpenWithDialog'](arg1);
 }
 
 export function StartTransfer(arg1) {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import axios from "axios";
 import QRCode from "react-qr-code";
 import {
@@ -6,15 +6,14 @@ import {
   StartTransfer,
   GetServerInfo,
   RestartServer,
-  GetOpenableApps,
-  OpenFileWith,
   OpenSourceFile,
   ShowInFolder,
+  ShowOpenWithDialog,
   SaveTempFile,
   GetClipboardFiles,
   GetSecureSettings,
 } from "../../wailsjs/go/main/App";
-import { main, utils } from "../../wailsjs/go/models";
+import { main } from "../../wailsjs/go/models";
 import {
   WindowMinimise,
   WindowToggleMaximise,
@@ -23,10 +22,12 @@ import {
   OnFileDropOff,
   EventsOn,
   EventsOff,
+  BrowserOpenURL,
 } from "../../wailsjs/runtime/runtime";
 import { useTransactions } from "../hooks/useTransactions";
 import { useTransferSpeed, formatBytes } from "../hooks/useTransferSpeed";
 import { useDevices, type Client } from "../hooks/useDevices";
+import { useActivity } from "../hooks/useActivity";
 import {
   X,
   MessageSquare,
@@ -39,7 +40,6 @@ import {
   QrCode,
   RefreshCw,
   Monitor,
-  MoreVertical,
   ExternalLink,
   FolderOpen,
   Play,
@@ -51,235 +51,23 @@ import { PlatformIcon } from "../components/PlatformIcon";
 
 import { ACCENT_COLORS, THEME_PRESETS } from "../themeConstants";
 
-// Helper function to get app icon based on app name
-const getAppIcon = (appName: string, appCommand: string) => {
-  const name = appName.toLowerCase();
-  const command = appCommand.toLowerCase();
-
-  // Browser icons
-  if (name.includes("chrome") || command.includes("chrome")) {
-    return (
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-        <circle cx="12" cy="12" r="10" fill="#4285F4" />
-        <circle cx="12" cy="12" r="5" fill="white" />
-        <circle cx="12" cy="12" r="3" fill="#4285F4" />
-        <path d="M12 2a10 10 0 0 0-8.66 5h8.66z" fill="#EA4335" />
-        <path d="M12 17l-7.48 4.33A10 10 0 0 0 12 22z" fill="#34A853" />
-        <path d="M12 17l7.48 4.33A10 10 0 0 0 20.66 7z" fill="#FBBC05" />
-      </svg>
-    );
-  }
-  if (name.includes("firefox")) {
-    return (
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-        <path
-          d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z"
-          fill="#FF7139"
-        />
-      </svg>
-    );
-  }
-  if (name.includes("edge")) {
-    return (
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-        <path
-          d="M21.86 12.5a9.87 9.87 0 0 1-18.8 4.4 10 10 0 0 0 16-8.4 10 10 0 0 0-18.9-4 9.87 9.87 0 0 1 18.2 3.5l3.5.5z"
-          fill="#0078D7"
-        />
-      </svg>
-    );
-  }
-
-  // Adobe apps
-  if (name.includes("photoshop") || command.includes("photoshop")) {
-    return (
-      <svg width="14" height="14" viewBox="0 0 24 24">
-        <rect width="24" height="24" rx="4" fill="#001E36" />
-        <text
-          x="50%"
-          y="50%"
-          dominantBaseline="middle"
-          textAnchor="middle"
-          fill="#31A8FF"
-          fontSize="14"
-          fontWeight="bold"
-        >
-          Ps
-        </text>
-      </svg>
-    );
-  }
-  if (name.includes("illustrator")) {
-    return (
-      <svg width="14" height="14" viewBox="0 0 24 24">
-        <rect width="24" height="24" rx="4" fill="#330000" />
-        <text
-          x="50%"
-          y="50%"
-          dominantBaseline="middle"
-          textAnchor="middle"
-          fill="#FF9A00"
-          fontSize="14"
-          fontWeight="bold"
-        >
-          Ai
-        </text>
-      </svg>
-    );
-  }
-
-  // Code editors
-  if (name.includes("vscode") || name.includes("code")) {
-    return (
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="#007ACC">
-        <path d="M17.5 0l-10 10L2 6.5 0 8.5l7.5 3.5L0 15.5 2 17.5l5.5-3.5 10 10L24 21V3L17.5 0z" />
-      </svg>
-    );
-  }
-  if (name.includes("sublime")) {
-    return (
-      <svg width="14" height="14" viewBox="0 0 24 24">
-        <rect width="24" height="24" fill="#FF9800" />
-      </svg>
-    );
-  }
-
-  // Image viewers
-  if (name.includes("paint") || command.includes("mspaint")) {
-    return (
-      <svg
-        width="14"
-        height="14"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-      >
-        <path d="M12 2L2 7l10 5 10-5-10-5z" />
-        <path d="M2 17l10 5 10-5" />
-        <path d="M2 12l10 5 10-5" />
-      </svg>
-    );
-  }
-
-  // Snipping Tool
-  if (name.includes("snip") || command.includes("snip")) {
-    return (
-      <svg
-        width="14"
-        height="14"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-      >
-        <rect x="3" y="3" width="18" height="18" rx="2" />
-        <path d="M9 9l6 6m0-6l-6 6" />
-      </svg>
-    );
-  }
-
-  // Windows / System default
-  if (
-    name.includes("windows") ||
-    name.includes("system") ||
-    command.includes("explorer")
-  ) {
-    return <FolderOpen size={14} />;
-  }
-
-  // Video players
-  if (name.includes("vlc")) {
-    return (
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="#FF8800">
-        <path d="M12 2l-8 8v8l8 4 8-4V10l-8-8z" />
-      </svg>
-    );
-  }
-
-  // Default icon
-  return <ExternalLink size={14} />;
-};
-
 const TransactionActions = ({
   transaction,
   isDarkMode,
   compact = false,
   filePath,
   isOnBlueBubble = false,
+  onOpen,
 }: {
   transaction: any;
   isDarkMode: boolean;
   compact?: boolean;
   filePath?: string;
   isOnBlueBubble?: boolean;
+  onOpen?: (filename: string) => void;
 }) => {
-  const [isOpen, setIsOpen] = useState(false);
-  const [apps, setApps] = useState<utils.AppInfo[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [dropdownPos, setDropdownPos] = useState({ top: 0, left: 0 });
-  const dropdownRef = useRef<HTMLDivElement>(null);
-  const buttonRef = useRef<HTMLButtonElement>(null);
-
   // Use provided filePath or fall back to transaction.filename
   const resolvedPath = filePath || transaction.filename || "";
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        dropdownRef.current &&
-        !dropdownRef.current.contains(event.target as Node) &&
-        buttonRef.current &&
-        !buttonRef.current.contains(event.target as Node)
-      ) {
-        setIsOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
-  // Calculate dropdown position when opening
-  useEffect(() => {
-    if (isOpen && buttonRef.current) {
-      const rect = buttonRef.current.getBoundingClientRect();
-      // Position above the button, aligned to the right
-      setDropdownPos({
-        top: rect.top - 8, // 8px margin above button
-        left: rect.right - 192, // 192px = w-48 (12rem)
-      });
-    }
-  }, [isOpen]);
-
-  const handleOpen = async () => {
-    if (apps.length > 0) {
-      setIsOpen(!isOpen);
-      return;
-    }
-
-    setLoading(true);
-    setIsOpen(!isOpen);
-    try {
-      const result = await GetOpenableApps(resolvedPath);
-      setApps(result || []);
-    } catch (err) {
-      console.error(err);
-      // Fallback
-      setApps([{ name: "Open System Default", command: "explorer" }]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleAppClick = async (appCmd: string) => {
-    try {
-      await OpenFileWith(resolvedPath, appCmd);
-      setIsOpen(false);
-    } catch (err) {
-      console.error(err);
-      alert("Failed to open file");
-    }
-  };
 
   const handleShowInFolder = async () => {
     try {
@@ -290,7 +78,25 @@ const TransactionActions = ({
     }
   };
 
-  // Determine button styling based on context
+  const handleChooseApp = async () => {
+    try {
+      await ShowOpenWithDialog(resolvedPath);
+    } catch (err) {
+      console.error(err);
+      alert("Failed to open 'Open With' dialog");
+    }
+  };
+
+  const handleOpen = async () => {
+    try {
+      await OpenSourceFile(resolvedPath);
+      onOpen?.(transaction.filename || resolvedPath);
+    } catch (err) {
+      console.error(err);
+      alert("Failed to open file");
+    }
+  };
+
   const buttonClass = isOnBlueBubble
     ? "bg-white/20 hover:bg-white/30 text-white"
     : isDarkMode
@@ -298,95 +104,45 @@ const TransactionActions = ({
       : "bg-gray-100 hover:bg-gray-200 text-gray-600";
 
   return (
-    <div className="relative" ref={dropdownRef}>
-      <div className="flex items-center gap-2">
-        {!compact && (
-          <div
-            className={`text-[10px] ${
-              isDarkMode ? "text-slate-500" : "text-gray-400"
-            }`}
-          >
-            {new Date(transaction.timestamp).toLocaleTimeString([], {
-              hour: "2-digit",
-              minute: "2-digit",
-            })}
-            <Check size={12} className="ml-1 inline" />
-          </div>
-        )}
-
-        <button
-          onClick={handleShowInFolder}
-          className={`p-1.5 rounded-md transition-colors ${buttonClass}`}
-          title="Show in Folder"
-        >
-          <FolderOpen size={12} />
-        </button>
-
-        <button
-          ref={buttonRef}
-          onClick={handleOpen}
-          className={`flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium transition-colors ${buttonClass}`}
-        >
-          Open with <MoreVertical size={10} />
-        </button>
-      </div>
-      {isOpen && (
+    <div className="flex  gap-2 items-stretch">
+      {!compact && (
         <div
-          className={`fixed w-48 rounded-lg shadow-xl border overflow-hidden z-[100] animate-in fade-in zoom-in-95 duration-200 ${
-            isDarkMode
-              ? "bg-slate-800 border-slate-700 text-slate-200"
-              : "bg-white border-gray-200 text-gray-700"
+          className={`text-[10px] ${
+            isDarkMode ? "text-slate-500" : "text-gray-400"
           }`}
-          style={{
-            top: `${dropdownPos.top}px`,
-            left: `${dropdownPos.left}px`,
-            transform: "translateY(-100%)",
-          }}
         >
-          <div
-            className={`px-3 py-2 text-[10px] font-bold uppercase tracking-wider ${
-              isDarkMode ? "text-slate-500" : "text-gray-400 bg-gray-50/50"
-            }`}
-          >
-            Open with...
-          </div>
-
-          {loading ? (
-            <div className="px-4 py-3 text-xs text-center opacity-60">
-              Loading apps...
-            </div>
-          ) : apps.length === 0 ? (
-            <div className="px-4 py-3 text-xs text-center opacity-60">
-              No apps found
-            </div>
-          ) : (
-            <div className="max-h-[200px] overflow-y-auto">
-              {apps.map((app, i) => (
-                <button
-                  key={i}
-                  onClick={() => handleAppClick(app.command)}
-                  className={`w-full text-left px-3 py-2 text-xs flex items-center gap-2 transition-colors ${
-                    isDarkMode ? "hover:bg-slate-700" : "hover:bg-gray-50"
-                  }`}
-                >
-                  <div className="w-4 h-4 flex items-center justify-center shrink-0">
-                    {app.icon ? (
-                      <img
-                        src={app.icon}
-                        alt=""
-                        className="w-full h-full object-contain"
-                      />
-                    ) : (
-                      getAppIcon(app.name, app.command)
-                    )}
-                  </div>
-                  <span className="truncate">{app.name}</span>
-                </button>
-              ))}
-            </div>
-          )}
+          {new Date(transaction.timestamp).toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+          })}
+          <Check size={12} className="ml-1 inline" />
         </div>
       )}
+
+      <button
+        onClick={handleChooseApp}
+        className={`px-2 text-xs rounded-md transition-colors ${buttonClass}`}
+        title="Open with…"
+      >
+        Open with
+        {/* <ExternalLink size={12} /> */}
+      </button>
+
+      <button
+        onClick={handleShowInFolder}
+        className={`p-1.5 rounded-md transition-colors ${buttonClass}`}
+        title="Show in Folder"
+      >
+        <FolderOpen size={12} />
+      </button>
+
+      <button
+        onClick={handleOpen}
+        className={`px-2 text-xs rounded-md transition-colors ${buttonClass}`}
+        title="Open"
+      >
+        <ExternalLink size={12} />
+      </button>
     </div>
   );
 };
@@ -562,6 +318,20 @@ export const DesktopView = () => {
   const [isCheckingNetwork, setIsCheckingNetwork] = useState(false);
   const [transactionToCancel, setTransactionToCancel] = useState<any>(null); // Use any or specific type if available
 
+  const { logActivity } = useActivity();
+
+  useEffect(() => {
+    const handler = (event: MessageEvent) => {
+      if (event.data?.type === "open-external") {
+        BrowserOpenURL(event.data.url);
+      }
+    };
+
+    window.addEventListener("message", handler);
+
+    return () => window.removeEventListener("message", handler);
+  }, []);
+
   // Wails Native File Drop Handler
   useEffect(() => {
     OnFileDrop(async (x, y, paths) => {
@@ -571,6 +341,10 @@ export const DesktopView = () => {
           setFilePaths(paths);
           const info = await StartTransfer(paths);
           setServerInfo(info);
+          logActivity(
+            "shared",
+            `Sharing ${paths.length} file(s) via drag & drop: ${paths.map((p) => p.split(/[\\/]/).pop()).join(", ")}`,
+          );
         }
       } catch (err) {
         console.error("OnFileDrop error:", err);
@@ -580,7 +354,7 @@ export const DesktopView = () => {
     return () => {
       OnFileDropOff();
     };
-  }, []);
+  }, [logActivity]);
 
   // Drag and Drop Handlers
   const handleDragEnter = (e: React.DragEvent) => {
@@ -715,6 +489,57 @@ export const DesktopView = () => {
   const { clients } = useDevices(serverInfo?.url, true, adminToken);
   const speeds = useTransferSpeed(transactions);
 
+  // Track previously-seen transaction statuses so we only log once per completion
+  const prevTransactionStatuses = useRef<Record<number, string>>({});
+
+  // Log sent / received when a transaction first reaches "completed"
+  useEffect(() => {
+    transactions.forEach((txn) => {
+      const prev = prevTransactionStatuses.current[txn.id];
+      if (txn.status === "completed" && prev !== "completed") {
+        const isMe = txn.senderId === "server";
+        if (txn.type === "file") {
+          const sizeLabel = txn.fileSize
+            ? ` (${formatBytes(txn.fileSize)})`
+            : "";
+          if (isMe) {
+            logActivity("sent", `Sent ${txn.filename || "file"}${sizeLabel}`);
+          } else {
+            logActivity(
+              "received",
+              `Received ${txn.filename || "file"}${sizeLabel}`,
+            );
+          }
+        } else if (txn.type === "text") {
+          const preview = txn.textContent
+            ? txn.textContent.slice(0, 40) +
+              (txn.textContent.length > 40 ? "…" : "")
+            : "";
+          if (isMe) {
+            logActivity("sent", `Sent text: "${preview}"`);
+          } else {
+            logActivity("received", `Received text: "${preview}"`);
+          }
+        }
+      }
+      prevTransactionStatuses.current[txn.id] = txn.status;
+    });
+  }, [transactions, logActivity]);
+
+  // Log app closed on unmount
+  useEffect(() => {
+    return () => {
+      logActivity("closed", "App session ended");
+    };
+  }, [logActivity]);
+
+  const handleFileOpened = useCallback(
+    (filename: string) => {
+      logActivity("opened", `Opened ${filename}`);
+    },
+    [logActivity],
+  );
+
   const handleBlockClient = async (client: Client) => {
     if (!serverInfo?.url) return;
     try {
@@ -725,9 +550,11 @@ export const DesktopView = () => {
         : `${serverInfo.url}/api/${
             client.blocked ? "unblock" : "block"
           }-client`;
-      await axios.post(url, {
-        ip: client.ip,
-      });
+      await axios.post(url, { ip: client.ip });
+      logActivity(
+        "blocked",
+        `${client.blocked ? "Unblocked" : "Blocked"} device: ${client.name || client.platform} (${client.ip})`,
+      );
     } catch (err) {
       console.error("Failed to block/unblock client:", err);
       alert("Failed to update client status");
@@ -744,9 +571,11 @@ export const DesktopView = () => {
         : `${serverInfo.url}/api/${
             client.sendingBlocked ? "unblock" : "block"
           }-sending`;
-      await axios.post(url, {
-        ip: client.ip,
-      });
+      await axios.post(url, { ip: client.ip });
+      logActivity(
+        "blocked",
+        `${client.sendingBlocked ? "Unblocked sending from" : "Blocked sending from"}: ${client.name || client.platform} (${client.ip})`,
+      );
     } catch (err) {
       console.error("Failed to block/unblock sending for client:", err);
       alert("Failed to update client status");
@@ -760,11 +589,40 @@ export const DesktopView = () => {
     }
   }, [clients.length]);
 
+  // Track device connect / disconnect
+  const prevClientsRef = useRef<Client[]>([]);
+  useEffect(() => {
+    const prev = prevClientsRef.current;
+    // Newly connected
+    clients.forEach((c) => {
+      if (!prev.find((p) => p.ip === c.ip)) {
+        logActivity(
+          "connected",
+          `Device connected: ${c.name || c.platform} (${c.ip})`,
+        );
+      }
+    });
+    // Disconnected
+    prev.forEach((c) => {
+      if (!clients.find((curr) => curr.ip === c.ip)) {
+        logActivity(
+          "disconnected",
+          `Device disconnected: ${c.name || c.platform} (${c.ip})`,
+        );
+      }
+    });
+    prevClientsRef.current = clients;
+  }, [clients, logActivity]);
+
   const handleRestartServer = async () => {
     setIsCheckingNetwork(true);
     try {
       const info = await RestartServer();
       setServerInfo(info);
+      logActivity(
+        "restarted",
+        `Server restarted — new URL: ${info.url || "unknown"}`,
+      );
 
       // If SSID is missing, poll for it
       if (!info.ssid) {
@@ -807,6 +665,10 @@ export const DesktopView = () => {
       try {
         const info = await GetServerInfo();
         setServerInfo(info);
+        logActivity(
+          "started",
+          `App started — server at ${info.url || "unknown"}`,
+        );
 
         // If SSID is empty, retry after a short delay to get updated SSID
         if (!info.ssid) {
@@ -834,6 +696,10 @@ export const DesktopView = () => {
         message: "Network changed! Server restarted",
       });
       setTimeout(() => setNotification({ show: false, message: "" }), 3000);
+      logActivity(
+        "network_changed",
+        `Network changed — new URL: ${info.url || "unknown"}${info.ssid ? ` (${info.ssid})` : ""}`,
+      );
 
       // If SSID is empty, poll for it (as backend fetches it asynchronously)
       if (!info.ssid) {
@@ -855,7 +721,7 @@ export const DesktopView = () => {
         EventsOff("network-changed");
       }
     };
-  }, []);
+  }, [logActivity]);
 
   // Sync theme with server and save to localStorage
   useEffect(() => {
@@ -1047,6 +913,10 @@ export const DesktopView = () => {
         setFilePaths(files);
         const info = await StartTransfer(files);
         setServerInfo(info);
+        logActivity(
+          "shared",
+          `Sharing ${files.length} file(s): ${files.map((f) => f.split(/[\\/]/).pop()).join(", ")}`,
+        );
       }
     } catch (err) {
       console.error(err);
@@ -1246,6 +1116,7 @@ export const DesktopView = () => {
         {/* TODO: add ad */}
 
         <iframe
+          id="adFrame"
           src={`${
             import.meta.env.DEV
               ? "http://localhost:5174"
@@ -1702,6 +1573,7 @@ export const DesktopView = () => {
                                       transaction={transaction}
                                       isDarkMode={isDarkMode}
                                       compact={true}
+                                      onOpen={handleFileOpened}
                                     />
                                   </div>
                                 </div>
@@ -1729,6 +1601,7 @@ export const DesktopView = () => {
                                       compact={true}
                                       filePath={transaction.serverFilePath}
                                       isOnBlueBubble={true}
+                                      onOpen={handleFileOpened}
                                     />
                                   </div>
                                 </div>
@@ -1970,9 +1843,14 @@ export const DesktopView = () => {
                           </p>
                         </div>
                         <button
-                          onClick={() =>
-                            setTextTransferEnabled(!textTransferEnabled)
-                          }
+                          onClick={() => {
+                            const next = !textTransferEnabled;
+                            setTextTransferEnabled(next);
+                            logActivity(
+                              "settings_changed",
+                              `Text Transfer: ${next ? "enabled" : "disabled"}`,
+                            );
+                          }}
                           className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors shrink-0 ${
                             textTransferEnabled ? "" : theme.iconBg
                           }`}
@@ -2003,7 +1881,14 @@ export const DesktopView = () => {
                           </p>
                         </div>
                         <button
-                          onClick={() => setSecurityEnabled(!securityEnabled)}
+                          onClick={() => {
+                            const next = !securityEnabled;
+                            setSecurityEnabled(next);
+                            logActivity(
+                              "settings_changed",
+                              `Security: ${next ? "enabled" : "disabled"}`,
+                            );
+                          }}
                           className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors shrink-0 ${
                             securityEnabled ? "" : theme.iconBg
                           }`}
@@ -2034,9 +1919,14 @@ export const DesktopView = () => {
                           </p>
                         </div>
                         <button
-                          onClick={() =>
-                            setMultiClientEnabled(!multiClientEnabled)
-                          }
+                          onClick={() => {
+                            const next = !multiClientEnabled;
+                            setMultiClientEnabled(next);
+                            logActivity(
+                              "settings_changed",
+                              `Multi-Client: ${next ? "enabled" : "disabled"}`,
+                            );
+                          }}
                           className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors shrink-0 ${
                             multiClientEnabled ? "" : theme.iconBg
                           }`}
@@ -2393,6 +2283,10 @@ export const DesktopView = () => {
                 ? `/api/cancel-transaction/${transactionToCancel.id}?admin=${adminToken}`
                 : `/api/cancel-transaction/${transactionToCancel.id}`;
               await axios.post(url);
+              logActivity(
+                "cancelled",
+                `Cancelled transfer: ${transactionToCancel.filename || "file"}`,
+              );
             } catch (err) {
               console.error("Failed to cancel transaction:", err);
             }

@@ -77,7 +77,7 @@ func (a *App) startup(ctx context.Context) {
 	}
 
 	// Start monitoring network changes
-	go a.monitorNetwork()
+	// go a.monitorNetwork()
 }
 
 // startPersistentServer starts a server that runs throughout the app lifetime
@@ -95,28 +95,31 @@ func (a *App) startPersistentServer() error {
 	}
 
 	// Detect development mode by checking if PeerHop's Vite dev server is running
-	// We need to verify it's actually PeerHop's dev server, not another Vite app on port 5173
+	// We only check this in dev builds to prevent production builds from proxying to unrelated dev servers
 	devServerURL := ""
-	if resp, err := http.Get("http://localhost:5173"); err == nil {
-		// Read response to check if it's PeerHop's dev server
-		// PeerHop's dev server should return HTML with "PeerHop" or typical Vite dev server response
-		body, readErr := io.ReadAll(resp.Body)
-		resp.Body.Close()
+	env := runtime.Environment(a.ctx)
+	if env.BuildType == "dev" {
+		if resp, err := http.Get("http://localhost:5173"); err == nil {
+			// Read response to check if it's PeerHop's dev server
+			// PeerHop's dev server should return HTML with "PeerHop" or typical Vite dev server response
+			body, readErr := io.ReadAll(resp.Body)
+			resp.Body.Close()
 
-		if readErr == nil {
-			bodyStr := string(body)
-			// Check if response contains PeerHop-specific markers or Vite dev server markers
-			// Vite dev server typically returns HTML with script tags for /@vite/client
-			isPeerHopDevServer := strings.Contains(bodyStr, "/@vite/client") ||
-				strings.Contains(bodyStr, "PeerHop") ||
-				strings.Contains(bodyStr, "/src/main.tsx") ||
-				strings.Contains(bodyStr, "/src/main.jsx")
+			if readErr == nil {
+				bodyStr := string(body)
+				// Check if response contains PeerHop-specific markers or Vite dev server markers
+				// Vite dev server typically returns HTML with script tags for /@vite/client
+				isPeerHopDevServer := strings.Contains(bodyStr, "/@vite/client") ||
+					strings.Contains(bodyStr, "PeerHop") ||
+					strings.Contains(bodyStr, "/src/main.tsx") ||
+					strings.Contains(bodyStr, "/src/main.jsx")
 
-			if isPeerHopDevServer {
-				devServerURL = "http://localhost:5173"
-				logger.Info("Development mode detected - proxying to PeerHop Vite dev server")
-			} else {
-				logger.Info("Port 5173 is in use but not by PeerHop - serving embedded dist")
+				if isPeerHopDevServer {
+					devServerURL = "http://localhost:5173"
+					logger.Info("Development mode detected - proxying to PeerHop Vite dev server")
+				} else {
+					logger.Info("Port 5173 is in use but not by PeerHop - serving embedded dist")
+				}
 			}
 		}
 	}
@@ -198,77 +201,77 @@ func (a *App) RestartServer() (*ServerInfo, error) {
 }
 
 // monitorNetwork checks for network changes every few seconds
-func (a *App) monitorNetwork() {
-	ticker := time.NewTicker(2 * time.Second)
-	defer ticker.Stop()
+// func (a *App) monitorNetwork() {
+// 	ticker := time.NewTicker(2 * time.Second)
+// 	defer ticker.Stop()
 
-	for {
-		select {
-		case <-a.ctx.Done():
-			return
-		case <-ticker.C:
-			// Copy serverInfo to avoid race conditions
-			if a.serverInfo == nil {
-				continue
-			}
+// 	for {
+// 		select {
+// 		case <-a.ctx.Done():
+// 			return
+// 		case <-ticker.C:
+// 			// Copy serverInfo to avoid race conditions
+// 			if a.serverInfo == nil {
+// 				continue
+// 			}
 
-			// Make local copies to avoid nil pointer dereference during restart
-			savedURL := a.serverInfo.URL
-			savedSSID := a.serverInfo.SSID
+// 			// Make local copies to avoid nil pointer dereference during restart
+// 			savedURL := a.serverInfo.URL
+// 			savedSSID := a.serverInfo.SSID
 
-			// Early check if we have valid data
-			if savedURL == "" {
-				continue
-			}
+// 			// Early check if we have valid data
+// 			if savedURL == "" {
+// 				continue
+// 			}
 
-			currentIP, err := network.GetLocalIP()
-			if err != nil {
-				// If we can't get IP, assume network down or unchanged?
-				// Just checking "127.0.0.1" vs saved might trigger unnecessary restarts.
-				// Let's use loopback as currentIP if failed
-				currentIP = "127.0.0.1"
-			}
-			currentSSID := network.GetWiFiName()
+// 			currentIP, err := network.GetLocalIP()
+// 			if err != nil {
+// 				// If we can't get IP, assume network down or unchanged?
+// 				// Just checking "127.0.0.1" vs saved might trigger unnecessary restarts.
+// 				// Let's use loopback as currentIP if failed
+// 				currentIP = "127.0.0.1"
+// 			}
+// 			currentSSID := network.GetWiFiName()
 
-			// Check for changes
-			// We extract the IP from the URL (http://192.168.1.10:1234 -> 192.168.1.10)
-			savedIP := ""
-			if strings.HasPrefix(savedURL, "http://") {
-				parts := strings.Split(strings.TrimPrefix(savedURL, "http://"), ":")
-				if len(parts) > 0 {
-					savedIP = parts[0]
-				}
-			}
+// 			// Check for changes
+// 			// We extract the IP from the URL (http://192.168.1.10:1234 -> 192.168.1.10)
+// 			savedIP := ""
+// 			if strings.HasPrefix(savedURL, "http://") {
+// 				parts := strings.Split(strings.TrimPrefix(savedURL, "http://"), ":")
+// 				if len(parts) > 0 {
+// 					savedIP = parts[0]
+// 				}
+// 			}
 
-			// Detect specific changes
-			ipChanged := currentIP != savedIP
-			ssidChanged := currentSSID != savedSSID
+// 			// Detect specific changes
+// 			ipChanged := currentIP != savedIP
+// 			ssidChanged := currentSSID != savedSSID
 
-			// Special handling for SSID:
-			// If savedSSID is empty (startup or offline) and currentSSID is valid (online),
-			// ONLY ignore this change if we are still within the startup grace period (e.g. 5 seconds).
-			// This prevents false positives during async SSID fetch on startup,
-			// but ALLOWS valid detection when reconnecting after being offline for a while.
-			if ssidChanged && savedSSID == "" && time.Since(a.serverStartTime) < 5*time.Second {
-				ssidChanged = false
-			}
+// 			// Special handling for SSID:
+// 			// If savedSSID is empty (startup or offline) and currentSSID is valid (online),
+// 			// ONLY ignore this change if we are still within the startup grace period (e.g. 5 seconds).
+// 			// This prevents false positives during async SSID fetch on startup,
+// 			// but ALLOWS valid detection when reconnecting after being offline for a while.
+// 			if ssidChanged && savedSSID == "" && time.Since(a.serverStartTime) < 5*time.Second {
+// 				ssidChanged = false
+// 			}
 
-			if ipChanged || ssidChanged {
-				logger.Info("[Network] Change detected! IP: %s -> %s, SSID: %s -> %s", savedIP, currentIP, savedSSID, currentSSID)
+// 			if ipChanged || ssidChanged {
+// 				logger.Info("[Network] Change detected! IP: %s -> %s, SSID: %s -> %s", savedIP, currentIP, savedSSID, currentSSID)
 
-				// Restart server
-				newInfo, err := a.RestartServer()
-				if err != nil {
-					logger.Error("[Network] Failed to restart server: %v", err)
-					continue
-				}
+// 				// Restart server
+// 				newInfo, err := a.RestartServer()
+// 				if err != nil {
+// 					logger.Error("[Network] Failed to restart server: %v", err)
+// 					continue
+// 				}
 
-				// Emit event to frontend
-				runtime.EventsEmit(a.ctx, "network-changed", newInfo)
-			}
-		}
-	}
-}
+// 				// Emit event to frontend
+// 				runtime.EventsEmit(a.ctx, "network-changed", newInfo)
+// 			}
+// 		}
+// 	}
+// }
 
 // SelectFiles opens a dialog to select multiple files
 func (a *App) SelectFiles() ([]string, error) {
@@ -398,43 +401,26 @@ func (a *App) ClearTransfer() error {
 	return nil
 }
 
-// GetOpenableApps returns list of apps for a file
-func (a *App) GetOpenableApps(filePath string) ([]utils.AppInfo, error) {
-	// If filePath is relative (e.g. just filename), try to find it in Downloads or current dir
-	if !filepath.IsAbs(filePath) {
-		// Try Downloads first as that's where we save
-		home, _ := os.UserHomeDir()
-		dlPath := filepath.Join(home, "Downloads", filePath)
-		if _, err := os.Stat(dlPath); err == nil {
-			filePath = dlPath
-		}
-	}
-	return utils.GetOpenableApps(filePath)
-}
-
-// OpenFileWith opens the file with the selected app
-func (a *App) OpenFileWith(filePath string, appCmd string) error {
-	// Resolve path similar to GetOpenableApps
-	if !filepath.IsAbs(filePath) {
-		home, _ := os.UserHomeDir()
-		dlPath := filepath.Join(home, "Downloads", filePath)
-		if _, err := os.Stat(dlPath); err == nil {
-			filePath = dlPath
-		}
-	}
-	return utils.OpenFileWithApp(filePath, appCmd)
+func removeZoneIdentifier(filePath string) {
+	zonePath := filePath + ":Zone.Identifier"
+	os.Remove(zonePath)
 }
 
 // OpenSourceFile opens the file in default app
 func (a *App) OpenSourceFile(filePath string) error {
-	// Resolve path
+
 	if !filepath.IsAbs(filePath) {
 		home, _ := os.UserHomeDir()
 		dlPath := filepath.Join(home, "Downloads", filePath)
+
 		if _, err := os.Stat(dlPath); err == nil {
 			filePath = dlPath
 		}
 	}
+
+	// Remove Windows Internet security flag
+	removeZoneIdentifier(filePath)
+
 	return utils.OpenFileDefault(filePath)
 }
 
@@ -449,6 +435,18 @@ func (a *App) ShowInFolder(filePath string) error {
 		}
 	}
 	return utils.ShowInFolder(filePath)
+}
+
+// ShowOpenWithDialog opens the native Windows "Open With" dialog for a file
+func (a *App) ShowOpenWithDialog(filePath string) error {
+	if !filepath.IsAbs(filePath) {
+		home, _ := os.UserHomeDir()
+		dlPath := filepath.Join(home, "Downloads", filePath)
+		if _, err := os.Stat(dlPath); err == nil {
+			filePath = dlPath
+		}
+	}
+	return utils.ShowOpenWithDialog(filePath)
 }
 
 // SaveTempFile saves base64 data to a temporary file and returns the path
