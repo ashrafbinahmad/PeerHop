@@ -661,67 +661,9 @@ export const DesktopView = () => {
   // --- Effects ---
 
   useEffect(() => {
-    const fetchServerInfo = async () => {
-      try {
-        const info = await GetServerInfo();
-        setServerInfo(info);
-        logActivity(
-          "started",
-          `App started — server at ${info.url || "unknown"}`,
-        );
-
-        // If SSID is empty, retry after a short delay to get updated SSID
-        if (!info.ssid) {
-          setTimeout(async () => {
-            try {
-              const updatedInfo = await GetServerInfo();
-              setServerInfo(updatedInfo);
-            } catch (err) {
-              console.error("Failed to get updated server info:", err);
-            }
-          }, 1000); // Retry after 1 second
-        }
-      } catch (err) {
-        console.error("Failed to get server info:", err);
-      }
-    };
-    fetchServerInfo();
-
-    // Listen for network changes
-    const unsubscribe = EventsOn("network-changed", (info: main.ServerInfo) => {
-      console.log("[DesktopView] Network changed:", info);
-      setServerInfo(info);
-      setNotification({
-        show: true,
-        message: "Network changed! Server restarted",
-      });
-      setTimeout(() => setNotification({ show: false, message: "" }), 3000);
-      logActivity(
-        "network_changed",
-        `Network changed — new URL: ${info.url || "unknown"}${info.ssid ? ` (${info.ssid})` : ""}`,
-      );
-
-      // If SSID is empty, poll for it (as backend fetches it asynchronously)
-      if (!info.ssid) {
-        setTimeout(async () => {
-          try {
-            const updated = await GetServerInfo();
-            setServerInfo(updated);
-          } catch (err) {
-            console.error(err);
-          }
-        }, 1000);
-      }
-    });
-
-    return () => {
-      if (typeof unsubscribe === "function") {
-        unsubscribe();
-      } else {
-        EventsOff("network-changed");
-      }
-    };
-  }, [logActivity]);
+    // Attempt to restart server on initialization to ensure fresh state
+    handleRestartServer();
+  }, []);
 
   // Sync theme with server and save to localStorage
   useEffect(() => {
