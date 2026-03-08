@@ -6,7 +6,7 @@
 
   <Identity
     Name="Transender.PeerHop"
-    Version="2.4.3.0"
+    Version="2.4.4.0"
     Publisher="CN=CBE90A45-8594-4076-AEDB-BD3B88F1C249"
     ProcessorArchitecture="x64" />
 

@@ -77,7 +77,9 @@ func (ts *TransactionStore) AddTransaction(txn *Transaction) int {
 
 	txn.ID = ts.nextID
 	txn.Timestamp = time.Now()
-	txn.Status = "pending"
+	if txn.Status == "" {
+		txn.Status = "pending"
+	}
 	ts.transactions[txn.ID] = txn
 	ts.nextID++
 

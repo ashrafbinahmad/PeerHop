@@ -1,4 +1,10 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, {
+  useState,
+  useEffect,
+  useRef,
+  useCallback,
+  useMemo,
+} from "react";
 import axios from "axios";
 import QRCode from "react-qr-code";
 import {
@@ -473,6 +479,7 @@ export const DesktopView = () => {
   // Scroll and Refs
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const adRef = useRef<HTMLIFrameElement>(null);
 
   // Hook: WebSocket for transactions
   const { transactions, sendText } = useTransactions(
@@ -511,14 +518,11 @@ export const DesktopView = () => {
             );
           }
         } else if (txn.type === "text") {
-          const preview = txn.textContent
-            ? txn.textContent.slice(0, 40) +
-              (txn.textContent.length > 40 ? "…" : "")
-            : "";
+          const charCount = txn.textContent?.length || 0;
           if (isMe) {
-            logActivity("sent", `Sent text: "${preview}"`);
+            logActivity("sent", `Sent ${charCount} characters text`);
           } else {
-            logActivity("received", `Received text: "${preview}"`);
+            logActivity("received", `Received ${charCount} characters text`);
           }
         }
       }
@@ -889,6 +893,34 @@ export const DesktopView = () => {
     bubbleMeStyle: { backgroundColor: activeAccent.color },
   };
 
+  // Stable URL for the ad iframe to prevent reload on theme changes.
+  // We'll use postMessage to update the theme inside the iframe instead.
+  const initialAdUrl = useMemo(() => {
+    const baseUrl = import.meta.env.DEV
+      ? "http://localhost:5174"
+      : "https://www.peerhop.in";
+    const bgParam = activeTheme.bg.replace("bg-[", "").replace("]", "");
+    return `${baseUrl}/desktop-ad?bg=${encodeURIComponent(
+      bgParam,
+    )}&theme=${encodeURIComponent(activeThemeId)}&isDark=${String(isDarkMode)}`;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Communicate theme changes to the ad iframe without reloading it
+  useEffect(() => {
+    if (adRef.current?.contentWindow) {
+      adRef.current.contentWindow.postMessage(
+        {
+          type: "theme-update",
+          bg: activeTheme.bg.replace("bg-[", "").replace("]", ""),
+          themeId: activeThemeId,
+          isDark: isDarkMode,
+        },
+        "*",
+      );
+    }
+  }, [activeThemeId, isDarkMode, activeTheme.bg]);
+
   return (
     <div
       className={`flex h-screen w-full font-sans overflow-hidden transition-colors duration-300 ${theme.bg} ${theme.text} relative`}
@@ -950,7 +982,12 @@ export const DesktopView = () => {
         className={`absolute top-0 left-0 right-0 z-40 h-[48px] flex items-center px-4 gap-2 ${theme.panelBg}`}
         style={{ "--wails-draggable": "drag" } as React.CSSProperties}
       >
-        <img src={logo} alt="Logo" className="w-6 h-6 object-contain" />
+        <img
+          src={logo}
+          alt="Logo"
+          className="w-6 h-6 object-contain pointer-events-none "
+          draggable={false}
+        />
         <h2 className={`text-[17px] font-semibold ${theme.text}`}>PeerHop</h2>
       </div>
       {/* WINDOW CONTROLS - FIXED TOP RIGHT */}
@@ -1058,16 +1095,9 @@ export const DesktopView = () => {
         {/* TODO: add ad */}
 
         <iframe
+          ref={adRef}
           id="adFrame"
-          src={`${
-            import.meta.env.DEV
-              ? "http://localhost:5174"
-              : "https://www.peerhop.in"
-          }/desktop-ad?bg=${encodeURIComponent(
-            theme.bg.replace("bg-[", "").replace("]", ""),
-          )}&theme=${encodeURIComponent(activeThemeId)}&isDark=${String(
-            isDarkMode,
-          )}`}
+          src={initialAdUrl}
           width="100%"
           height="55"
           frameBorder="0"
