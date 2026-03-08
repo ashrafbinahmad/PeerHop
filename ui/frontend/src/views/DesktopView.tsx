@@ -2001,8 +2001,15 @@ export const DesktopView = () => {
               <>
                 {/* Header */}
                 <div className="mb-8 flex flex-col items-center pt-8">
-                  <h1 className={`text-xl font-bold ${theme.text}`}>
-                    Connect Device
+                  <h1
+                    className={`flex flex-col items-center text-center ${theme.text}`}
+                  >
+                    <span className="text-sm font-semibold opacity-60 uppercase tracking-wider">
+                      Connect device to
+                    </span>
+                    <span className="text-2xl font-black tracking-tight mt-1 text-white">
+                      Start sharing files
+                    </span>
                   </h1>
                 </div>
 
