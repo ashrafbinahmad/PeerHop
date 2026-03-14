@@ -136,27 +136,45 @@ async function main() {
     }
     success('All build files present\n');
 
-    // Step 1: Update root package.json
-    step(1, 6, 'Updating root package.json...');
+    // Step 1: Update frontend versions
+    step(1, 7, 'Updating frontend versions...');
+    const frontendVersionPath = path.join(__dirname, '..', 'ui', 'frontend', 'src', 'version.ts');
+    const frontendPackageJsonPath = path.join(__dirname, '..', 'ui', 'frontend', 'package.json');
+    try {
+        // 1. Update version.ts
+        fs.writeFileSync(frontendVersionPath, `export const APP_VERSION = "${version}";\n`);
+
+        // 2. Update frontend package.json
+        const frontendPackageJson = JSON.parse(fs.readFileSync(frontendPackageJsonPath, 'utf8'));
+        frontendPackageJson.version = version;
+        fs.writeFileSync(frontendPackageJsonPath, JSON.stringify(frontendPackageJson, null, 2) + '\n');
+
+        success(`Updated frontend versions to ${version}\n`);
+    } catch (err) {
+        error(`Failed to update frontend versions: ${err.message}`);
+    }
+
+    // Step 2: Update root package.json
+    step(2, 7, 'Updating root package.json...');
     rootPackageJson.version = version;
     fs.writeFileSync(rootPackageJsonPath, JSON.stringify(rootPackageJson, null, 2) + '\n');
     success(`Updated root package.json to ${version}\n`);
 
-    // Step 2: Update version file
-    step(2, 6, 'Updating version file...');
+    // Step 3: Update version file
+    step(3, 7, 'Updating version file...');
     fs.writeFileSync('version', version);
     success(`Updated version to ${version}\n`);
 
-    // Step 3: Update npm package
-    step(3, 6, 'Updating npm package...');
+    // Step 4: Update npm package
+    step(4, 7, 'Updating npm package...');
     const npmPackageJsonPath = path.join(__dirname, '..', 'npm-package', 'package.json');
     const npmPackageJson = JSON.parse(fs.readFileSync(npmPackageJsonPath, 'utf8'));
     npmPackageJson.version = version;
     fs.writeFileSync(npmPackageJsonPath, JSON.stringify(npmPackageJson, null, 2) + '\n');
     success(`Updated npm-package/package.json to ${version}\n`);
 
-    // Step 4: Copy binaries to npm-package
-    step(4, 6, 'Copying binaries to npm package...');
+    // Step 5: Copy binaries to npm-package
+    step(5, 7, 'Copying binaries to npm package...');
     const npmBinDir = path.join(__dirname, '..', 'npm-package', 'bin');
     if (!fs.existsSync(npmBinDir)) {
         fs.mkdirSync(npmBinDir, { recursive: true });
@@ -165,8 +183,8 @@ async function main() {
     fs.copyFileSync('builds/peerhop_cli_linux', path.join(npmBinDir, 'peerhop-linux'));
     success('Copied CLI binaries to npm-package/bin\n');
 
-    // Step 5: Create Github Release and Upload Assets
-    step(5, 6, 'Publishing to GitHub Releases...');
+    // Step 6: Create Github Release and Upload Assets
+    step(6, 7, 'Publishing to GitHub Releases...');
 
     // Check if gh CLI is installed
     try {
@@ -200,7 +218,7 @@ async function main() {
     success(`Published release v${version} to GitHub\n`);
 
     // We still push the tag to the source repo for version tracking, but without triggering the old workflow
-    step('5.5', 6, 'Tagging source repository...');
+    step('6.5', 7, 'Tagging source repository...');
     exec('git add .', 'Git add');
     try {
         execSync(`git commit -m "Release v${version}"`, { stdio: 'inherit' });
@@ -217,7 +235,7 @@ async function main() {
     const shouldPublish = answer.toLowerCase() === 'y' || answer.toLowerCase() === 'yes';
 
     if (shouldPublish) {
-        step(6, 6, 'Publishing to npm...');
+        step(7, 7, 'Publishing to npm...');
         process.chdir(path.join(__dirname, '..', 'npm-package'));
         if (!exec('npm publish', 'NPM publish')) {
             error('Failed to publish to npm');

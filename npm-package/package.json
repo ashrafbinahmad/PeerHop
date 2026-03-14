@@ -1,6 +1,6 @@
 {
   "name": "peerhop",
-  "version": "2.5.0",
+  "version": "2.5.1",
   "description": "Fast local network file transfer CLI",
   "bin": {
     "peerhop": "index.js"

@@ -72,6 +72,25 @@ log('  6. Verify all builds\n', 'white');
 const buildsDir = path.join(__dirname, '..', 'builds');
 const backupDir = path.join(__dirname, '..', 'builds_backup');
 
+// Step 0.5: Update frontend versions
+step('0.5', 6, 'Updating frontend versions...');
+const frontendVersionPath = path.join(__dirname, '..', 'ui', 'frontend', 'src', 'version.ts');
+const frontendPackageJsonPath = path.join(__dirname, '..', 'ui', 'frontend', 'package.json');
+try {
+    // 1. Update version.ts
+    fs.writeFileSync(frontendVersionPath, `export const APP_VERSION = "${version}";\n`);
+
+    // 2. Update package.json
+    const frontendPackageJson = JSON.parse(fs.readFileSync(frontendPackageJsonPath, 'utf8'));
+    frontendPackageJson.version = version;
+    fs.writeFileSync(frontendPackageJsonPath, JSON.stringify(frontendPackageJson, null, 2) + '\n');
+
+    success(`Updated frontend versions to ${version}\n`);
+} catch (err) {
+    error(`Failed to update frontend versions: ${err.message}`);
+    process.exit(1);
+}
+
 // Step 1: Clean existing builds (or backup if locked)
 step(1, 6, 'Cleaning existing builds...');
 if (fs.existsSync(buildsDir)) {
