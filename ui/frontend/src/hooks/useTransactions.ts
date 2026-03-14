@@ -61,7 +61,7 @@ export const useTransactions = (
   isSample = false,
   isDesktop: boolean = false,
   securityToken?: string,
-  securityEnabled?: boolean
+  securityEnabled?: boolean,
 ): UseTransactionsResult => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
@@ -84,7 +84,7 @@ export const useTransactions = (
       const paramName = isDesktop ? "admin" : "security";
       return `${url}${separator}${paramName}=${securityToken}`;
     },
-    [securityToken, isDesktop]
+    [securityToken, isDesktop],
   );
 
   if (isSample) {
@@ -247,7 +247,7 @@ export const useTransactions = (
         throw err;
       }
     },
-    [baseURL, addSecurityToken]
+    [baseURL, addSecurityToken],
   );
 
   // WebSocket connection and listener - MUST be in same effect to ensure listener is added before connect
@@ -290,18 +290,6 @@ export const useTransactions = (
           if (message.data.clients && Array.isArray(message.data.clients)) {
             const clients = message.data.clients as Client[];
             setClients(clients);
-
-            if (clients.length > 0) {
-              const desktopClient = clients.find(
-                (c) =>
-                  c.platform === "windows" ||
-                  c.platform === "linux" ||
-                  c.platform === "iOS"
-              );
-              if (desktopClient && desktopClient.name) {
-                setDeviceName(desktopClient.name);
-              }
-            }
           }
           break;
 
@@ -332,7 +320,7 @@ export const useTransactions = (
           setTransactions((prevTransactions) => {
             const updatedTxn = message.data as Transaction;
             const existingIndex = prevTransactions.findIndex(
-              (t) => t.id === updatedTxn.id
+              (t) => t.id === updatedTxn.id,
             );
 
             if (existingIndex >= 0) {
@@ -380,7 +368,7 @@ export const useTransactions = (
       }
 
       console.log(
-        `[useTransactions] Setting up WebSocket. URL: ${wsURLWithParams}, isDesktop: ${isDesktop}`
+        `[useTransactions] Setting up WebSocket. URL: ${wsURLWithParams}, isDesktop: ${isDesktop}`,
       );
 
       // CRITICAL: Add listener FIRST, then connect

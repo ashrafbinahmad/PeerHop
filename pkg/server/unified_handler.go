@@ -1197,7 +1197,7 @@ func (h *UnifiedHandler) serveFile(w http.ResponseWriter, r *http.Request, fileP
 						bytesOffset = offset
 						// DEBUG: Log range requests (simplified, in MB)
 						offsetMB := float64(bytesOffset) / (1024 * 1024)
-						fmt.Printf("[📥 RANGE] TxID=%d Offset=%.1fMB\n", txnID, offsetMB)
+						fmt.Printf("[📥 RANGE] TxID=%d Offset=%.2fMB\n", txnID, offsetMB)
 					}
 				}
 			}
@@ -1481,6 +1481,24 @@ func (h *UnifiedHandler) ClearFilePath() {
 
 // Shutdown cleans up resources
 func (h *UnifiedHandler) Shutdown() {
+	// 1. Cancel all in-progress transactions
+	if h.TxStore != nil {
+		h.TxStore.CancelAllInProgress()
+
+		// 2. Broadcast updates while WebSocket hub is still active
+		if h.WSHub != nil {
+			transactions := h.TxStore.GetAllTransactions()
+			for _, txn := range transactions {
+				if txn.Status == "cancelled" || txn.Status == "failed" {
+					h.WSHub.BroadcastTransactionUpdate(txn)
+				}
+			}
+			// Small delay to allow messages to be sent before closing connections
+			time.Sleep(100 * time.Millisecond)
+		}
+	}
+
+	// 3. Shutdown WebSocket Hub
 	if h.WSHub != nil {
 		h.WSHub.Shutdown()
 	}

@@ -10,24 +10,33 @@ import (
 	"time"
 )
 
-// GetWiFiName returns the SSID of the currently connected Wi-Fi network (Windows only)
+// GetWiFiName returns the SSID of the currently connected Wi-Fi network (Windows only).
 func GetWiFiName() string {
-	// Create context with timeout to prevent hanging
+	return fetchWiFiName()
+}
+
+func fetchWiFiName() string {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
-	// Use powershell to get SSID accurately
-	// Added -NoProfile and -NonInteractive to speed up and prevent hangs
-	cmd := exec.CommandContext(ctx, "powershell", "-NoProfile", "-NonInteractive", "-Command", "(netsh wlan show interfaces) -Match '^\\s+SSID' -Replace '^\\s+SSID\\s+:\\s+', ''")
-
-	// Hide the command window
-	cmd.SysProcAttr = &syscall.SysProcAttr{
-		HideWindow: true,
-	}
+	// Call netsh directly — avoids PowerShell cold-start overhead (~10x faster)
+	cmd := exec.CommandContext(ctx, "netsh", "wlan", "show", "interfaces")
+	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
 
 	output, err := cmd.Output()
 	if err != nil {
 		return ""
 	}
-	return strings.TrimSpace(string(output))
+
+	for _, line := range strings.Split(string(output), "\n") {
+		trimmed := strings.TrimSpace(line)
+		// Match "SSID" but not "BSSID"
+		if strings.HasPrefix(trimmed, "SSID") && !strings.HasPrefix(trimmed, "BSSID") {
+			parts := strings.SplitN(trimmed, ":", 2)
+			if len(parts) == 2 {
+				return strings.TrimSpace(parts[1])
+			}
+		}
+	}
+	return ""
 }

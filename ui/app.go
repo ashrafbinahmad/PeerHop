@@ -28,6 +28,7 @@ type App struct {
 	serverInfo      *ServerInfo
 	httpServer      *http.Server
 	serverStartTime time.Time
+	currentPort     int
 }
 
 // NewApp creates a new App application struct
@@ -89,10 +90,13 @@ func (a *App) startPersistentServer() error {
 		ip = "127.0.0.1"
 	}
 
+	// Get a free port for the server
 	port, err := network.GetFreePort()
 	if err != nil {
 		return err
 	}
+
+	a.currentPort = port
 
 	// Detect development mode by checking if PeerHop's Vite dev server is running
 	// We only check this in dev builds to prevent production builds from proxying to unrelated dev servers
@@ -171,6 +175,16 @@ func (a *App) GetServerInfo() (*ServerInfo, error) {
 	if a.serverInfo == nil {
 		return nil, fmt.Errorf("server not started")
 	}
+
+	// Refresh SSID and IP in case they changed (e.g. WiFi switch)
+	ssid := network.GetWiFiName()
+	a.serverInfo.SSID = ssid
+
+	ip, err := network.GetLocalIP()
+	if err == nil && a.currentPort > 0 {
+		a.serverInfo.URL = fmt.Sprintf("http://%s:%d", ip, a.currentPort)
+	}
+
 	return a.serverInfo, nil
 }
 

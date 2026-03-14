@@ -1,0 +1,363 @@
+import React from "react";
+import { Settings, Check, RefreshCw } from "lucide-react";
+import { THEME_PRESETS, ACCENT_COLORS } from "../../themeConstants";
+import { CopyButton } from "../../components/CopyButton";
+import { EditableDeviceName } from "./EditableDeviceName";
+import type { Client } from "../../hooks/useDevices";
+import type { ActivityType } from "../../hooks/useActivity";
+import { APP_VERSION } from "../../version";
+
+interface SettingsPanelProps {
+  theme: any;
+  activeThemeId: string;
+  setActiveThemeId: (id: string) => void;
+  activeAccentId: string;
+  setActiveAccentId: (id: string) => void;
+  activeAccent: any;
+  textTransferEnabled: boolean;
+  setTextTransferEnabled: (val: boolean) => void;
+  securityEnabled: boolean;
+  setSecurityEnabled: (val: boolean) => void;
+  multiClientEnabled: boolean;
+  setMultiClientEnabled: (val: boolean) => void;
+  logActivity: (type: ActivityType, message: string) => void;
+  serverInfo: any;
+  securityToken: string;
+  isDarkMode: boolean;
+  handleRestartServer: () => void;
+  isCheckingNetwork: boolean;
+  clients: Client[];
+  adminToken: string;
+  handleBlockClient: (client: Client) => void;
+  handleBlockSending: (client: Client) => void;
+}
+
+export const SettingsPanel = ({
+  theme,
+  activeThemeId,
+  setActiveThemeId,
+  activeAccentId,
+  setActiveAccentId,
+  activeAccent,
+  textTransferEnabled,
+  setTextTransferEnabled,
+  securityEnabled,
+  setSecurityEnabled,
+  multiClientEnabled,
+  setMultiClientEnabled,
+  logActivity,
+  serverInfo,
+  securityToken,
+  isDarkMode,
+  handleRestartServer,
+  isCheckingNetwork,
+  clients,
+  adminToken,
+  handleBlockClient,
+  handleBlockSending,
+}: SettingsPanelProps) => {
+  return (
+    <div className="w-full self-start text-left pt-8">
+      {/* Left-aligned header */}
+      <div className="mb-8 flex items-center gap-3">
+        <Settings size={24} className={theme.text} />
+        <h1 className={`text-2xl font-bold ${theme.text}`}>Settings</h1>
+      </div>
+
+      {/* Settings Content - No borders, left-aligned */}
+      <div className="space-y-6 text-left">
+        {/* Theme Setting */}
+        <div>
+          <h3 className={`text-sm font-semibold mb-3 ${theme.text}`}>Themes</h3>
+
+          {/* Theme Cards - Horizontal Scroll */}
+          <div className="flex overflow-x-auto gap-3 mb-2 pb-2 -mx-2 px-2 select-none scrollbar-hide">
+            {THEME_PRESETS.map((t) => (
+              <button
+                key={t.id}
+                onClick={() => setActiveThemeId(t.id)}
+                className={`shrink-0 w-20 p-1 rounded-xl border-2 transition-all duration-200 group ${
+                  activeThemeId === t.id
+                    ? "border-[#007AFF]"
+                    : "border-transparent hover:border-gray-200 dark:hover:border-slate-700"
+                }`}
+                style={{
+                  borderColor:
+                    activeThemeId === t.id ? activeAccent.color : undefined,
+                }}
+              >
+                <div
+                  className={`h-12 rounded-lg mb-1.5 relative overflow-hidden`}
+                  style={{ backgroundColor: t.previewColor }}
+                >
+                  {/* Scaled Mock UI in Card */}
+                  <div className="absolute top-1.5 left-1.5 right-6 h-1.5 rounded-full bg-slate-400/20"></div>
+                  <div className="absolute top-4 left-1.5 right-3 h-3 rounded bg-white/20"></div>
+                  <div
+                    className="absolute top-8 right-1.5 left-6 h-3 rounded"
+                    style={{ backgroundColor: activeAccent.color }}
+                  ></div>
+                </div>
+                <div
+                  className={`text-[10px] font-medium text-center truncate ${
+                    theme.subText
+                  } ${activeThemeId === t.id ? "font-bold" : ""}`}
+                  style={{
+                    color:
+                      activeThemeId === t.id ? activeAccent.color : undefined,
+                  }}
+                >
+                  {t.name}
+                </div>
+              </button>
+            ))}
+          </div>
+
+          {/* Accent Colors */}
+          <div className="flex flex-wrap gap-2 items-center justify-start">
+            {ACCENT_COLORS.map((color) => (
+              <button
+                key={color.id}
+                onClick={() => setActiveAccentId(color.id)}
+                className={`w-4 h-4 rounded-full transition-all duration-200 flex items-center justify-center ${
+                  activeAccentId === color.id
+                    ? "scale-105 ring ring-offset-2 ring-offset-transparent"
+                    : "hover:scale-105"
+                }`}
+                style={{
+                  backgroundColor: color.color,
+                  boxShadow:
+                    activeAccentId === color.id
+                      ? `0 0 0 2px ${
+                          theme.bg === "bg-[#0f172a]" ? "#0f172a" : "white"
+                        }, 0 0 0 3px ${color.color}`
+                      : "none",
+                }}
+              >
+                {activeAccentId === color.id && (
+                  <Check size={10} className="text-white" />
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Features */}
+        <div>
+          <h3 className={`text-sm font-semibold mb-4 ${theme.text}`}>
+            Features
+          </h3>
+          <div className="space-y-3">
+            {/* Text Transfer Toggle */}
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex-1">
+                <p className={`text-sm font-medium ${theme.text}`}>
+                  Text Transfer
+                </p>
+                <p className={`text-xs mt-0.5 ${theme.subText}`}>
+                  Enable sending and receiving text messages
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  const next = !textTransferEnabled;
+                  setTextTransferEnabled(next);
+                  logActivity(
+                    "settings_changed",
+                    `Text Transfer: ${next ? "enabled" : "disabled"}`,
+                  );
+                }}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors shrink-0 ${
+                  textTransferEnabled ? "" : theme.iconBg
+                }`}
+                style={{
+                  backgroundColor: textTransferEnabled
+                    ? theme.accentColor
+                    : undefined,
+                }}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    textTransferEnabled ? "translate-x-6" : "translate-x-1"
+                  }`}
+                />
+              </button>
+            </div>
+
+            {/* Security Toggle */}
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex-1">
+                <p className={`text-sm font-medium ${theme.text}`}>
+                  Enable Security
+                </p>
+                <p className={`text-xs mt-0.5 ${theme.subText}`}>
+                  Require security token for API access
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  const next = !securityEnabled;
+                  setSecurityEnabled(next);
+                  logActivity(
+                    "settings_changed",
+                    `Security: ${next ? "enabled" : "disabled"}`,
+                  );
+                }}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors shrink-0 ${
+                  securityEnabled ? "" : theme.iconBg
+                }`}
+                style={{
+                  backgroundColor: securityEnabled
+                    ? theme.accentColor
+                    : undefined,
+                }}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    securityEnabled ? "translate-x-6" : "translate-x-1"
+                  }`}
+                />
+              </button>
+            </div>
+
+            {/* Multi-Client Toggle */}
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex-1">
+                <p className={`text-sm font-medium ${theme.text}`}>
+                  Enable Multi-Client
+                </p>
+                <p className={`text-xs mt-0.5 ${theme.subText}`}>
+                  Allow multiple devices to connect simultaneously
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  const next = !multiClientEnabled;
+                  setMultiClientEnabled(next);
+                  logActivity(
+                    "settings_changed",
+                    `Multi-Client: ${next ? "enabled" : "disabled"}`,
+                  );
+                }}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors shrink-0 ${
+                  multiClientEnabled ? "" : theme.iconBg
+                }`}
+                style={{
+                  backgroundColor: multiClientEnabled
+                    ? theme.accentColor
+                    : undefined,
+                }}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    multiClientEnabled ? "translate-x-6" : "translate-x-1"
+                  }`}
+                />
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Server Info */}
+        {serverInfo && (
+          <div>
+            <h3 className={`text-sm font-semibold mb-4 ${theme.text}`}>
+              Server Information
+            </h3>
+            <div className="space-y-3">
+              <div>
+                <p
+                  className={`text-[10px] uppercase tracking-wider mb-1.5 ${theme.subText}`}
+                >
+                  URL
+                </p>
+                <div className="flex items-center gap-2">
+                  <code className={`text-xs font-mono flex-1 ${theme.text}`}>
+                    {serverInfo.url
+                      ? securityEnabled && securityToken
+                        ? `${serverInfo.url}?security=${securityToken}`
+                        : serverInfo.url
+                      : ""}
+                  </code>
+                  <CopyButton
+                    text={
+                      serverInfo.url
+                        ? securityEnabled && securityToken
+                          ? `${serverInfo.url}?security=${securityToken}`
+                          : serverInfo.url
+                        : ""
+                    }
+                    className={`p-1.5 rounded-md ${
+                      isDarkMode
+                        ? "hover:bg-slate-700 text-slate-400 hover:text-slate-300"
+                        : "hover:bg-gray-100 text-gray-400 hover:text-gray-600"
+                    }`}
+                    isDarkMode={isDarkMode}
+                  />
+                </div>
+              </div>
+              {serverInfo.ssid && (
+                <div>
+                  <p
+                    className={`text-[10px] uppercase tracking-wider mb-1.5 ${theme.subText}`}
+                  >
+                    Wi-Fi Network
+                  </p>
+                  <code className={`text-xs font-mono ${theme.text}`}>
+                    {serverInfo.ssid}
+                  </code>
+                </div>
+              )}
+              <div className="pt-2">
+                <button
+                  onClick={handleRestartServer}
+                  disabled={isCheckingNetwork}
+                  className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                    theme.iconBg
+                  } ${theme.ghostHover} ${theme.text} ${
+                    isCheckingNetwork ? "opacity-50 cursor-not-allowed" : ""
+                  }`}
+                >
+                  <RefreshCw
+                    size={14}
+                    className={isCheckingNetwork ? "animate-spin" : ""}
+                  />
+                  {isCheckingNetwork ? "Restarting..." : "Restart Server"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Connected Devices - Only show when multi-client is enabled */}
+        {multiClientEnabled && clients.length > 0 && (
+          <div>
+            <h3 className={`text-sm font-semibold mb-4 ${theme.text}`}>
+              Connected Devices ({clients.length})
+            </h3>
+            <div className="space-y-2">
+              {clients.map((client) => (
+                <EditableDeviceName
+                  key={client.ip}
+                  client={client}
+                  isDarkMode={isDarkMode}
+                  theme={theme}
+                  serverUrl={serverInfo?.url || ""}
+                  adminToken={adminToken}
+                  onBlock={handleBlockClient}
+                  onBlockSending={handleBlockSending}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+        {/* App Version */}
+        <div className="pt-4 mt-8 border-t border-gray-100 dark:border-slate-800 opacity-30">
+          <p className={`text-[10px] text-center ${theme.subText}`}>
+            PeerHop v{APP_VERSION}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+};

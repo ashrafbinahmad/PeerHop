@@ -188,13 +188,10 @@ func (ts *TransactionStore) UpdateClientProgress(id int, clientIP string, bytesT
 	defer ts.mu.Unlock()
 
 	if txn, exists := ts.transactions[id]; exists {
-		// Check for cancellation
-		if txn.ClientStatus != nil && txn.ClientStatus[clientIP] == "cancelled" {
-			return
-		}
-		// Also check valid cancellation map
+
+		// Check global and client-specific cancellation
 		cancelKey := fmt.Sprintf("%d_%s", id, clientIP)
-		if ts.clientCancelled[cancelKey] {
+		if ts.cancelled[id] || ts.clientCancelled[cancelKey] || txn.Status == "cancelled" {
 			return
 		}
 
@@ -250,12 +247,10 @@ func (ts *TransactionStore) UpdateClientRangeProgress(id int, clientIP string, r
 	defer ts.mu.Unlock()
 
 	if txn, exists := ts.transactions[id]; exists {
-		// Check for cancellation
-		if txn.ClientStatus != nil && txn.ClientStatus[clientIP] == "cancelled" {
-			return
-		}
+
+		// Check global and client-specific cancellation
 		cancelKey := fmt.Sprintf("%d_%s", id, clientIP)
-		if ts.clientCancelled[cancelKey] {
+		if ts.cancelled[id] || ts.clientCancelled[cancelKey] || txn.Status == "cancelled" {
 			return
 		}
 
@@ -334,13 +329,13 @@ func (ts *TransactionStore) UpdateClientRangeProgress(id int, clientIP string, r
 
 			// Show progress with visual indicator
 			if progress >= 100 {
-				fmt.Printf("[✅ COMPLETE] TxID=%d %.1fMB/%.1fMB (100%%)\n",
+				fmt.Printf("[✅ COMPLETE] TxID=%d %.2fMB/%.2fMB (100%%)\n",
 					id, downloadedMB, totalMB)
 			} else if len(ranges) > 1 {
-				fmt.Printf("[📊 PROGRESS] TxID=%d %.1fMB/%.1fMB (%.1f%%) - %d parallel ranges\n",
+				fmt.Printf("[📊 PROGRESS] TxID=%d %.2fMB/%.2fMB (%.2f%%) - %d parallel ranges\n",
 					id, downloadedMB, totalMB, progress, len(ranges))
 			} else {
-				fmt.Printf("[📊 PROGRESS] TxID=%d %.1fMB/%.1fMB (%.1f%%)\n",
+				fmt.Printf("[📊 PROGRESS] TxID=%d %.2fMB/%.2fMB (%.2f%%)\n",
 					id, downloadedMB, totalMB, progress)
 			}
 		}
@@ -489,6 +484,29 @@ func (ts *TransactionStore) CancelTransaction(id int) bool {
 	return false
 }
 
+// CancelAllInProgress cancels all transactions that are NOT completed, failed, or already cancelled
+func (ts *TransactionStore) CancelAllInProgress() {
+	ts.mu.Lock()
+	defer ts.mu.Unlock()
+
+	for id, txn := range ts.transactions {
+		if txn.Status != "completed" && txn.Status != "failed" && txn.Status != "cancelled" {
+			ts.cancelled[id] = true
+			txn.Status = "cancelled"
+
+			// Also reset client statuses if any
+			if txn.ClientStatus != nil {
+				for ip := range txn.ClientStatus {
+					// Cancel any client download that isn't already finished
+					if txn.ClientStatus[ip] != "completed" && txn.ClientStatus[ip] != "failed" {
+						txn.ClientStatus[ip] = "cancelled"
+					}
+				}
+			}
+		}
+	}
+}
+
 // CancelClientDownload cancels a download for a specific client (by IP)
 func (ts *TransactionStore) CancelClientDownload(id int, clientIP string) bool {
 	ts.mu.Lock()
@@ -504,14 +522,24 @@ func (ts *TransactionStore) CancelClientDownload(id int, clientIP string) bool {
 		ts.clientCancelled[cancelKey] = true
 
 		// Reset client-specific progress
-		if txn.ClientProgress != nil {
-			txn.ClientProgress[clientIP] = 0
+		if txn.ClientProgress == nil {
+			txn.ClientProgress = make(map[string]float64)
 		}
-		if txn.ClientStatus != nil {
-			txn.ClientStatus[clientIP] = "cancelled"
+		txn.ClientProgress[clientIP] = 0
+
+		if txn.ClientStatus == nil {
+			txn.ClientStatus = make(map[string]string)
 		}
-		if txn.ClientBytes != nil {
-			txn.ClientBytes[clientIP] = 0
+		txn.ClientStatus[clientIP] = "cancelled"
+
+		if txn.ClientBytes == nil {
+			txn.ClientBytes = make(map[string]int64)
+		}
+		txn.ClientBytes[clientIP] = 0
+
+		// Reset client ranges to allow a fresh start if they download again
+		if txn.ClientRanges != nil {
+			delete(txn.ClientRanges, clientIP)
 		}
 
 		// Keep the cancellation flag active for 2 seconds to prevent browser auto-retry

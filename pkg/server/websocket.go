@@ -71,8 +71,8 @@ type WebSocketHub struct {
 	themeID             string // Current theme ID
 	accentID            string // Current accent ID
 
-	// Track last sent percentage for each transaction to only send whole number changes
-	lastSentPercent map[int]int
+	// Track last sent bytes for each transaction to allow smooth sub-1% updates
+	lastSentBytes map[int]int64
 
 	done chan struct{} // Channel to signal shutdown
 }
@@ -80,14 +80,14 @@ type WebSocketHub struct {
 // NewWebSocketHub creates a new WebSocket hub
 func NewWebSocketHub(txStore *TransactionStore, clientStore *ClientStore) *WebSocketHub {
 	return &WebSocketHub{
-		connections:     make(map[*SafeConn]bool),
-		txStore:         txStore,
-		clientStore:     clientStore,
-		desktopName:     "PeerHop", // Default name
-		themeID:         "night",   // Default theme
-		accentID:        "blue",    // Default accent
-		lastSentPercent: make(map[int]int),
-		done:            make(chan struct{}),
+		connections:   make(map[*SafeConn]bool),
+		txStore:       txStore,
+		clientStore:   clientStore,
+		desktopName:   "PeerHop", // Default name
+		themeID:       "night",   // Default theme
+		accentID:      "blue",    // Default accent
+		lastSentBytes: make(map[int]int64),
+		done:          make(chan struct{}),
 	}
 }
 
@@ -145,29 +145,28 @@ func (hub *WebSocketHub) Broadcast(msgType string, data interface{}) {
 
 // BroadcastTransactionUpdate broadcasts a single transaction update
 func (hub *WebSocketHub) BroadcastTransactionUpdate(txn *Transaction) {
-	// Only broadcast percentage updates if they increase by whole numbers
-	currentPercent := int(txn.TransactionPercent)
+	// We allow updates to be broadcast if bytes have changed, even if percent hasn't.
+	// The caller (UnifiedHandler or StartMonitoring) is already throttled to ~200ms.
+	currentBytes := txn.BytesTransferred
 
 	hub.mu.Lock()
-	lastPercent, exists := hub.lastSentPercent[txn.ID]
+	lastBytes, exists := hub.lastSentBytes[txn.ID]
 
 	// Only send if:
-	// 1. First time sending for this transaction (!exists)
-	// 2. Percentage increased to next whole number
-	// 3. Percentage decreased (reset to 0 after cancellation)
-	// 4. Status changed to completed, pending, or in_progress, or cancelled
+	// 1. First time sending for this transaction
+	// 2. Bytes have changed
+	// 3. Status changed
 	shouldBroadcast := !exists ||
-		currentPercent > lastPercent ||
-		currentPercent < lastPercent || // Reset to 0
+		currentBytes != lastBytes ||
 		txn.Status == "completed" ||
 		txn.Status == "pending" ||
 		txn.Status == "cancelled"
 
 	if shouldBroadcast {
-		hub.lastSentPercent[txn.ID] = currentPercent
+		hub.lastSentBytes[txn.ID] = currentBytes
 		// Reduce log noise for frequent progress updates, log only status changes or 100%
-		if txn.Status == "completed" || txn.Status == "pending" || txn.Status == "cancelled" || currentPercent%10 == 0 {
-			logger.Debug("[WebSocket] Broadcasting txn %d: %s %.0f%% (status: %s)",
+		if txn.Status == "completed" || txn.Status == "pending" || txn.Status == "cancelled" {
+			logger.Debug("[WebSocket] Broadcasting txn %d: %s %.2f%% (status: %s)",
 				txn.ID, txn.Filename, txn.TransactionPercent, txn.Status)
 		}
 	}
@@ -409,7 +408,7 @@ func (hub *WebSocketHub) HandleWebSocket(w http.ResponseWriter, r *http.Request)
 	if hub.txStore != nil {
 		transactions := hub.txStore.GetAllTransactions()
 		for _, txn := range transactions {
-			hub.lastSentPercent[txn.ID] = int(txn.TransactionPercent)
+			hub.lastSentBytes[txn.ID] = txn.BytesTransferred
 		}
 		jsonData, _ := json.Marshal(WSMessage{
 			Type: "transactions_init",

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import "./App.css";
 import { getMetaData, MetaData } from "./api";
-import { DesktopView } from "./views/DesktopView";
+import { DesktopView } from "./views/DesktopView/DesktopView";
 import { MobileUnified } from "./views/MobileUnified";
 
 import { MobileUpload } from "./views/MobileUpload";
@@ -41,25 +41,28 @@ function App() {
     );
 
   // Mobile/Web view
-  if (mobileState) {
+  if (
+    mobileState ||
+    (import.meta.env.DEV && !window.location.host.includes("wails.localhost"))
+  ) {
     // UI App (Unified View)
-    if (mobileState.app === "ui") {
+    if (mobileState?.app === "ui" || import.meta.env.DEV) {
       return (
         <MobileUnified
-          downloadFilename={mobileState.filename}
-          downloadSize={mobileState.size}
+          downloadFilename={mobileState?.filename}
+          downloadSize={mobileState?.size}
         />
       );
     }
 
     // CLI App (Split Views)
-    if (mobileState.mode === "upload") {
+    if (mobileState?.mode === "upload") {
       return <MobileUpload />;
     } else {
       return (
         <MobileDownload
-          filename={mobileState.filename || "file"}
-          size={mobileState.size || 0}
+          filename={mobileState?.filename || "file"}
+          size={mobileState?.size || 0}
         />
       );
     }

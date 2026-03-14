@@ -63,4 +63,13 @@ try {
     console.error(`❌ Failed to update version file: ${err.message}`);
 }
 
+// 5. Update frontend version.ts
+const frontendVersionPath = path.join(rootDir, 'ui', 'frontend', 'src', 'version.ts');
+try {
+    fs.writeFileSync(frontendVersionPath, `export const APP_VERSION = "${version}";\n`);
+    console.log('✓ Updated ui/frontend/src/version.ts');
+} catch (err) {
+    console.error(`❌ Failed to update ui/frontend/src/version.ts: ${err.message}`);
+}
+
 console.log(`\n✅ Version updated to ${version} in all configuration files!\n`);

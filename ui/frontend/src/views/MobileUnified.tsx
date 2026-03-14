@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import axios from "axios";
 import { useTransactions } from "../hooks/useTransactions";
-import { useTransferSpeed, formatBytes } from "../hooks/useTransferSpeed";
+import { formatBytes, calculateSpeed } from "../utils/format";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { CopyButton } from "../components/CopyButton";
 import {
@@ -16,6 +16,7 @@ import {
   Monitor,
   User,
   Smartphone,
+  RefreshCw,
 } from "lucide-react";
 import { ACCENT_COLORS, THEME_PRESETS } from "../themeConstants";
 
@@ -23,6 +24,50 @@ interface Props {
   downloadFilename?: string;
   downloadSize?: number;
 }
+
+// Logic for WiFi signal layers based on mbps
+const signalLogic = {
+  getLayers: (mbps: number) => {
+    if (mbps >= 10) return 4;
+    if (mbps >= 5) return 3;
+    if (mbps >= 2) return 2;
+    return 1;
+  },
+};
+
+const getNumericSpeed = (bytes: number, timestamp: string) => {
+  if (!bytes || !timestamp) return 0;
+  const startTime = new Date(timestamp).getTime();
+  const timeDiff = (Date.now() - startTime) / 1000;
+  if (timeDiff <= 0) return 0;
+  return bytes / (1024 * 1024) / timeDiff;
+};
+
+const WifiSignalIcon = ({
+  layers,
+  color,
+}: {
+  layers: number;
+  color: string;
+}) => (
+  <svg
+    width="14"
+    height="14"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke={color}
+    strokeWidth="3"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className="inline-block ml-1"
+    style={{ marginBottom: "2px" }}
+  >
+    <path d="M12 20h.01" opacity={layers >= 1 ? 1 : 0.2} />
+    <path d="M8.5 16.5a5 5 0 0 1 7 0" opacity={layers >= 2 ? 1 : 0.2} />
+    <path d="M5 13a10 10 0 0 1 14 0" opacity={layers >= 3 ? 1 : 0.2} />
+    <path d="M2 9.5a15 15 0 0 1 20 0" opacity={layers >= 4 ? 1 : 0.2} />
+  </svg>
+);
 
 export const MobileUnified: React.FC<Props> = ({
   downloadFilename,
@@ -202,12 +247,12 @@ export const MobileUnified: React.FC<Props> = ({
   // Auto-download when multi-client is disabled
   useEffect(() => {
     console.log(
-      `[Auto-Download] Effect triggered - multiClientEnabled: ${multiClientEnabled}, myIp: ${myIp}, transactions: ${transactions.length}`
+      `[Auto-Download] Effect triggered - multiClientEnabled: ${multiClientEnabled}, myIp: ${myIp}, transactions: ${transactions.length}`,
     );
 
     if (multiClientEnabled) {
       console.log(
-        "[Auto-Download] Multi-client enabled - skipping auto-download"
+        "[Auto-Download] Multi-client enabled - skipping auto-download",
       );
       return;
     }
@@ -225,7 +270,7 @@ export const MobileUnified: React.FC<Props> = ({
       // Check if already downloaded
       if (downloadedIdsRef.current.has(txn.id)) {
         console.log(
-          `[Auto-Download] Skipping txn ${txn.id} - already downloaded`
+          `[Auto-Download] Skipping txn ${txn.id} - already downloaded`,
         );
         return false;
       }
@@ -237,7 +282,7 @@ export const MobileUnified: React.FC<Props> = ({
         myIp && txn.clientProgress ? txn.clientProgress[myIp] : undefined;
 
       console.log(
-        `[Auto-Download] Txn ${txn.id}: status=${clientStatus}, progress=${clientProgress}, globalStatus=${txn.status}`
+        `[Auto-Download] Txn ${txn.id}: status=${clientStatus}, progress=${clientProgress}, globalStatus=${txn.status}`,
       );
 
       // Auto-download if:
@@ -251,7 +296,7 @@ export const MobileUnified: React.FC<Props> = ({
 
       if (shouldDownload) {
         console.log(
-          `[Auto-Download] Txn ${txn.id} (${txn.filename}) is eligible for download`
+          `[Auto-Download] Txn ${txn.id} (${txn.filename}) is eligible for download`,
         );
       }
 
@@ -259,7 +304,7 @@ export const MobileUnified: React.FC<Props> = ({
     });
 
     console.log(
-      `[Auto-Download] Found ${pendingDownloads.length} pending downloads`
+      `[Auto-Download] Found ${pendingDownloads.length} pending downloads`,
     );
 
     // Sort by ID to download in order
@@ -270,7 +315,7 @@ export const MobileUnified: React.FC<Props> = ({
       const txn = pendingDownloads[0];
       if (txn.downloadLink) {
         console.log(
-          `[Auto-Download] ✅ Starting download for transaction ${txn.id}: ${txn.filename}`
+          `[Auto-Download] ✅ Starting download for transaction ${txn.id}: ${txn.filename}`,
         );
 
         // Mark as downloaded to prevent re-trigger
@@ -302,7 +347,7 @@ export const MobileUnified: React.FC<Props> = ({
         }, 100);
       } else {
         console.log(
-          `[Auto-Download] ❌ No download link for transaction ${txn.id}`
+          `[Auto-Download] ❌ No download link for transaction ${txn.id}`,
         );
       }
     }
@@ -320,7 +365,7 @@ export const MobileUnified: React.FC<Props> = ({
       scrollContainerRef.current;
 
     const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
-    const isAtBottom = distanceFromBottom < 150;
+    const isAtBottom = distanceFromBottom < 10;
 
     isUserAtBottomRef.current = isAtBottom;
     setShowScrollButton(!isAtBottom);
@@ -363,31 +408,37 @@ export const MobileUnified: React.FC<Props> = ({
   useEffect(() => {
     if (downloadingTransactionId !== null) {
       const transaction = transactions.find(
-        (t) => t.id === downloadingTransactionId
+        (t) => t.id === downloadingTransactionId,
       );
       if (transaction) {
-        // Check both global status and client-specific status
-        const isCompleted = transaction.status === "completed";
-        const isCancelled = transaction.status === "cancelled";
+        const isMe = transaction.senderId === myIp;
+
+        // Check client-specific status for downloads
         const clientStatus =
           myIp && transaction.clientStatus
             ? transaction.clientStatus[myIp]
             : undefined;
-        const isClientDone =
-          clientStatus === "completed" || clientStatus === "in_progress";
-        const isClientCancelled = clientStatus === "cancelled";
 
-        // Clear if completed, in progress, cancelled, or no longer exists
-        if (isCompleted || isClientDone || isCancelled || isClientCancelled) {
+        // Use effective completion/cancellation logic
+        const isActuallyDone =
+          (!isMe && clientStatus === "completed") ||
+          (isMe && transaction.status === "completed");
+
+        const isActuallyInProgress =
+          (!isMe && clientStatus === "in_progress") ||
+          (isMe && transaction.status === "in_progress");
+
+        // Clear download indicator if completed or in progress (server now tracking)
+        if (isActuallyDone || isActuallyInProgress) {
           console.log(
-            `[Download State] Clearing downloadingTransactionId for txn ${downloadingTransactionId} - status: ${transaction.status}, clientStatus: ${clientStatus}`
+            `[Download State] Clearing downloadingTransactionId for txn ${downloadingTransactionId} - status: ${transaction.status}, clientStatus: ${clientStatus}`,
           );
           setDownloadingTransactionId(null);
         }
       } else {
         // Transaction no longer exists - clear the state
         console.log(
-          `[Download State] Clearing downloadingTransactionId for txn ${downloadingTransactionId} - transaction not found`
+          `[Download State] Clearing downloadingTransactionId for txn ${downloadingTransactionId} - transaction not found`,
         );
         setDownloadingTransactionId(null);
       }
@@ -418,7 +469,7 @@ export const MobileUnified: React.FC<Props> = ({
   }, [transactions, myIp]);
 
   // Hook for download speeds (WebSocket)
-  const downloadSpeeds = useTransferSpeed(transactions, myIp);
+  // Speed is calculated inline using calculateSpeed helper
 
   // State for upload speeds (Local Axios)
   const [uploadSpeeds, setUploadSpeeds] = useState<Record<string, string>>({});
@@ -500,7 +551,7 @@ export const MobileUnified: React.FC<Props> = ({
         (t.senderId === myIp || t.senderId === "server") &&
         t.senderId === myIp &&
         t.status === "in_progress" &&
-        uploadProgress[t.filename || ""] !== undefined
+        uploadProgress[t.filename || ""] !== undefined,
     );
 
     // Call API to cancel on server (don't await strictly to ensure abort happens)
@@ -529,6 +580,13 @@ export const MobileUnified: React.FC<Props> = ({
 
     // Set downloading state immediately for instant feedback
     setDownloadingTransactionId(transaction.id);
+
+    // Safety timeout: Clear "Starting..." state if server doesn't respond or transition status in 5s
+    setTimeout(() => {
+      setDownloadingTransactionId((prev) =>
+        prev === transaction.id ? null : prev,
+      );
+    }, 5000);
 
     if (transaction.downloadLink) {
       // Server identifies client by IP from request
@@ -561,16 +619,18 @@ export const MobileUnified: React.FC<Props> = ({
         : `/api/cancel-download/${transactionToCancel.id}`;
       await axios.post(url);
       console.log(
-        `Cancelled download for transaction ${transactionToCancel.id}`
+        `Cancelled download for transaction ${transactionToCancel.id}`,
       );
       setShowCancelConfirm(false);
       setTransactionToCancel(null);
+      setDownloadingTransactionId(null);
     } catch (err) {
       console.error("Failed to cancel download:", err);
       setNotification({ show: true, message: "Failed to cancel download" });
       setTimeout(() => setNotification({ show: false, message: "" }), 3000);
       setShowCancelConfirm(false);
       setTransactionToCancel(null);
+      setDownloadingTransactionId(null);
     }
   };
 
@@ -604,7 +664,7 @@ export const MobileUnified: React.FC<Props> = ({
 
   return (
     <div
-      className={`grid grid-rows-[max-content_1fr_max-content] fixed inset-0 h-[100dvh] w-full font-sans overflow-hidden bg-background transition-colors duration-300 ${theme.bg} ${theme.text}`}
+      className={`grid grid-rows-[max-content_auto_1fr_max-content] fixed inset-0 h-[100dvh] w-full font-sans overflow-hidden bg-background transition-colors duration-300 ${theme.bg} ${theme.text}`}
       onDragEnter={handleDragEnter}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
@@ -643,6 +703,23 @@ export const MobileUnified: React.FC<Props> = ({
         </div>
       </div>
 
+      {/* DISCONNECTED BANNER */}
+      {!isConnected && !isInitializing ? (
+        <div className="shrink-0 bg-red-500 text-white px-4 py-2.5 flex items-center justify-between text-sm shadow-lg z-30 animate-in slide-in-from-top duration-300">
+          <div className="flex gap-3">
+            <span className="font-bold leading-none">Connection Lost</span>
+          </div>
+          <button
+            onClick={() => window.location.reload()}
+            className="bg-white text-red-600 active:scale-95 p-1.5 rounded-full font-bold transition-all flex items-center gap-2 text-xs shadow-sm"
+          >
+            <RefreshCw size={14} strokeWidth={3} />
+          </button>
+        </div>
+      ) : (
+        <div />
+      )}
+
       {/* MESSAGES */}
       <div
         ref={scrollContainerRef}
@@ -655,7 +732,7 @@ export const MobileUnified: React.FC<Props> = ({
               "[MobileUnified] Rendering transactions:",
               visibleTransactions.length,
               "isUploading:",
-              isUploading
+              isUploading,
             );
             console.log("[MobileUnified] My IP:", myIp);
             console.log("[MobileUnified] Upload Progress:", uploadProgress);
@@ -684,7 +761,7 @@ export const MobileUnified: React.FC<Props> = ({
                 </div>
                 <div className="flex flex-col items-center gap-1">
                   <span className="text-lg font-medium tracking-tight opacity-90">
-                    {isSendingDisabled ? "Sending Disabled" : "Share a file..."}
+                    {isSendingDisabled ? "Sending Disabled" : "Share a file"}
                   </span>
                   <span className={`text-xs opacity-50`}>
                     Tap to browse files
@@ -740,19 +817,31 @@ export const MobileUnified: React.FC<Props> = ({
               // For downloads (!isMe), check client-specific progress
               let clientProgress = 0;
               let clientStatus = transaction.status;
-              if (
-                !isMe &&
-                myIp &&
-                transaction.clientProgress &&
-                transaction.clientStatus
-              ) {
-                clientProgress = transaction.clientProgress[myIp] || 0;
-                clientStatus = transaction.clientStatus[myIp] || "pending";
+              if (!isMe && myIp) {
+                // For downloads, we MUST use client-specific status if it exists
+                // If it doesn't exist, it means this client hasn't started downloading yet
+                if (
+                  transaction.clientStatus &&
+                  transaction.clientStatus[myIp]
+                ) {
+                  clientStatus = transaction.clientStatus[myIp];
+                  clientProgress =
+                    (transaction.clientProgress &&
+                      transaction.clientProgress[myIp]) ||
+                    0;
+                } else if (
+                  transaction.status === "completed" ||
+                  transaction.status === "in_progress"
+                ) {
+                  // File is available on server, but I haven't started downloading
+                  clientStatus = "pending";
+                  clientProgress = 0;
+                }
+                // If transaction.status is "cancelled" or "failed", we keep it as clientStatus
               }
 
               // Use client-specific status for downloads (declare early)
-              const effectiveStatus =
-                !isMe && clientStatus ? clientStatus : transaction.status;
+              const effectiveStatus = clientStatus;
 
               // Determine the raw progress value
               const rawPercent =
@@ -760,8 +849,8 @@ export const MobileUnified: React.FC<Props> = ({
                 transaction.status === "in_progress"
                   ? localProgress // Upload progress
                   : !isMe && clientProgress > 0
-                  ? clientProgress // Download progress (client-specific)
-                  : transaction.transactionPercent; // Fallback to global
+                    ? clientProgress // Download progress (client-specific)
+                    : transaction.transactionPercent; // Fallback to global
 
               // Convert to number and validate
               let currentProgress = isNaN(Number(rawPercent))
@@ -774,7 +863,7 @@ export const MobileUnified: React.FC<Props> = ({
               // Debug logging for progress
               if (!isMe && transaction.id) {
                 console.log(
-                  `[Progress Debug] Txn ${transaction.id}: rawPercent=${rawPercent}, currentProgress=${currentProgress}, effectiveStatus=${effectiveStatus}, clientProgress=${clientProgress}, isMe=${isMe}`
+                  `[Progress Debug] Txn ${transaction.id}: rawPercent=${rawPercent}, currentProgress=${currentProgress}, effectiveStatus=${effectiveStatus}, clientProgress=${clientProgress}, isMe=${isMe}`,
                 );
               }
 
@@ -791,7 +880,7 @@ export const MobileUnified: React.FC<Props> = ({
                 // this is likely a restart after cancellation - reset tracking
                 if (currentProgress < 5 && previousHighest > 10) {
                   console.log(
-                    `[Progress] Detected download restart for txn ${transaction.id}: resetting from ${previousHighest}% to ${currentProgress}%`
+                    `[Progress] Detected download restart for txn ${transaction.id}: resetting from ${previousHighest}% to ${currentProgress}%`,
                   );
                   delete highestProgressRef.current[transaction.id];
                   // Update with the new (low) progress value
@@ -806,17 +895,14 @@ export const MobileUnified: React.FC<Props> = ({
                 ) {
                   // Don't let it go backwards (unless it's a restart)
                   console.log(
-                    `[Progress] Preventing backwards: txn ${transaction.id} from ${currentProgress}% to ${previousHighest}%`
+                    `[Progress] Preventing backwards: txn ${transaction.id} from ${currentProgress}% to ${previousHighest}%`,
                   );
                   currentProgress = previousHighest;
                 } else if (currentProgress > previousHighest) {
                   // Update the highest seen
                   highestProgressRef.current[transaction.id] = currentProgress;
                 }
-              } else if (
-                effectiveStatus === "completed" ||
-                transaction.status === "completed"
-              ) {
+              } else if (effectiveStatus === "completed") {
                 // For completed transactions, always show 100%
                 currentProgress = 100;
                 highestProgressRef.current[transaction.id] = 100;
@@ -830,7 +916,7 @@ export const MobileUnified: React.FC<Props> = ({
                 // Also clear tracking when returning to pending state (preparing for restart)
                 if (highestProgressRef.current[transaction.id] !== undefined) {
                   console.log(
-                    `[Progress] Clearing tracking for txn ${transaction.id} - status is pending`
+                    `[Progress] Clearing tracking for txn ${transaction.id} - status is pending`,
                   );
                   delete highestProgressRef.current[transaction.id];
                 }
@@ -846,7 +932,7 @@ export const MobileUnified: React.FC<Props> = ({
                   }: displayPercent=${displayPercent}, will show progress UI: ${
                     effectiveStatus === "in_progress" ||
                     downloadingTransactionId === transaction.id
-                  }`
+                  }`,
                 );
               }
 
@@ -966,10 +1052,10 @@ export const MobileUnified: React.FC<Props> = ({
                                       img.style.display = "none";
                                       if (img.nextElementSibling) {
                                         img.nextElementSibling.classList.remove(
-                                          "hidden"
+                                          "hidden",
                                         );
                                         img.nextElementSibling.classList.add(
-                                          "flex"
+                                          "flex",
                                         );
                                       }
                                     }}
@@ -1032,9 +1118,36 @@ export const MobileUnified: React.FC<Props> = ({
                                     transaction.id)) ||
                               (isMe && transaction.status === "in_progress") ? (
                                 <div className="flex flex-col gap-0.5 mt-1 font-mono">
-                                  <span>
-                                    {downloadSpeeds[transaction.id] ||
-                                      "0.0 MB/s"}
+                                  <span className="flex items-center">
+                                    {(() => {
+                                      const bytes =
+                                        myIp &&
+                                        transaction.clientBytes &&
+                                        transaction.clientBytes[myIp] !==
+                                          undefined
+                                          ? transaction.clientBytes[myIp]
+                                          : transaction.bytesTransferred || 0;
+                                      const mbps = getNumericSpeed(
+                                        bytes,
+                                        transaction.timestamp,
+                                      );
+                                      const layers =
+                                        signalLogic.getLayers(mbps);
+                                      return (
+                                        <>
+                                          {calculateSpeed(
+                                            bytes,
+                                            transaction.timestamp,
+                                          )}
+                                          <WifiSignalIcon
+                                            layers={layers}
+                                            color={
+                                              isMe ? "#fff" : theme.accentColor
+                                            }
+                                          />
+                                        </>
+                                      );
+                                    })()}
                                   </span>
                                   <span>
                                     {(() => {
@@ -1063,14 +1176,21 @@ export const MobileUnified: React.FC<Props> = ({
                                       }
                                       return formatBytes(downloadedBytes);
                                     })()}{" "}
-                                    / {formatBytes(transaction.fileSize)}
+                                    /{" "}
+                                    {formatBytes(transaction.fileSize, [
+                                      "GB",
+                                      "TB",
+                                      "PB",
+                                    ])}
                                   </span>
-                                  <span className="font-medium flex justify-between w-full">
-                                    <span>{Math.round(displayPercent)}%</span>
+                                  <span className="font-bold flex justify-between w-full">
+                                    <span className="text-md">
+                                      {displayPercent.toFixed(2)}%
+                                    </span>
                                     {/* Time on same line */}
-                                    <span className="opacity-70 font-normal">
+                                    <span className="opacity-70 font-normal text-xs">
                                       {new Date(
-                                        transaction.timestamp
+                                        transaction.timestamp,
                                       ).toLocaleTimeString([], {
                                         hour: "2-digit",
                                         minute: "2-digit",
@@ -1180,20 +1300,20 @@ export const MobileUnified: React.FC<Props> = ({
                                         ? "bg-slate-800 text-slate-600 cursor-not-allowed"
                                         : "bg-gray-200 text-gray-400 cursor-not-allowed"
                                       : isDarkMode
-                                      ? "bg-slate-700 text-[#0A84FF] hover:bg-slate-600"
-                                      : `bg-gray-100 hover:bg-gray-200`
+                                        ? "bg-slate-700 text-[#0A84FF] hover:bg-slate-600"
+                                        : `bg-gray-100 hover:bg-gray-200`
                                   }`}
                                   style={
                                     downloadingTransactionId !==
                                       transaction.id && !isDarkMode
                                       ? { color: theme.accentColor }
                                       : downloadingTransactionId !==
-                                          transaction.id && isDarkMode
-                                      ? {
-                                          color: theme.accentColor,
-                                          backgroundColor: theme.iconBg,
-                                        }
-                                      : {}
+                                            transaction.id && isDarkMode
+                                        ? {
+                                            color: theme.accentColor,
+                                            backgroundColor: theme.iconBg,
+                                          }
+                                        : {}
                                   }
                                   title={
                                     downloadingTransactionId === transaction.id
@@ -1218,10 +1338,10 @@ export const MobileUnified: React.FC<Props> = ({
                           <span>
                             {new Date(transaction.timestamp).toLocaleTimeString(
                               [],
-                              { hour: "2-digit", minute: "2-digit" }
+                              { hour: "2-digit", minute: "2-digit" },
                             )}
                           </span>
-                          {transaction.status === "completed" && (
+                          {effectiveStatus === "completed" && (
                             <Check size={12} className="ml-1" />
                           )}
                         </div>
