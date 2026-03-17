@@ -6,6 +6,7 @@ import { EditableDeviceName } from "./EditableDeviceName";
 import type { Client } from "../../hooks/useDevices";
 import type { ActivityType } from "../../hooks/useActivity";
 import { APP_VERSION } from "../../version";
+import { useTranslation } from "../../hooks/useTranslation";
 
 interface SettingsPanelProps {
   theme: any;
@@ -56,19 +57,20 @@ export const SettingsPanel = ({
   handleBlockClient,
   handleBlockSending,
 }: SettingsPanelProps) => {
+  const { t } = useTranslation();
   return (
     <div className="w-full self-start text-left pt-8">
       {/* Left-aligned header */}
       <div className="mb-8 flex items-center gap-3">
         <Settings size={24} className={theme.text} />
-        <h1 className={`text-2xl font-bold ${theme.text}`}>Settings</h1>
+        <h1 className={`text-2xl font-bold ${theme.text}`}>{t('settings')}</h1>
       </div>
 
       {/* Settings Content - No borders, left-aligned */}
       <div className="space-y-6 text-left">
         {/* Theme Setting */}
         <div>
-          <h3 className={`text-sm font-semibold mb-3 ${theme.text}`}>Themes</h3>
+          <h3 className={`text-sm font-semibold mb-3 ${theme.text}`}>{t('themes')}</h3>
 
           {/* Theme Cards - Horizontal Scroll */}
           <div className="flex overflow-x-auto gap-3 mb-2 pb-2 -mx-2 px-2 select-none scrollbar-hide">
@@ -145,17 +147,17 @@ export const SettingsPanel = ({
         {/* Features */}
         <div>
           <h3 className={`text-sm font-semibold mb-4 ${theme.text}`}>
-            Features
+            {t('features')}
           </h3>
           <div className="space-y-3">
             {/* Text Transfer Toggle */}
             <div className="flex items-start justify-between gap-4">
               <div className="flex-1">
                 <p className={`text-sm font-medium ${theme.text}`}>
-                  Text Transfer
+                  {t('text_transfer')}
                 </p>
                 <p className={`text-xs mt-0.5 ${theme.subText}`}>
-                  Enable sending and receiving text messages
+                  {t('enable_sending_receiving')}
                 </p>
               </div>
               <button
@@ -188,10 +190,10 @@ export const SettingsPanel = ({
             <div className="flex items-start justify-between gap-4">
               <div className="flex-1">
                 <p className={`text-sm font-medium ${theme.text}`}>
-                  Enable Security
+                  {t('enable_security')}
                 </p>
                 <p className={`text-xs mt-0.5 ${theme.subText}`}>
-                  Require security token for API access
+                  {t('require_token')}
                 </p>
               </div>
               <button
@@ -224,10 +226,10 @@ export const SettingsPanel = ({
             <div className="flex items-start justify-between gap-4">
               <div className="flex-1">
                 <p className={`text-sm font-medium ${theme.text}`}>
-                  Enable Multi-Client
+                  {t('multi_client')}
                 </p>
                 <p className={`text-xs mt-0.5 ${theme.subText}`}>
-                  Allow multiple devices to connect simultaneously
+                  {t('allow_multiple_devices')}
                 </p>
               </div>
               <button
@@ -262,14 +264,14 @@ export const SettingsPanel = ({
         {serverInfo && (
           <div>
             <h3 className={`text-sm font-semibold mb-4 ${theme.text}`}>
-              Server Information
+              {t('server_info')}
             </h3>
             <div className="space-y-3">
               <div>
                 <p
                   className={`text-[10px] uppercase tracking-wider mb-1.5 ${theme.subText}`}
                 >
-                  URL
+                  {t('url')}
                 </p>
                 <div className="flex items-center gap-2">
                   <code className={`text-xs font-mono flex-1 ${theme.text}`}>
@@ -301,7 +303,7 @@ export const SettingsPanel = ({
                   <p
                     className={`text-[10px] uppercase tracking-wider mb-1.5 ${theme.subText}`}
                   >
-                    Wi-Fi Network
+                    {t('wifi_network')}
                   </p>
                   <code className={`text-xs font-mono ${theme.text}`}>
                     {serverInfo.ssid}
@@ -322,7 +324,7 @@ export const SettingsPanel = ({
                     size={14}
                     className={isCheckingNetwork ? "animate-spin" : ""}
                   />
-                  {isCheckingNetwork ? "Restarting..." : "Restart Server"}
+                  {isCheckingNetwork ? t('restarting') : t('restart_server')}
                 </button>
               </div>
             </div>
@@ -333,7 +335,7 @@ export const SettingsPanel = ({
         {multiClientEnabled && clients.length > 0 && (
           <div>
             <h3 className={`text-sm font-semibold mb-4 ${theme.text}`}>
-              Connected Devices ({clients.length})
+              {t('connected_devices')} ({clients.length})
             </h3>
             <div className="space-y-2">
               {clients.map((client) => (
@@ -354,7 +356,7 @@ export const SettingsPanel = ({
         {/* App Version */}
         <div className="pt-4 mt-8 border-t border-gray-100 dark:border-slate-800 opacity-30">
           <p className={`text-[10px] text-center ${theme.subText}`}>
-            PeerHop v{APP_VERSION}
+            {t('app_name')} {t('v')}{APP_VERSION}
           </p>
         </div>
       </div>

@@ -1,9 +1,11 @@
-import React from "react";
-import QRCode from "react-qr-code";
 import { Check, RefreshCw, Upload } from "lucide-react";
 import { CopyButton } from "../../components/CopyButton";
 import { EditableDeviceName } from "./EditableDeviceName";
 import type { Client } from "../../hooks/useDevices";
+import { QRCode } from "react-qrcode-logo";
+import logo from "../../assets/images/appicon.png";
+import { Theme } from "../../themeConstants";
+import { useTranslation } from "../../hooks/useTranslation";
 
 interface QRPanelProps {
   serverInfo: any;
@@ -12,7 +14,7 @@ interface QRPanelProps {
   multiClientEnabled: boolean;
   clients: Client[];
   activeClientDownload: any;
-  theme: any;
+  theme: Theme;
   isDarkMode: boolean;
   isCheckingNetwork: boolean;
   handleRestartServer: () => void;
@@ -36,6 +38,7 @@ export const QRPanel = ({
   handleBlockSending,
   adminToken,
 }: QRPanelProps) => {
+  const { t } = useTranslation();
   if (!serverInfo) {
     return (
       <div className={`text-center ${theme.subText}`}>
@@ -44,7 +47,7 @@ export const QRPanel = ({
         >
           <Upload size={24} />
         </div>
-        <p>Starting server...</p>
+        <p>{t('starting_server')}</p>
       </div>
     );
   }
@@ -55,10 +58,12 @@ export const QRPanel = ({
       <div className="mb-8 flex flex-col items-center pt-8">
         <h1 className={`flex flex-col items-center text-center ${theme.text}`}>
           <span className="text-sm font-semibold opacity-60 uppercase tracking-wider">
-            Connect device to
+            {t('connect_device')}
           </span>
-          <span className="text-xl font-bold tracking-tight mt-1 text-white uppercase">
-            Start sharing files
+          <span
+            className={`text-xl font-bold tracking-tight mt-1  uppercase ${theme.text}`}
+          >
+            {t('start_sharing')}
           </span>
         </h1>
       </div>
@@ -69,7 +74,7 @@ export const QRPanel = ({
           <p
             className={`text-xs font-semibold uppercase tracking-wider ${theme.subText}`}
           >
-            Step 1: Network
+            {t('step_1_network')}
           </p>
 
           {serverInfo?.ssid ? (
@@ -89,8 +94,8 @@ export const QRPanel = ({
             >
               <p className={`text-sm ${theme.text} mb-1`}>
                 {isCheckingNetwork
-                  ? "Checking Network..."
-                  : "Having trouble to detect network name"}
+                  ? t('checking_network')
+                  : t('trouble_detecting_network')}
               </p>
             </div>
           )}
@@ -104,7 +109,7 @@ export const QRPanel = ({
               <p
                 className={`text-xs font-semibold uppercase tracking-wider ${theme.subText}`}
               >
-                Status
+                {t('status')}
               </p>
               <div className="flex flex-col items-center gap-6 py-8">
                 <div
@@ -181,7 +186,7 @@ export const QRPanel = ({
                         className={`text-lg font-bold animate-in fade-in duration-300`}
                         style={{ color: "#22c55e" }}
                       >
-                        Downloading...
+                        {t('downloading')}
                       </p>
                       <p
                         className={`text-sm ${theme.subText} truncate max-w-[250px] animate-in fade-in duration-300`}
@@ -194,12 +199,12 @@ export const QRPanel = ({
                       <p
                         className={`text-lg font-bold ${theme.text} animate-in fade-in duration-300`}
                       >
-                        Connected
+                        {t('connected')}
                       </p>
                       <p
                         className={`text-sm ${theme.subText} animate-in fade-in duration-300`}
                       >
-                        {clients[0].name || clients[0].platform} device
+                        {clients[0].name || clients[0].platform} {t('device')}
                       </p>
                     </>
                   )}
@@ -212,33 +217,42 @@ export const QRPanel = ({
               <p
                 className={`text-xs font-semibold uppercase tracking-wider ${theme.subText}`}
               >
-                Step 2: Scan QR
+                {t('step_2_scan_qr')}
               </p>
 
-              <div className="flex justify-center">
+              <div className="flex justify-center ">
                 <div
-                  className={`p-3 rounded-2xl ${
-                    isDarkMode
-                      ? "bg-white shadow-lg"
-                      : "bg-white shadow-[0_8px_30px_rgba(0,0,0,0.12)] border border-gray-100"
-                  }`}
+                  className={`p-3 rounded-2xl `}
                   style={{
                     opacity: serverInfo?.url ? 1 : 0.7,
                     filter: serverInfo?.url ? "none" : "blur(8px)",
                     transition: "all 0.3s ease",
                   }}
                 >
-                  <div className="w-[180px] h-[180px]">
+                  <div className="">
                     <QRCode
-                      value={
-                        serverInfo?.url
+                      {...{
+                        value: serverInfo?.url
                           ? securityEnabled && securityToken
                             ? `${serverInfo.url}?security=${securityToken}`
                             : serverInfo.url
-                          : ""
-                      }
-                      style={{ height: "100%", width: "100%" }}
-                      viewBox={`0 0 256 256`}
+                          : "",
+                        size: 200,
+                        quietZone: 0,
+                        qrStyle: "dots",
+                        fgColor: isDarkMode ? "#fff" : "#000",
+                        bgColor: "transparent",
+                        logoImage: logo,
+                        logoPaddingRadius: 1,
+                        logoPadding: 1,
+                        logoWidth: 30,
+                        logoPaddingStyle: "circle",
+                        logoOpacity: 1,
+                        ecLevel: "Q",
+                        eyeRadius: 50,
+                        eyeColor: isDarkMode ? "#d6e3ef" : "#1b415e",
+                        removeQrCodeBehindLogo: true,
+                      }}
                     />
                   </div>
                 </div>
@@ -275,13 +289,13 @@ export const QRPanel = ({
                   <p
                     className={`text-[10px] uppercase tracking-widest font-bold opacity-30`}
                   >
-                    Or enter URL manually
+                    {t('or_enter_url_manually')}
                   </p>
                 </div>
               ) : (
-                <p className={`text-xs ${theme.subText}`}>
-                  Waiting for network connection...
-                </p>
+                  <p className={`text-xs ${theme.subText}`}>
+                    {t('waiting_network')}
+                  </p>
               )}
             </>
           )}
@@ -303,7 +317,7 @@ export const QRPanel = ({
               size={18}
               className={isCheckingNetwork ? "animate-spin" : ""}
             />
-            {isCheckingNetwork ? "Restarting..." : "Restart Server"}
+            {isCheckingNetwork ? t('restarting') : t('restart_server')}
           </button>
         </div>
       </div>
@@ -314,10 +328,10 @@ export const QRPanel = ({
           className={`mt-10 w-full px-4 animate-in slide-in-from-bottom-2 fade-in duration-500`}
         >
           <h3
-            className={`text-xs font-semibold uppercase tracking-wider mb-3 text-center ${theme.subText}`}
-          >
-            Connected Devices
-          </h3>
+             className={`text-xs font-semibold uppercase tracking-wider mb-3 text-center ${theme.subText}`}
+           >
+             {t('connected_devices')}
+           </h3>
           <div className="flex flex-col gap-2">
             {clients.map((client) => (
               <EditableDeviceName

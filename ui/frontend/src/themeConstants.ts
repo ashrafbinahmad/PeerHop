@@ -20,7 +20,30 @@ export const ACCENT_COLORS = [
   { id: "gold", color: "#eab308", name: "Gold", ring: "ring-yellow-500" },
 ];
 
-export const THEME_PRESETS = [
+export type Theme = {
+  id: string;
+  name: string;
+  bg: string;
+  headerBg: string;
+  text: string;
+  subText: string;
+  panelBg: string;
+  panelCard: string;
+  inputAreaBg: string;
+  inputField: string;
+  bubbleOther: string;
+  border: string;
+  iconBg: string;
+  iconText: string;
+  ghostHover: string;
+  deviceItemBg: string;
+  isDark: boolean;
+  previewColor: string;
+  metaColor: string;
+  accentColor?: string;
+};
+
+export const THEME_PRESETS: Theme[] = [
   {
     id: "classic",
     name: "Classic",

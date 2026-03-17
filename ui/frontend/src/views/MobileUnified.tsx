@@ -19,6 +19,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { ACCENT_COLORS, THEME_PRESETS } from "../themeConstants";
+import { useTranslation } from "../hooks/useTranslation";
 
 interface Props {
   downloadFilename?: string;
@@ -131,6 +132,8 @@ export const MobileUnified: React.FC<Props> = ({
     message: string;
   }>({ show: false, message: "" });
 
+  const { t } = useTranslation();
+
   // Track which transaction is being downloaded (for instant feedback)
   const [downloadingTransactionId, setDownloadingTransactionId] = useState<
     number | null
@@ -189,11 +192,10 @@ export const MobileUnified: React.FC<Props> = ({
           </svg>
         </div>
         <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-          Access Denied
+          {t("access_denied")}
         </h2>
         <p className="text-gray-600 dark:text-gray-400 max-w-sm">
-          This PeerHop server is protected. Please scan the QR code from the
-          desktop application to access files.
+          {t("protected_server")}
         </p>
       </div>
     );
@@ -315,7 +317,7 @@ export const MobileUnified: React.FC<Props> = ({
       const txn = pendingDownloads[0];
       if (txn.downloadLink) {
         console.log(
-          `[Auto-Download] ✅ Starting download for transaction ${txn.id}: ${txn.filename}`,
+          `[Auto-Download] ✅ ${t("connected")} download for transaction ${txn.id}: ${txn.filename}`,
         );
 
         // Mark as downloaded to prevent re-trigger
@@ -525,7 +527,7 @@ export const MobileUnified: React.FC<Props> = ({
       setTimeout(scrollToBottom, 100);
     } catch (err: any) {
       if (!axios.isCancel(err)) {
-        setNotification({ show: true, message: "Upload failed" });
+        setNotification({ show: true, message: t("upload_failed") });
         setTimeout(() => setNotification({ show: false, message: "" }), 3000);
       }
       setIsUploading(false);
@@ -626,7 +628,7 @@ export const MobileUnified: React.FC<Props> = ({
       setDownloadingTransactionId(null);
     } catch (err) {
       console.error("Failed to cancel download:", err);
-      setNotification({ show: true, message: "Failed to cancel download" });
+      setNotification({ show: true, message: t("failed_to_cancel_download") });
       setTimeout(() => setNotification({ show: false, message: "" }), 3000);
       setShowCancelConfirm(false);
       setTransactionToCancel(null);
@@ -654,7 +656,7 @@ export const MobileUnified: React.FC<Props> = ({
       setTimeout(scrollToBottom, 100);
     } catch (err) {
       console.error(err);
-      setNotification({ show: true, message: "Failed to send text" });
+      setNotification({ show: true, message: t("failed_to_send_text") });
       setTimeout(() => setNotification({ show: false, message: "" }), 3000);
     }
   };
@@ -688,7 +690,7 @@ export const MobileUnified: React.FC<Props> = ({
             className="text-2xl font-bold"
             style={{ color: theme.accentColor }}
           >
-            Drop files to send
+            {t("drop_files")}
           </h3>
         </div>
       )}
@@ -707,7 +709,9 @@ export const MobileUnified: React.FC<Props> = ({
       {!isConnected && !isInitializing ? (
         <div className="shrink-0 bg-red-500 text-white px-4 py-2.5 flex items-center justify-between text-sm shadow-lg z-30 animate-in slide-in-from-top duration-300">
           <div className="flex gap-3">
-            <span className="font-bold leading-none">Connection Lost</span>
+            <span className="font-bold leading-none">
+              {t("connection_lost")}
+            </span>
           </div>
           <button
             onClick={() => window.location.reload()}
@@ -761,10 +765,12 @@ export const MobileUnified: React.FC<Props> = ({
                 </div>
                 <div className="flex flex-col items-center gap-1">
                   <span className="text-lg font-medium tracking-tight opacity-90">
-                    {isSendingDisabled ? "Sending Disabled" : "Share a file"}
+                    {isSendingDisabled
+                      ? t("sending_disabled")
+                      : t("share_file")}
                   </span>
                   <span className={`text-xs opacity-50`}>
-                    Tap to browse files
+                    {t("tap_browse")}
                   </span>
                 </div>
               </button>
@@ -791,7 +797,7 @@ export const MobileUnified: React.FC<Props> = ({
                     style={{ color: theme.accentColor }}
                   />
                   <span className="text-sm font-medium opacity-90">
-                    Send text
+                    {t("send_text")}
                   </span>
                 </button>
               )}
@@ -1108,7 +1114,7 @@ export const MobileUnified: React.FC<Props> = ({
                           })()}
 
                           <div className="flex-1 min-w-0">
-                            <div className="font-semibold truncate">
+                            <div className="font-normal truncate">
                               {transaction.filename}
                             </div>
                             <div className="text-xs opacity-70">
@@ -1218,7 +1224,7 @@ export const MobileUnified: React.FC<Props> = ({
                                           transaction.filename || ""
                                         ] === undefined)) && (
                                       <span className="font-medium text-red-500/70">
-                                        Cancelled
+                                        {t("cancelled")}
                                       </span>
                                     )}
                                     {!isMe &&
@@ -1228,20 +1234,19 @@ export const MobileUnified: React.FC<Props> = ({
                                           className="font-medium"
                                           style={{ color: theme.accentColor }}
                                         >
-                                          Downloading...
+                                          {t("downloading")}
                                         </span>
                                       )}
                                     {!isMe &&
                                       effectiveStatus === "completed" && (
                                         <span className="text-green-500 font-medium">
-                                          Download completed.
+                                          {t("download_completed")}
                                         </span>
                                       )}
                                   </div>
                                   {!isMe && effectiveStatus === "completed" && (
                                     <div className="text-[10px] opacity-60">
-                                      Please check your browser downloads to get
-                                      the file
+                                      {t("check_browser_downloads")}
                                     </div>
                                   )}
                                 </div>
@@ -1261,7 +1266,7 @@ export const MobileUnified: React.FC<Props> = ({
                                   ? "bg-red-500/20 text-red-400 hover:bg-red-500/30"
                                   : "bg-red-100 text-red-600 hover:bg-red-200"
                               }`}
-                              title="Cancel upload"
+                              title={t("cancel_upload")}
                             >
                               <X size={18} />
                             </button>
@@ -1281,7 +1286,7 @@ export const MobileUnified: React.FC<Props> = ({
                                       ? "bg-red-500/20 text-red-400 hover:bg-red-500/30"
                                       : "bg-red-100 text-red-600 hover:bg-red-200"
                                   }`}
-                                  title="Cancel download"
+                                  title={t("cancel_download")}
                                 >
                                   <X size={18} />
                                 </button>
@@ -1317,8 +1322,8 @@ export const MobileUnified: React.FC<Props> = ({
                                   }
                                   title={
                                     downloadingTransactionId === transaction.id
-                                      ? "Starting..."
-                                      : "Download"
+                                      ? t("starting")
+                                      : t("download")
                                   }
                                 >
                                   <Download size={18} />
@@ -1380,7 +1385,9 @@ export const MobileUnified: React.FC<Props> = ({
                   value={textInput}
                   onChange={(e) => setTextInput(e.target.value)}
                   placeholder={
-                    isSendingDisabled ? "Sending disabled" : "Type a message..."
+                    isSendingDisabled
+                      ? t("sending_disabled")
+                      : t("type_a_message")
                   }
                   disabled={isSendingDisabled}
                   className={`flex-1 px-4 py-2 rounded-xl outline-none ${
@@ -1416,7 +1423,9 @@ export const MobileUnified: React.FC<Props> = ({
                 >
                   <Upload size={18} style={{ color: theme.accentColor }} />
                   <span>
-                    {isSendingDisabled ? "Sending Disabled" : "Select Files"}
+                    {isSendingDisabled
+                      ? t("sending_disabled")
+                      : t("select_files")}
                   </span>
                 </button>
 
@@ -1459,7 +1468,7 @@ export const MobileUnified: React.FC<Props> = ({
                   isDarkMode ? "text-orange-300" : "text-orange-600"
                 }`}
               >
-                {isBlocked ? "You are blocked" : "Sending is blocked"}
+                {isBlocked ? t("you_are_blocked") : t("sending_is_blocked")}
               </span>
             </div>
           )}
@@ -1478,16 +1487,18 @@ export const MobileUnified: React.FC<Props> = ({
       {/* Confirmation Dialog */}
       <ConfirmDialog
         isOpen={showCancelConfirm}
-        title="Cancel Download"
+        title={t("cancel_download_title")}
         message={
           <>
-            Stop downloading "{transactionToCancel?.filename}"?
+            {t("stop_receiving", {
+              filename: transactionToCancel?.filename || "",
+            })}
             <br />
-            This will end the file transfer.
+            {t("this_will_end_transfer")}
           </>
         }
-        confirmText="Stop"
-        cancelText="Continue"
+        confirmText={t("stop")}
+        cancelText={t("continue")}
         onConfirm={confirmCancelDownload}
         onCancel={cancelCancelDownload}
         destructive={true}
@@ -1496,16 +1507,16 @@ export const MobileUnified: React.FC<Props> = ({
 
       <ConfirmDialog
         isOpen={showUploadCancelConfirm}
-        title="Cancel Upload"
+        title={t("cancel_upload_title")}
         message={
           <>
-            Stop sending files?
+            {t("stop_sending_files")}
             <br />
-            This will cancel the current transfer.
+            {t("this_will_end_transfer")}
           </>
         }
-        confirmText="Stop Sending"
-        cancelText="Continue"
+        confirmText={t("stop_sending")}
+        cancelText={t("continue")}
         onConfirm={confirmCancelUpload}
         onCancel={cancelCancelUpload}
         destructive={true}

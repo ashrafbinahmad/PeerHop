@@ -2,6 +2,7 @@
 const { execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
+const readline = require('readline');
 const { buildMSIX } = require('./build-msix');
 
 // ANSI color codes
@@ -443,4 +444,22 @@ log('  Any UI changes require rebuilding the entire application.', 'white');
 log('\nNext steps:', 'cyan');
 log('  Run: npm run publish', 'white');
 log('  Or manually test the builds in ./builds/', 'white');
+
+const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout
+});
+
+rl.question('\nDo you want to build all language variants? (y/n): ', (answer) => {
+    rl.close();
+    if (answer.toLowerCase() === 'y' || answer.toLowerCase() === 'yes') {
+        log('\nStarting multi-language builds...', 'cyan');
+        try {
+            execSync(`node ./scripts/build-multi-lang.js ${version}`, { stdio: 'inherit' });
+            log('\n✓ Multi-language builds complete!', 'cyan');
+        } catch (err) {
+            log(`\n✗ Multi-language build failed: ${err.message}`, 'red');
+        }
+    }
+});
 

@@ -46,6 +46,7 @@ import { APP_VERSION } from "../../version";
 import { ACCENT_COLORS, THEME_PRESETS } from "../../themeConstants";
 
 import { ConfirmDialog } from "../../components/ConfirmDialog";
+import { useTranslation } from "../../hooks/useTranslation";
 
 const blobToBase64 = (blob: Blob): Promise<string> => {
   return new Promise((resolve, reject) => {
@@ -75,6 +76,11 @@ export const DesktopView = () => {
   }>({ show: false, message: "" });
   const [isCheckingNetwork, setIsCheckingNetwork] = useState(false);
   const [transactionToCancel, setTransactionToCancel] = useState<any>(null); // Use any or specific type if available
+  const [iframeHeight, setIframeHeight] = useState<string | number | undefined>(
+    "55px",
+  );
+  const [iframIsLoaded, setIframeIsLoaded] = useState(false);
+  const { t, lang } = useTranslation();
 
   const { logActivity } = useActivity();
 
@@ -82,6 +88,10 @@ export const DesktopView = () => {
     const handler = (event: MessageEvent) => {
       if (event.data?.type === "open-external") {
         BrowserOpenURL(event.data.url);
+      } else if (event.data?.type === "set-iframe-height") {
+        setIframeHeight(event.data.height);
+      } else if (event.data?.type === "iframe-is-loaded") {
+        setIframeIsLoaded(true);
       }
     };
 
@@ -102,7 +112,7 @@ export const DesktopView = () => {
           setServerInfo(info);
           logActivity(
             "shared",
-            `Sharing ${paths.length} file(s) via drag & drop: ${paths.map((p) => p.split(/[\\/]/).pop()).join(", ")}`,
+            `${t("sharing_files", { count: paths.length })} via drag & drop: ${paths.map((p) => p.split(/[\\/]/).pop()).join(", ")}`,
           );
         }
       } catch (err) {
@@ -264,19 +274,25 @@ export const DesktopView = () => {
             ? ` (${formatBytes(txn.fileSize)})`
             : "";
           if (isMe) {
-            logActivity("sent", `Sent ${txn.filename || "file"}${sizeLabel}`);
+            logActivity(
+              "sent",
+              `${t("sent")} ${txn.filename || "file"}${sizeLabel}`,
+            );
           } else {
             logActivity(
               "received",
-              `Received ${txn.filename || "file"}${sizeLabel}`,
+              `${t("received")} ${txn.filename || "file"}${sizeLabel}`,
             );
           }
         } else if (txn.type === "text") {
           const charCount = txn.textContent?.length || 0;
           if (isMe) {
-            logActivity("sent", `Sent ${charCount} characters text`);
+            logActivity("sent", `${t("sent")} ${charCount} characters text`);
           } else {
-            logActivity("received", `Received ${charCount} characters text`);
+            logActivity(
+              "received",
+              `${t("received")} ${charCount} characters text`,
+            );
           }
         }
       }
@@ -286,15 +302,15 @@ export const DesktopView = () => {
 
   // Log app session start / end
   useEffect(() => {
-    logActivity("started", `App Version: ${APP_VERSION}`);
+    logActivity("started", `${t("app_name")} v${APP_VERSION}`);
     return () => {
-      logActivity("closed", "App session ended");
+      logActivity("closed", t("app_session_ended"));
     };
-  }, [logActivity]);
+  }, [logActivity, t]);
 
   const handleFileOpened = useCallback(
     (filename: string) => {
-      logActivity("opened", `Opened ${filename}`);
+      logActivity("opened", `${t("opened")} ${filename}`);
     },
     [logActivity],
   );
@@ -312,11 +328,11 @@ export const DesktopView = () => {
       await axios.post(url, { ip: client.ip });
       logActivity(
         "blocked",
-        `${client.blocked ? "Unblocked" : "Blocked"} device: ${client.name || client.platform} (${client.ip})`,
+        `${client.blocked ? t("unblocked") : t("blocked")} device: ${client.name || client.platform} (${client.ip})`,
       );
     } catch (err) {
       console.error("Failed to block/unblock client:", err);
-      alert("Failed to update client status");
+      alert(t("failed_to_update_client"));
     }
   };
 
@@ -333,11 +349,11 @@ export const DesktopView = () => {
       await axios.post(url, { ip: client.ip });
       logActivity(
         "blocked",
-        `${client.sendingBlocked ? "Unblocked sending from" : "Blocked sending from"}: ${client.name || client.platform} (${client.ip})`,
+        `${client.sendingBlocked ? t("unblock_sending") : t("block_sending")} from: ${client.name || client.platform} (${client.ip})`,
       );
     } catch (err) {
       console.error("Failed to block/unblock sending for client:", err);
-      alert("Failed to update client status");
+      alert(t("failed_to_update_client"));
     }
   };
 
@@ -357,7 +373,7 @@ export const DesktopView = () => {
       if (!prev.find((p) => p.ip === c.ip)) {
         logActivity(
           "connected",
-          `Device connected: ${c.name || c.platform} (${c.ip})`,
+          `${t("device_connected")}: ${c.name || c.platform} (${c.ip})`,
         );
       }
     });
@@ -366,7 +382,7 @@ export const DesktopView = () => {
       if (!clients.find((curr) => curr.ip === c.ip)) {
         logActivity(
           "disconnected",
-          `Device disconnected: ${c.name || c.platform} (${c.ip})`,
+          `${t("device_disconnected")}: ${c.name || c.platform} (${c.ip})`,
         );
       }
     });
@@ -386,7 +402,7 @@ export const DesktopView = () => {
             await axios.post(url);
             logActivity(
               "cancelled",
-              `Auto-cancelled ${txn.filename || "file"} due to server restart`,
+              `${t("cancelled")} ${txn.filename || "file"} due to server restart`,
             );
           } catch (err) {
             console.error(
@@ -404,7 +420,7 @@ export const DesktopView = () => {
       setServerInfo(info);
       logActivity(
         "restarted",
-        `Server restarted — new URL: ${info.url || "unknown"}`,
+        `${t("restarted")} — new URL: ${info.url || "unknown"}`,
       );
 
       // If SSID is missing, poll for it
@@ -437,7 +453,7 @@ export const DesktopView = () => {
     } catch (err) {
       console.error("Failed to restart server:", err);
       setIsCheckingNetwork(false);
-      alert("Failed to restart server");
+      alert(t("failed_to_restart"));
     }
   };
 
@@ -655,7 +671,7 @@ export const DesktopView = () => {
         setServerInfo(info);
         logActivity(
           "shared",
-          `Sharing ${files.length} file(s): ${files.map((f) => f.split(/[\\/]/).pop()).join(", ")}`,
+          `${t("sharing_files", { count: files.length })}: ${files.map((f) => f.split(/[\\/]/).pop()).join(", ")}`,
         );
       }
     } catch (err) {
@@ -671,7 +687,7 @@ export const DesktopView = () => {
       setTextInput("");
     } catch (err) {
       console.error(err);
-      alert("Failed to send text");
+      alert(t("failed_to_send_text"));
     }
   };
 
@@ -709,7 +725,7 @@ export const DesktopView = () => {
     const bgParam = activeTheme.bg.replace("bg-[", "").replace("]", "");
     return `${baseUrl}/desktop-ad?bg=${encodeURIComponent(
       bgParam,
-    )}&theme=${encodeURIComponent(activeThemeId)}&isDark=${String(isDarkMode)}&version=${APP_VERSION}`;
+    )}&theme=${encodeURIComponent(activeThemeId)}&isDark=${String(isDarkMode)}&version=${APP_VERSION}&lang=${lang}`;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -723,11 +739,12 @@ export const DesktopView = () => {
           themeId: activeThemeId,
           isDark: isDarkMode,
           version: APP_VERSION,
+          lang: lang,
         },
         "*",
       );
     }
-  }, [activeThemeId, isDarkMode, activeTheme.bg]);
+  }, [activeThemeId, isDarkMode, activeTheme.bg, lang]);
 
   return (
     <div
@@ -761,7 +778,7 @@ export const DesktopView = () => {
             className="text-2xl font-bold"
             style={{ color: theme.accentColor }}
           >
-            Drop files to send
+            {t("drop_files")}
           </h3>
         </div>
       )}
@@ -912,6 +929,8 @@ export const DesktopView = () => {
         scrollContainerRef={scrollContainerRef}
         messagesEndRef={messagesEndRef}
         isUserAtBottomRef={isUserAtBottomRef}
+        iframeHeight={iframeHeight}
+        iframeIsLoaded={iframIsLoaded}
       />
       {/* --- RIGHT SIDE: SERVER INFO & QR --- */}
       {/* On Mobile: Absolute positioning covers the entire chat area (respects header).
@@ -982,16 +1001,18 @@ export const DesktopView = () => {
       </div>
       <ConfirmDialog
         isOpen={!!transactionToCancel}
-        title="Cancel Transfer"
+        title={t("cancel_transfer")}
         message={
           <>
-            Stop receiving "{transactionToCancel?.filename}"?
+            {t("stop_receiving", {
+              filename: transactionToCancel?.filename || "",
+            })}
             <br />
-            This will end the file transfer.
+            {t("this_will_end_transfer")}
           </>
         }
-        confirmText="Stop"
-        cancelText="Continue"
+        confirmText={t("stop")}
+        cancelText={t("continue")}
         onConfirm={async () => {
           if (transactionToCancel) {
             try {

@@ -15,6 +15,7 @@
     "check:release": "powershell -Command \"$files = @('builds/peerhop_win.exe', 'builds/peerhop_setup.msi', 'builds/peerhop_linux', 'builds/peerhop_cli_win.exe', 'builds/peerhop_cli_linux'); $missing = @(); foreach ($f in $files) { if (Test-Path $f) { Write-Host \\\"✓ Found: $f\\\" -ForegroundColor Green } else { $missing += $f; Write-Host \\\"✗ Missing: $f\\\" -ForegroundColor Red } }; if ($missing.Count -gt 0) { Write-Host \\\"`n✗ Missing $($missing.Count) file(s)!\\\" -ForegroundColor Red; exit 1 } else { Write-Host \\\"`n✓ All build files are present!\\\" -ForegroundColor Green }\"",
     "version:update": "node ./scripts/update-version.js",
     "build": "node ./scripts/build-all.js",
+    "build:multi": "node ./scripts/build-multi-lang.js",
     "publish": "node ./scripts/publish.js",
     "build-and-publish": "node ./scripts/build-and-publish.js",
     "dev:cli": "go run ./cmd/peerhop",

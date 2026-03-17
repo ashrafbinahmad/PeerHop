@@ -1,4 +1,4 @@
-import React, { useRef } from "react";
+import React, { useRef, useState } from "react";
 import axios from "axios";
 import {
   MessageSquare,
@@ -15,6 +15,7 @@ import { TransactionActions } from "./TransactionActions";
 import { formatBytes, calculateSpeed } from "../../utils/format";
 import type { Client } from "../../hooks/useDevices";
 import { OpenSourceFile } from "../../../wailsjs/go/main/App";
+import { useTranslation } from "../../hooks/useTranslation";
 
 interface ChatPanelProps {
   visibleTransactions: any[];
@@ -39,6 +40,8 @@ interface ChatPanelProps {
   scrollContainerRef: React.RefObject<HTMLDivElement>;
   messagesEndRef: React.RefObject<HTMLDivElement>;
   isUserAtBottomRef: React.MutableRefObject<boolean>;
+  iframeHeight: number | string | undefined;
+  iframeIsLoaded: boolean;
 }
 
 export const ChatPanel = ({
@@ -64,7 +67,10 @@ export const ChatPanel = ({
   scrollContainerRef,
   messagesEndRef,
   isUserAtBottomRef,
+  iframeHeight,
+  iframeIsLoaded,
 }: ChatPanelProps) => {
+  const { t } = useTranslation();
   const handleScroll = () => {
     if (!scrollContainerRef.current) return;
     const { scrollTop, scrollHeight, clientHeight } =
@@ -93,17 +99,23 @@ export const ChatPanel = ({
         id="adFrame"
         src={initialAdUrl}
         width="100%"
-        height="55"
-        frameBorder="0"
-        allowTransparency={true}
-        className="absolute top-10 left-0 w-screen h-14 z-50"
+        height={iframeHeight}
+        // allowTransparency={true}
+        className="absolute top-10 left-0 w-screen z-50"
         style={{
           maxWidth: "100dvw",
           backgroundColor: "transparent",
           border: "none",
           display: "block",
+          opacity: iframeIsLoaded ? 1 : 0,
         }}
-      ></iframe>
+        onError={() => {
+          console.log("Error loading ad");
+        }}
+        onLoad={() => {
+          console.log("Ad loaded");
+        }}
+      />
 
       {/* MESSAGES AREA */}
       <div
@@ -132,10 +144,10 @@ export const ChatPanel = ({
                 </div>
                 <div className="flex flex-col items-center gap-1">
                   <span className="text-lg font-medium tracking-tight opacity-90">
-                    Share a file
+                    {t("share_file")}
                   </span>
                   <span className={`text-xs opacity-50`}>
-                    Click to browse or drop here
+                    {t("click_to_browse")}
                   </span>
                 </div>
               </button>
@@ -156,7 +168,7 @@ export const ChatPanel = ({
                   style={{ color: theme.accentColor }}
                 />
                 <span className="text-sm font-medium opacity-90">
-                  Send text
+                  {t("send_text")}
                 </span>
               </button>
             </div>
@@ -332,7 +344,7 @@ export const ChatPanel = ({
                             })()}
                             <div className="min-w-[140px] flex-1 text-left">
                               <div
-                                className="font-semibold text-sm truncate max-w-[200px]"
+                                className="font-normal text-sm truncate max-w-[200px]"
                                 title={transaction.filename}
                               >
                                 {transaction.filename}
@@ -585,7 +597,7 @@ export const ChatPanel = ({
                 value={textInput}
                 onChange={(e) => setTextInput(e.target.value)}
                 onKeyPress={(e) => e.key === "Enter" && handleSendText()}
-                placeholder="Type a message..."
+                placeholder={t("type_message")}
                 className={`flex-1 px-4 py-2 border-transparent border transition-all rounded-2xl text-[15px] outline-none ${theme.inputField}`}
                 autoFocus
               />
@@ -610,7 +622,9 @@ export const ChatPanel = ({
                   className="group-hover:-translate-y-0.5 transition-transform"
                   style={{ color: theme.accentColor }}
                 />
-                <span className="group-hover:text-current">Select Files</span>
+                <span className="group-hover:text-current">
+                  {t("select_files")}
+                </span>
               </button>
 
               {textTransferEnabled && (
@@ -628,7 +642,9 @@ export const ChatPanel = ({
                       ? "bg-red-500/10 hover:bg-red-500/20 text-red-500"
                       : theme.iconBg + " " + theme.ghostHover
                   }`}
-                  title={showTextInput ? "Close Text Input" : "Send Text"}
+                  title={
+                    showTextInput ? t("close_text_input") : t("send_text_title")
+                  }
                 >
                   {showTextInput ? (
                     <X size={22} />
