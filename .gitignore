@@ -32,3 +32,4 @@ ui/build/windows/msix_dist/
 
 # Go
 vendor/
+builds/peerhop.cer
