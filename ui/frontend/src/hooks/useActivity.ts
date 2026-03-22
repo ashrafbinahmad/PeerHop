@@ -51,7 +51,7 @@ export function readActivity(): ActivityEntry[] {
   }
 }
 
-/** Append one entry; prune if over cap; then emit to adFrame iframe. */
+/** Append one entry; prune if over cap; check if feedback popup should show. */
 export function appendActivity(entry: Omit<ActivityEntry, "timestamp">): void {
   try {
     const current = readActivity();
@@ -64,18 +64,61 @@ export function appendActivity(entry: Omit<ActivityEntry, "timestamp">): void {
     const pruned = next.slice(-ACTIVITY_CAP);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(pruned));
 
-    // Emit to the ad iframe so it can react in real time
-    const iframe = document.getElementById(
-      "adFrame",
-    ) as HTMLIFrameElement | null;
-    if (iframe?.contentWindow) {
-      iframe.contentWindow.postMessage(
-        { type: "activity", data: newEntry },
-        "*",
+    // Check if we should show the referral feedback popup
+    checkAndShowFeedbackPopup();
+  } catch {
+    // localStorage may be unavailable in some environments – silently ignore
+  }
+}
+
+/** Count activities with type "shared" or "received" in the current log. */
+export function countShareAndReceiveActivities(): number {
+  try {
+    const activities = readActivity();
+    return activities.filter(
+      (a) => a.type === "shared" || a.type === "received",
+    ).length;
+  } catch {
+    return 0;
+  }
+}
+
+/** Check if user has already submitted a review. */
+export function hasUserReviewed(): boolean {
+  try {
+    return localStorage.getItem("hasReviewed") === "true";
+  } catch {
+    return false;
+  }
+}
+
+/** Save that user has reviewed. */
+export function markAsReviewed(): void {
+  try {
+    localStorage.setItem("hasReviewed", "true");
+  } catch {
+    // silently ignore
+  }
+}
+
+/** Check if feedback popup should display and emit event. */
+export function checkAndShowFeedbackPopup(): void {
+  try {
+    if (hasUserReviewed()) return; // Already reviewed, don't show again
+
+    const count = countShareAndReceiveActivities();
+    const thresholds = [5, 10, 30, 40, 50]; // Show at these counts
+
+    if (thresholds.includes(count)) {
+      // Emit custom event that components can listen to
+      window.dispatchEvent(
+        new CustomEvent("showReferralFeedback", {
+          detail: { thresholdReached: count },
+        }),
       );
     }
   } catch {
-    // localStorage may be unavailable in some environments – silently ignore
+    // silently ignore
   }
 }
 

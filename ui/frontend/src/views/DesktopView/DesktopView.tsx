@@ -27,7 +27,11 @@ import {
 import { useTransactions } from "../../hooks/useTransactions";
 import { formatBytes } from "../../utils/format";
 import { useDevices, type Client } from "../../hooks/useDevices";
-import { useActivity } from "../../hooks/useActivity";
+import {
+  hasUserReviewed,
+  markAsReviewed,
+  useActivity,
+} from "../../hooks/useActivity";
 import { useShareTarget } from "../../hooks/useShareTarget";
 import {
   X,
@@ -42,6 +46,7 @@ import logo from "../../assets/images/appicon.png";
 import { ChatPanel } from "./ChatPanel";
 import { SettingsPanel } from "./SettingsPanel";
 import { QRPanel } from "./QRPanel";
+import { ReferralFeedbackModal } from "../../components/ReferralFeedbackModal";
 import { APP_VERSION } from "../../version";
 
 import { ACCENT_COLORS, THEME_PRESETS } from "../../themeConstants";
@@ -412,6 +417,7 @@ export const DesktopView = () => {
     } finally {
       localStorage.setItem("peerhop_review_requested", "true");
       setReviewRequested(true);
+      markAsReviewed();
     }
   };
 
@@ -823,6 +829,7 @@ export const DesktopView = () => {
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
+      <ReferralFeedbackModal onTriggerReview={triggerReviewFlow} />
       {/* Drag Overlay */}
       {isDragging && (
         <div
