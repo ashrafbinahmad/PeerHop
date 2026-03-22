@@ -121,9 +121,9 @@ export const ChatPanel = ({
       <div
         ref={scrollContainerRef}
         onScroll={handleScroll}
-        className="flex-1 overflow-y-auto px-4 py-4 pt-16 flex flex-col scroll-smooth custom-scrollbar w-full overflow-hidden hide-scrollbar"
+        className="flex-1 overflow-y-auto px-4 py-2 pt-16 flex flex-col scroll-smooth custom-scrollbar w-full overflow-hidden hide-scrollbar"
       >
-        <div className="mt-auto flex flex-col gap-3">
+        <div className="mt-auto flex flex-col gap-1">
           {visibleTransactions.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full gap-6 animate-in fade-in zoom-in-95 duration-500 my-auto pb-20">
               {/* Big Share File Button */}
@@ -584,8 +584,8 @@ export const ChatPanel = ({
               );
             })
           )}
-          <div ref={messagesEndRef} className="h-2" />
         </div>
+        <div ref={messagesEndRef} />
       </div>
       {/* INPUT AREA */}
       {(visibleTransactions.length > 0 || showTextInput) && (

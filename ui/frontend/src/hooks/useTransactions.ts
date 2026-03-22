@@ -220,7 +220,7 @@ export const useTransactions = (
       THEME_PRESETS.find((t) => t.id === "night") ||
       THEME_PRESETS[3];
 
-    const color = activeTheme.metaColor || (isDarkMode ? "#0f172a" : "#F2F2F7");
+    const color = "#effcf6"; //activeTheme.metaColor || (isDarkMode ? "#0f172a" : "#F2F2F7");
 
     // Update meta tag
     const metaThemeColor = document.querySelector('meta[name="theme-color"]');

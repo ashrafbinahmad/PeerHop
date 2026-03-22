@@ -68,7 +68,7 @@ export const QRPanel = ({
         </h1>
       </div>
 
-      <div className="w-full max-w-[300px] mx-auto space-y-8">
+      <div className="w-full max-w-[300px] mx-auto space-y-4">
         {/* Step 1: Network */}
         <div className="text-center space-y-2">
           <p
@@ -102,7 +102,7 @@ export const QRPanel = ({
         </div>
 
         {/* Step 2: QR Code or Connected Status */}
-        <div className="text-center space-y-4">
+        <div className="text-center space-y-2">
           {!multiClientEnabled && clients.length > 0 ? (
             <>
               {/* Connected Status - shown when multi-client is disabled and device connected */}
@@ -302,16 +302,18 @@ export const QRPanel = ({
         </div>
 
         {/* Server Controls */}
-        <div className="flex justify-center pt-4">
+        <div className="flex justify-center pt-4 !mt-12">
           <button
             onClick={handleRestartServer}
             disabled={isCheckingNetwork}
-            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium transition-all text-white shadow-md hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] ${
+            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium transition-all   hover:scale-[1.02] active:scale-[0.98] ${theme.ghostHover} ${
               isCheckingNetwork ? "opacity-50 cursor-not-allowed" : ""
             }`}
-            style={{
-              backgroundColor: theme.accentColor,
-            }}
+            style={
+              {
+                // backgroundColor: theme.,
+              }
+            }
           >
             <RefreshCw
               size={18}

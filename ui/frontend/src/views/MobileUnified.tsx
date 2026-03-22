@@ -227,11 +227,10 @@ export const MobileUnified: React.FC<Props> = ({
   const downloadedIdsRef = useRef<Set<number>>(new Set());
 
   const activeTheme =
-    THEME_PRESETS.find((t) => t.id === activeThemeId) ||
-    THEME_PRESETS.find((t) => t.id === "night") ||
-    THEME_PRESETS[3];
+    // THEME_PRESETS.find((t) => t.id === activeThemeId) ||
+    THEME_PRESETS.find((t) => t.id === "classic") || THEME_PRESETS[7];
   const activeAccent =
-    ACCENT_COLORS.find((a) => a.id === activeAccentId) || ACCENT_COLORS[0];
+    ACCENT_COLORS.find((a) => a.id === "sky") || ACCENT_COLORS[1];
 
   const theme = {
     ...activeTheme,
@@ -666,7 +665,7 @@ export const MobileUnified: React.FC<Props> = ({
 
   return (
     <div
-      className={`grid grid-rows-[max-content_auto_1fr_max-content] fixed inset-0 h-[100dvh] w-full font-sans overflow-hidden bg-background transition-colors duration-300 ${theme.bg} ${theme.text}`}
+      className={`grid grid-rows-[max-content_auto_1fr_max-content] fixed inset-0 h-[100dvh] w-full font-sans overflow-hidden _bg-background transition-colors duration-300 ${theme.bg} ${theme.text}`}
       onDragEnter={handleDragEnter}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
