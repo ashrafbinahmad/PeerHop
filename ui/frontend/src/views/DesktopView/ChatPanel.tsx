@@ -153,24 +153,26 @@ export const ChatPanel = ({
               </button>
 
               {/* Small Send Text Button */}
-              <button
-                onClick={() => {
-                  if (!textTransferEnabled) setShowTextInput(true);
-                  setShowTextInput(true);
-                }}
-                className={`flex items-center gap-2 px-5 py-2.5 rounded-full border transition-all duration-300 hover:scale-105 active:scale-95 ${
-                  theme.border
-                } ${isDarkMode ? "hover:bg-slate-800/50" : "hover:bg-gray-50"}`}
-              >
-                <MessageSquare
-                  size={16}
-                  strokeWidth={1.5}
-                  style={{ color: theme.accentColor }}
-                />
-                <span className="text-sm font-medium opacity-90">
-                  {t("send_text")}
-                </span>
-              </button>
+              {textTransferEnabled && (
+                <button
+                  onClick={() => {
+                    if (!textTransferEnabled) setShowTextInput(true);
+                    setShowTextInput(true);
+                  }}
+                  className={`flex items-center gap-2 px-5 py-2.5 rounded-full border transition-all duration-300 hover:scale-105 active:scale-95 ${
+                    theme.border
+                  } ${isDarkMode ? "hover:bg-slate-800/50" : "hover:bg-gray-50"}`}
+                >
+                  <MessageSquare
+                    size={16}
+                    strokeWidth={1.5}
+                    style={{ color: theme.accentColor }}
+                  />
+                  <span className="text-sm font-medium opacity-90">
+                    {t("send_text")}
+                  </span>
+                </button>
+              )}
             </div>
           ) : (
             visibleTransactions.map((transaction) => {
@@ -246,7 +248,7 @@ export const ChatPanel = ({
                               iconSize={12}
                             />
                           </div>
-                          <div className="text-[13px] leading-relaxed break-words">
+                          <div className="text-[13px] leading-relaxed whitespace-break-spaces">
                             {transaction.textContent}
                           </div>
                         </div>

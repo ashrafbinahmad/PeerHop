@@ -25,6 +25,8 @@ export function OpenLogFolder():Promise<void>;
 
 export function OpenSourceFile(arg1:string):Promise<void>;
 
+export function RequestReview():Promise<void>;
+
 export function RestartServer():Promise<main.ServerInfo>;
 
 export function SaveTempFile(arg1:string,arg2:string):Promise<string>;

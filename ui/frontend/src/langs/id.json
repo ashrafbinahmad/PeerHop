@@ -76,5 +76,18 @@
   "stop_sending_files": "Hentikan pengiriman file?",
   "you_are_blocked": "Anda diblokir",
   "sending_is_blocked": "Pengiriman diblokir",
-  "continue": "Lanjutkan"
+  "rate_app": "Beri nilai PeerHop",
+  "review_prompt_hint": "Terima kasih telah menggunakan PeerHop! Bantu kami dengan ulasan di toko.",
+  "continue": "Lanjutkan",
+  "feature_request_submitted": "Feature request submitted. Thank you!",
+  "request_feature": "Request feature",
+  "name": "Name",
+  "email": "Email",
+  "feature_short": "Feature (short)",
+  "feature_description": "Description",
+  "cancel": "Cancel",
+  "submit": "Submit",
+  "error_email_invalid": "Please enter a valid email address.",
+  "error_feature_short_or_description_required": "Feature title or details is required.",
+  "buy_developer_a_coffee": "Buy developer a coffee"
 }

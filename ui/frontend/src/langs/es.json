@@ -76,5 +76,18 @@
   "stop_sending_files": "¿Detener el envío de archivos?",
   "you_are_blocked": "Estás bloqueado",
   "sending_is_blocked": "El envío está bloqueado",
-  "continue": "Continuar"
+  "rate_app": "Califica PeerHop",
+  "review_prompt_hint": "¡Gracias por usar PeerHop! Ayúdanos a mejorar con una reseña en la tienda.",
+  "continue": "Continuar",
+  "feature_request_submitted": "Feature request submitted. Thank you!",
+  "request_feature": "Request feature",
+  "name": "Name",
+  "email": "Email",
+  "feature_short": "Feature (short)",
+  "feature_description": "Description",
+  "cancel": "Cancel",
+  "submit": "Submit",
+  "error_email_invalid": "Please enter a valid email address.",
+  "error_feature_short_or_description_required": "Feature title or details is required.",
+  "buy_developer_a_coffee": "Buy developer a coffee"
 }

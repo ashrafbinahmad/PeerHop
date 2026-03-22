@@ -139,7 +139,7 @@ function generateManifest(version) {
       <uap:VisualElements
         DisplayName="${APP_DISPLAY_NAME}"
         Description="Fast local file transfer"
-        BackgroundColor="transparent"
+        BackgroundColor="white"
         Square150x150Logo="Assets\\Square150x150Logo.png"
         Square44x44Logo="Assets\\Square44x44Logo.png">
       </uap:VisualElements>

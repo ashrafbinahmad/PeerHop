@@ -76,5 +76,18 @@
   "stop_sending_files": "Stop sending files?",
   "you_are_blocked": "You are blocked",
   "sending_is_blocked": "Sending is blocked",
-  "continue": "Continue"
+  "rate_app": "Rate PeerHop",
+  "review_prompt_hint": "Thanks for using PeerHop! Help us improve with a store review.",
+  "continue": "Continue",
+  "feature_request_submitted": "Feature request submitted. Thank you!",
+  "request_feature": "Request feature",
+  "name": "Name",
+  "email": "Email",
+  "feature_short": "Feature (short)",
+  "feature_description": "Description",
+  "cancel": "Cancel",
+  "submit": "Submit",
+  "error_email_invalid": "Please enter a valid email address.",
+  "error_feature_short_or_description_required": "Feature title or details is required.",
+  "buy_developer_a_coffee": "Buy developer a coffee"
 }

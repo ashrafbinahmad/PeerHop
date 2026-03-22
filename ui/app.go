@@ -225,6 +225,44 @@ func (a *App) SelectFiles() ([]string, error) {
 	return selection, err
 }
 
+const (
+	defaultWindowsStoreProductID = "9N5VVVHD710V"
+)
+
+func getWindowsStoreProductID() string {
+	id := os.Getenv("PEERHOP_STORE_PRODUCT_ID")
+	if id == "" {
+		id = os.Getenv("VITE_STORE_PRODUCT_ID")
+	}
+	if id == "" {
+		id = defaultWindowsStoreProductID
+	}
+	return id
+}
+
+// RequestReview triggers the native Windows Store rating dialog using WinRT StoreRequestHelper request type 16.
+// If WinRT does not work, it falls back to opening the ms-windows-store review URI.
+func (a *App) RequestReview() error {
+	storeID := getWindowsStoreProductID()
+	fws := "ms-windows-store://review/?ProductId=" + storeID
+	psCmd := fmt.Sprintf(`try {
+		$req = [Windows.Services.Store.StoreRequestHelper]::SendRequestAsync(16, '%s')
+		$req.GetResults() | Out-Null
+	} catch {
+		Start-Process -FilePath '%s'
+	}`, storeID, fws)
+
+	cmd := exec.Command("powershell", "-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", psCmd)
+	if err := cmd.Run(); err != nil {
+		logger.Warn("RequestReview PowerShell failed: %v", err)
+		if a.ctx != nil {
+			runtime.BrowserOpenURL(a.ctx, fws)
+		}
+		return nil
+	}
+	return nil
+}
+
 type ServerInfo struct {
 	URL      string `json:"url"`
 	Filename string `json:"filename"`

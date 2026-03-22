@@ -30,7 +30,8 @@ export type ActivityType =
   | "blocked" // device blocked or sending blocked
   | "restarted" // server restarted
   | "network_changed" // network/IP changed
-  | "settings_changed"; // any setting toggled
+  | "settings_changed" // any setting toggled
+  | "feature_request_submitted"; // feature request submitted
 
 export interface ActivityEntry {
   type: ActivityType;

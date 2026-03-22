@@ -1,20 +1,39 @@
 import React from "react";
-import { Settings, Check, RefreshCw } from "lucide-react";
-import { THEME_PRESETS, ACCENT_COLORS } from "../../themeConstants";
+import {
+  Settings,
+  Check,
+  RefreshCw,
+  Star,
+  Lightbulb,
+  StarIcon,
+  Type,
+  UserStar,
+  Coffee,
+} from "lucide-react";
+import {
+  THEME_PRESETS,
+  ACCENT_COLORS,
+  Theme,
+  opacityAddedColor,
+  AccentColor,
+} from "../../themeConstants";
 import { CopyButton } from "../../components/CopyButton";
+import { Switch } from "../../components/Switch";
 import { EditableDeviceName } from "./EditableDeviceName";
+import { FeatureRequestForm } from "./FeatureRequestForm";
 import type { Client } from "../../hooks/useDevices";
 import type { ActivityType } from "../../hooks/useActivity";
 import { APP_VERSION } from "../../version";
 import { useTranslation } from "../../hooks/useTranslation";
+import { BrowserOpenURL } from "../../../wailsjs/runtime/runtime";
 
 interface SettingsPanelProps {
-  theme: any;
+  theme: Theme;
   activeThemeId: string;
   setActiveThemeId: (id: string) => void;
   activeAccentId: string;
   setActiveAccentId: (id: string) => void;
-  activeAccent: any;
+  activeAccent: AccentColor;
   textTransferEnabled: boolean;
   setTextTransferEnabled: (val: boolean) => void;
   securityEnabled: boolean;
@@ -31,6 +50,9 @@ interface SettingsPanelProps {
   adminToken: string;
   handleBlockClient: (client: Client) => void;
   handleBlockSending: (client: Client) => void;
+  canPromptReview: boolean;
+  onRequestReview: () => void;
+  setNotification: (notification: { show: boolean; message: string }) => void;
 }
 
 export const SettingsPanel = ({
@@ -56,8 +78,31 @@ export const SettingsPanel = ({
   adminToken,
   handleBlockClient,
   handleBlockSending,
+  canPromptReview,
+  onRequestReview,
+  setNotification,
 }: SettingsPanelProps) => {
   const { t } = useTranslation();
+  const [isFeatureDrawerOpen, setFeatureDrawerOpen] = React.useState(false);
+
+  const ADDITIONAL_ACTIONS = [
+    {
+      label: t("rate_app"),
+      icon: <UserStar />,
+      onClick: onRequestReview,
+    },
+    {
+      label: t("request_feature"),
+      icon: <Lightbulb />,
+      onClick: () => setFeatureDrawerOpen(true),
+    },
+    {
+      label: t("buy_developer_a_coffee"),
+      icon: <Coffee />,
+      onClick: () => BrowserOpenURL("https://buymeacoffee.com/peerhop"),
+    },
+  ];
+
   return (
     <div className="w-full self-start text-left pt-8 ">
       {/* Left-aligned header */}
@@ -68,124 +113,79 @@ export const SettingsPanel = ({
 
       {/* Settings Content - No borders, left-aligned */}
       <div className="space-y-6 text-left">
-        {/* Theme Setting */}
-        <div>
-          <h3 className={`text-sm font-semibold mb-3 ${theme.text}`}>
-            {t("themes")}
-          </h3>
-
-          {/* Theme Cards - Horizontal Scroll */}
-          <div className="flex overflow-x-auto gap-3 mb-2 pb-2 -mx-8 px-5 select-none   hide-scrollbar">
-            {THEME_PRESETS.map((t) => (
+        <div className="flex flex-wrap gap-4 mt-4 text-left w-full transition-all ">
+          {ADDITIONAL_ACTIONS.map((action) => (
+            <div className="grow w-[45%]">
               <button
-                key={t.id}
-                onClick={() => setActiveThemeId(t.id)}
-                className={`shrink-0 w-20 p-1 rounded-xl border-2 transition-all duration-200 group ${
-                  activeThemeId === t.id
-                    ? "border-[#007AFF]"
-                    : "border-transparent hover:border-gray-200 dark:hover:border-slate-700"
-                }`}
+                onClick={action.onClick}
+                className={`px-4 py-2 rounded-lg w-full   text-sm font-medium  transition-colors  gap-3  ${isDarkMode ? "hover:!text-white" : "hover:!text-black"}   `}
                 style={{
-                  borderColor:
-                    activeThemeId === t.id ? activeAccent.color : undefined,
+                  backgroundColor: `${activeAccent.v2}`,
+                  color: `${isDarkMode ? "#ffffffd3" : "#00000096"}`,
                 }}
               >
-                <div
-                  className={`h-12 rounded-lg mb-1.5 relative overflow-hidden`}
-                  style={{ backgroundColor: t.previewColor }}
-                >
-                  {/* Scaled Mock UI in Card */}
-                  <div className="absolute top-1.5 left-1.5 right-6 h-1.5 rounded-full bg-slate-400/20"></div>
-                  <div className="absolute top-4 left-1.5 right-3 h-3 rounded bg-white/20"></div>
-                  <div
-                    className="absolute top-8 right-1.5 left-6 h-3 rounded"
-                    style={{ backgroundColor: activeAccent.color }}
-                  ></div>
-                </div>
-                <div
-                  className={`text-[10px] font-medium text-center truncate ${
-                    theme.subText
-                  } ${activeThemeId === t.id ? "font-bold" : ""}`}
-                  style={{
-                    color:
-                      activeThemeId === t.id ? activeAccent.color : undefined,
-                  }}
-                >
-                  {t.name}
-                </div>
+                <div>{action.icon}</div>
+                <div className="text-nowrap text-left">{action.label}</div>
               </button>
-            ))}
-          </div>
-
-          {/* Accent Colors */}
-          <div className="flex flex-wrap gap-2 items-center justify-start">
-            {ACCENT_COLORS.map((color) => (
-              <button
-                key={color.id}
-                onClick={() => setActiveAccentId(color.id)}
-                className={`w-4 h-4 rounded-full transition-all duration-200 flex items-center justify-center ${
-                  activeAccentId === color.id
-                    ? "scale-105 ring ring-offset-2 ring-offset-transparent"
-                    : "hover:scale-105"
-                }`}
-                style={{
-                  backgroundColor: color.color,
-                  boxShadow:
-                    activeAccentId === color.id
-                      ? `0 0 0 2px ${
-                          theme.bg === "bg-[#0f172a]" ? "#0f172a" : "white"
-                        }, 0 0 0 3px ${color.color}`
-                      : "none",
-                }}
-              >
-                {activeAccentId === color.id && (
-                  <Check size={10} className="text-white" />
-                )}
-              </button>
-            ))}
-          </div>
+            </div>
+          ))}
+          {/* <div className="grow w-[45%] ">
+            <button
+              onClick={onRequestReview}
+              className={`px-4 py-2 rounded-lg w-full    text-sm font-medium  transition-colors  gap-3  ${isDarkMode ? "hover:!text-white" : "hover:!text-black"}  `}
+              style={{
+                backgroundColor: `${activeAccent.v2}`,
+                color: `${isDarkMode ? "#ffffffd3" : "#00000096"}`,
+              }}
+            >
+              <div>
+                <UserStar />
+              </div>
+              <div className="text-nowrap text-left w-full">
+                {" "}
+                {t("rate_app")}
+              </div>
+            </button>
+          </div> */}
         </div>
+
+        <FeatureRequestForm
+          isOpen={isFeatureDrawerOpen}
+          onClose={() => setFeatureDrawerOpen(false)}
+          logActivity={logActivity}
+          setNotification={setNotification}
+          theme={theme}
+        />
 
         {/* Features */}
         <div>
           <h3 className={`text-sm font-semibold mb-4 ${theme.text}`}>
             {t("features")}
           </h3>
-          <div className="space-y-3">
+          <div className="space-y-5">
             {/* Text Transfer Toggle */}
             <div className="flex items-start justify-between gap-4">
               <div className="flex-1">
                 <p className={`text-sm font-medium ${theme.text}`}>
                   {t("text_transfer")}
                 </p>
-                <p className={`text-xs mt-0.5 ${theme.subText}`}>
+                {/* <p className={`text-xs mt-0.5 ${theme.subText}`}>
                   {t("enable_sending_receiving")}
-                </p>
+                </p> */}
               </div>
-              <button
-                onClick={() => {
-                  const next = !textTransferEnabled;
+              <Switch
+                checked={textTransferEnabled}
+                onChange={(next) => {
                   setTextTransferEnabled(next);
                   logActivity(
                     "settings_changed",
                     `Text Transfer: ${next ? "enabled" : "disabled"}`,
                   );
                 }}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors shrink-0 ${
-                  textTransferEnabled ? "" : theme.iconBg
-                }`}
-                style={{
-                  backgroundColor: textTransferEnabled
-                    ? theme.accentColor
-                    : undefined,
-                }}
-              >
-                <span
-                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                    textTransferEnabled ? "translate-x-6" : "translate-x-1"
-                  }`}
-                />
-              </button>
+                theme={theme}
+                ariaLabel={t("text_transfer")}
+                accentColor={activeAccent}
+              />
             </div>
 
             {/* Security Toggle */}
@@ -194,34 +194,23 @@ export const SettingsPanel = ({
                 <p className={`text-sm font-medium ${theme.text}`}>
                   {t("enable_security")}
                 </p>
-                <p className={`text-xs mt-0.5 ${theme.subText}`}>
+                {/* <p className={`text-xs mt-0.5 ${theme.subText}`}>
                   {t("require_token")}
-                </p>
+                </p> */}
               </div>
-              <button
-                onClick={() => {
-                  const next = !securityEnabled;
+              <Switch
+                checked={securityEnabled}
+                onChange={(next) => {
                   setSecurityEnabled(next);
                   logActivity(
                     "settings_changed",
                     `Security: ${next ? "enabled" : "disabled"}`,
                   );
                 }}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors shrink-0 ${
-                  securityEnabled ? "" : theme.iconBg
-                }`}
-                style={{
-                  backgroundColor: securityEnabled
-                    ? theme.accentColor
-                    : undefined,
-                }}
-              >
-                <span
-                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                    securityEnabled ? "translate-x-6" : "translate-x-1"
-                  }`}
-                />
-              </button>
+                theme={theme}
+                ariaLabel={t("enable_security")}
+                accentColor={activeAccent}
+              />
             </div>
 
             {/* Multi-Client Toggle */}
@@ -230,34 +219,23 @@ export const SettingsPanel = ({
                 <p className={`text-sm font-medium ${theme.text}`}>
                   {t("multi_client")}
                 </p>
-                <p className={`text-xs mt-0.5 ${theme.subText}`}>
+                {/* <p className={`text-xs mt-0.5 ${theme.subText}`}>
                   {t("allow_multiple_devices")}
-                </p>
+                </p> */}
               </div>
-              <button
-                onClick={() => {
-                  const next = !multiClientEnabled;
+              <Switch
+                checked={multiClientEnabled}
+                onChange={(next) => {
                   setMultiClientEnabled(next);
                   logActivity(
                     "settings_changed",
                     `Multi-Client: ${next ? "enabled" : "disabled"}`,
                   );
                 }}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors shrink-0 ${
-                  multiClientEnabled ? "" : theme.iconBg
-                }`}
-                style={{
-                  backgroundColor: multiClientEnabled
-                    ? theme.accentColor
-                    : undefined,
-                }}
-              >
-                <span
-                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                    multiClientEnabled ? "translate-x-6" : "translate-x-1"
-                  }`}
-                />
-              </button>
+                theme={theme}
+                ariaLabel={t("multi_client")}
+                accentColor={activeAccent}
+              />
             </div>
           </div>
         </div>
@@ -355,6 +333,84 @@ export const SettingsPanel = ({
             </div>
           </div>
         )}
+
+        {/* Theme Setting */}
+        <div>
+          <h3 className={`text-sm font-semibold mb-3 ${theme.text}`}>
+            {t("themes")}
+          </h3>
+
+          {/* Theme Cards - Horizontal Scroll */}
+          <div className="flex overflow-x-auto gap-3 mb-2 pb-2 -mx-8 px-7 select-none   hide-scrollbar">
+            {THEME_PRESETS.map((t) => (
+              <button
+                key={t.id}
+                onClick={() => setActiveThemeId(t.id)}
+                className={`shrink-0 w-20 p-1 rounded-xl border-2 transition-all duration-200 group ${
+                  activeThemeId === t.id
+                    ? "border-[#007AFF]"
+                    : "border-transparent hover:border-gray-200 dark:hover:border-slate-700"
+                }`}
+                style={{
+                  borderColor:
+                    activeThemeId === t.id ? activeAccent.v1 : undefined,
+                }}
+              >
+                <div
+                  className={`h-12 rounded-lg mb-1.5 relative overflow-hidden`}
+                  style={{ backgroundColor: t.previewColor }}
+                >
+                  {/* Scaled Mock UI in Card */}
+                  <div className="absolute top-1.5 left-1.5 right-6 h-1.5 rounded-full bg-slate-400/20"></div>
+                  <div className="absolute top-4 left-1.5 right-3 h-3 rounded bg-white/20"></div>
+                  <div
+                    className="absolute top-8 right-1.5 left-6 h-3 rounded"
+                    style={{ backgroundColor: activeAccent.color }}
+                  ></div>
+                </div>
+                <div
+                  className={`text-[10px] font-medium text-center truncate ${
+                    theme.subText
+                  } ${activeThemeId === t.id ? "font-bold" : ""}`}
+                  style={{
+                    color:
+                      activeThemeId === t.id ? activeAccent.color : undefined,
+                  }}
+                >
+                  {t.name}
+                </div>
+              </button>
+            ))}
+          </div>
+
+          {/* Accent Colors */}
+          <div className="flex flex-wrap gap-2 items-center justify-start">
+            {ACCENT_COLORS.map((color) => (
+              <button
+                key={color.id}
+                onClick={() => setActiveAccentId(color.id)}
+                className={`w-4 h-4 rounded-full transition-all duration-200 flex items-center justify-center ${
+                  activeAccentId === color.id
+                    ? "scale-105 ring ring-offset-2 ring-offset-transparent"
+                    : "hover:scale-105"
+                }`}
+                style={{
+                  backgroundColor: color.color,
+                  boxShadow:
+                    activeAccentId === color.id
+                      ? `0 0 0 2px ${
+                          theme.bg === "bg-[#0f172a]" ? "#0f172a" : "white"
+                        }, 0 0 0 3px ${color.color}`
+                      : "none",
+                }}
+              >
+                {activeAccentId === color.id && (
+                  <Check size={10} className="text-white" />
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
         {/* App Version */}
         <div className="pt-4 mt-8 border-t border-gray-100 dark:border-slate-800 opacity-40">
           <p className={`text-[13px] text-center ${theme.text}`}>

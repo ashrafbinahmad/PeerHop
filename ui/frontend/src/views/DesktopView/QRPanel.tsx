@@ -79,10 +79,10 @@ export const QRPanel = ({
 
           {serverInfo?.ssid ? (
             <div
-              className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg font-mono text-sm font-medium border h-10 ${
+              className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg font-mono text-sm font-medium _border h-10 ${
                 isDarkMode
-                  ? "bg-slate-800/50 border-slate-700 text-green-400"
-                  : "bg-white border-green-200 text-green-700"
+                  ? "bg-slate-800/50 _border-slate-700 text-green-400"
+                  : "bg-white _border-green-200 text-green-700"
               }`}
             >
               <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>

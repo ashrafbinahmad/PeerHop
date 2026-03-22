@@ -1,23 +1,85 @@
-export const ACCENT_COLORS = [
-  { id: "blue", color: "#007AFF", name: "Blue", ring: "ring-[#007AFF]" },
-  { id: "sky", color: "#0ea5e9", name: "Sky", ring: "ring-sky-500" },
-  { id: "green", color: "#22c55e", name: "Green", ring: "ring-green-500" },
-  { id: "pink", color: "#ec4899", name: "Pink", ring: "ring-pink-500" },
+export interface AccentColor {
+  id: string;
+  color: string;
+  name: string;
+  ring: string;
+  v1: string;
+  v2: string;
+}
+
+export const ACCENT_COLORS: AccentColor[] = [
+  {
+    id: "blue",
+    color: "#007AFF",
+    name: "Blue",
+    ring: "ring-[#007AFF]",
+    v1: "#007bff81",
+    v2: "#007bff1a",
+  },
+  {
+    id: "sky",
+    color: "#0ea5e9",
+    name: "Sky",
+    ring: "ring-sky-500",
+    v1: "#0ea5e981",
+    v2: "#0ea5e91a",
+  },
+  {
+    id: "green",
+    color: "#22c55e",
+    name: "Green",
+    ring: "ring-green-500",
+    v1: "#22c55e81",
+    v2: "#22c55e1a",
+  },
+  {
+    id: "pink",
+    color: "#ec4899",
+    name: "Pink",
+    ring: "ring-pink-500",
+    v1: "#ec489981",
+    v2: "#ec48991a",
+  },
   {
     id: "orange",
     color: "#f97316",
     name: "Orange",
     ring: "ring-orange-500",
+    v1: "#f9731681",
+    v2: "#f973161a",
   },
   {
     id: "purple",
     color: "#a855f7",
     name: "Purple",
     ring: "ring-purple-500",
+    v1: "#a855f781",
+    v2: "#a855f71a",
   },
-  { id: "red", color: "#ef4444", name: "Red", ring: "ring-red-500" },
-  { id: "stone", color: "#78716c", name: "Stone", ring: "ring-stone-500" },
-  { id: "gold", color: "#eab308", name: "Gold", ring: "ring-yellow-500" },
+  {
+    id: "red",
+    color: "#ef4444",
+    name: "Red",
+    ring: "ring-red-500",
+    v1: "#ef444481",
+    v2: "#ef44441a",
+  },
+  {
+    id: "stone",
+    color: "#78716c",
+    name: "Stone",
+    ring: "ring-stone-500",
+    v1: "#78716c81",
+    v2: "#78716c1a",
+  },
+  {
+    id: "gold",
+    color: "#eab308",
+    name: "Gold",
+    ring: "ring-yellow-500",
+    v1: "#eab30881",
+    v2: "#eab3081a",
+  },
 ];
 
 export type Theme = {
@@ -45,57 +107,13 @@ export type Theme = {
 
 export const THEME_PRESETS: Theme[] = [
   {
-    id: "classic",
-    name: "Classic",
-    bg: "bg-[#effcf6]",
-    headerBg: "bg-[#effcf6]/95 border-emerald-100",
-    text: "text-emerald-950",
-    subText: "text-emerald-700/70",
-    panelBg: "bg-[#f4fdf8] border-emerald-100",
-    panelCard: "bg-white border-emerald-100",
-    inputAreaBg: "bg-[#f4fdf8] border-emerald-100",
-    inputField: "bg-white text-emerald-950 focus:bg-white",
-    bubbleOther: "bg-white border-emerald-100 text-emerald-950",
-    border: "border-emerald-100",
-    iconBg: "bg-emerald-100",
-    iconText: "text-emerald-600",
-    ghostHover: "hover:bg-emerald-100 text-emerald-700",
-    deviceItemBg: "bg-[#f4fdf8] border-emerald-100",
-    isDark: false,
-    previewColor: "#effcf6",
-    metaColor: "#f4fdf8",
-  },
-
-  {
-    id: "day",
-    name: "Day",
-    bg: "bg-[#F2F2F7]",
-    headerBg: "bg-[#F2F2F7]/95 border-gray-200/50",
-    text: "text-gray-900",
-    subText: "text-gray-500",
-    panelBg: "bg-white border-gray-200",
-    panelCard: "bg-white border-gray-100",
-    inputAreaBg: "bg-white border-gray-200",
-    inputField: "bg-gray-100 hover:bg-gray-50 focus:bg-white",
-    bubbleOther: "bg-white border-gray-200 text-gray-900",
-    border: "border-gray-200",
-    iconBg: "bg-gray-100",
-    iconText: "text-gray-500",
-    ghostHover: "hover:bg-gray-200 text-gray-600",
-    deviceItemBg: "bg-gray-50 border-gray-100",
-    isDark: false,
-    previewColor: "#bfdbfe",
-    metaColor: "#ffffff",
-  },
-
-  {
     id: "tinted",
     name: "Tinted",
     bg: "bg-[#161b16]",
     headerBg: "bg-[#161b16]/95 border-[#232e25]",
     text: "text-emerald-50",
     subText: "text-emerald-400/60",
-    panelBg: "bg-[#1c241d] border-[#232e25]",
+    panelBg: "max-md:bg-[#1c241d] border-[#232e25]",
     panelCard: "bg-[#121712] border-[#232e25]",
     inputAreaBg: "bg-[#1c241d] border-[#232e25]",
     inputField: "bg-[#2A362C] text-emerald-50 focus:bg-[#344237]",
@@ -117,7 +135,7 @@ export const THEME_PRESETS: Theme[] = [
     headerBg: "bg-[#0f172a]/95 border-slate-800",
     text: "text-slate-100",
     subText: "text-slate-400",
-    panelBg: "bg-[#1e293b] border-slate-700",
+    panelBg: "max-md:bg-[#1e293b] border-slate-700",
     panelCard: "bg-[#0f172a] border-slate-700",
     inputAreaBg: "bg-[#1e293b] border-slate-700",
     inputField: "bg-[#334155] text-white focus:bg-[#475569]",
@@ -132,74 +150,6 @@ export const THEME_PRESETS: Theme[] = [
     metaColor: "#1e293b",
   },
 
-  /* ===================== NEW THEMES ===================== */
-
-  {
-    id: "arctic",
-    name: "Arctic",
-    bg: "bg-[#f8fafc]",
-    headerBg: "bg-[#f8fafc]/95 border-sky-100",
-    text: "text-slate-900",
-    subText: "text-slate-500",
-    panelBg: "bg-white border-sky-100",
-    panelCard: "bg-white border-sky-100",
-    inputAreaBg: "bg-white border-sky-100",
-    inputField: "bg-sky-50 focus:bg-white",
-    bubbleOther: "bg-white border-sky-100 text-slate-900",
-    border: "border-sky-100",
-    iconBg: "bg-sky-100",
-    iconText: "text-sky-600",
-    ghostHover: "hover:bg-sky-100 text-sky-600",
-    deviceItemBg: "bg-sky-50 border-sky-100",
-    isDark: false,
-    previewColor: "#e0f2fe",
-    metaColor: "#ffffff",
-  },
-
-  {
-    id: "sand",
-    name: "Sand",
-    bg: "bg-[#faf8f5]",
-    headerBg: "bg-[#faf8f5]/95 border-amber-100",
-    text: "text-amber-950",
-    subText: "text-amber-700/70",
-    panelBg: "bg-[#fffaf0] border-amber-100",
-    panelCard: "bg-white border-amber-100",
-    inputAreaBg: "bg-[#fffaf0] border-amber-100",
-    inputField: "bg-white focus:bg-white",
-    bubbleOther: "bg-white border-amber-100 text-amber-950",
-    border: "border-amber-100",
-    iconBg: "bg-amber-100",
-    iconText: "text-amber-700",
-    ghostHover: "hover:bg-amber-100 text-amber-700",
-    deviceItemBg: "bg-[#fffaf0] border-amber-100",
-    isDark: false,
-    previewColor: "#fde68a",
-    metaColor: "#fffaf0",
-  },
-
-  {
-    id: "rose",
-    name: "Rose",
-    bg: "bg-[#fff1f2]",
-    headerBg: "bg-[#fff1f2]/95 border-rose-200",
-    text: "text-rose-950",
-    subText: "text-rose-700/70",
-    panelBg: "bg-white border-rose-200",
-    panelCard: "bg-white border-rose-200",
-    inputAreaBg: "bg-white border-rose-200",
-    inputField: "bg-rose-50 focus:bg-white",
-    bubbleOther: "bg-white border-rose-200 text-rose-950",
-    border: "border-rose-200",
-    iconBg: "bg-rose-100",
-    iconText: "text-rose-600",
-    ghostHover: "hover:bg-rose-100 text-rose-600",
-    deviceItemBg: "bg-rose-50 border-rose-200",
-    isDark: false,
-    previewColor: "#fecdd3",
-    metaColor: "#ffffff",
-  },
-
   {
     id: "graphite",
     name: "Graphite",
@@ -207,7 +157,7 @@ export const THEME_PRESETS: Theme[] = [
     headerBg: "bg-[#18181b]/95 border-zinc-700",
     text: "text-zinc-100",
     subText: "text-zinc-400",
-    panelBg: "bg-[#27272a] border-zinc-700",
+    panelBg: "max-md:bg-[#27272a] border-zinc-700",
     panelCard: "bg-[#18181b] border-zinc-700",
     inputAreaBg: "bg-[#27272a] border-zinc-700",
     inputField: "bg-[#3f3f46] text-white focus:bg-[#52525b]",
@@ -229,7 +179,7 @@ export const THEME_PRESETS: Theme[] = [
     headerBg: "bg-[#020617]/95 border-blue-900",
     text: "text-blue-100",
     subText: "text-blue-400",
-    panelBg: "bg-[#020b26] border-blue-900",
+    panelBg: "max-md:bg-[#020b26] border-blue-900",
     panelCard: "bg-[#020617] border-blue-900",
     inputAreaBg: "bg-[#020b26] border-blue-900",
     inputField: "bg-[#081a40] text-white focus:bg-[#0a2463]",
@@ -243,4 +193,162 @@ export const THEME_PRESETS: Theme[] = [
     previewColor: "#081a40",
     metaColor: "#020b26",
   },
+
+  /* ===================== NEW THEMES ===================== */
+
+  {
+    id: "arctic",
+    name: "Arctic",
+    bg: "bg-[#f8fafc]",
+    headerBg: "bg-[#f8fafc]/95 border-sky-100",
+    text: "text-slate-900",
+    subText: "text-slate-500",
+    panelBg: "max-md:bg-white border-sky-100",
+    panelCard: "bg-white border-sky-100",
+    inputAreaBg: "bg-white border-sky-100",
+    inputField: "bg-sky-50 focus:bg-white",
+    bubbleOther: "bg-white border-sky-100 text-slate-900",
+    border: "border-sky-100",
+    iconBg: "bg-sky-100",
+    iconText: "text-sky-600",
+    ghostHover: "hover:bg-sky-100 text-sky-600",
+    deviceItemBg: "bg-sky-50 border-sky-100",
+    isDark: false,
+    previewColor: "#e0f2fe",
+    metaColor: "#ffffff",
+  },
+
+  {
+    id: "sand",
+    name: "Sand",
+    bg: "bg-[#faf8f5]",
+    headerBg: "bg-[#faf8f5]/95 border-amber-100",
+    text: "text-amber-950",
+    subText: "text-amber-700/70",
+    panelBg: "max-md:bg-[#fffaf0] border-amber-100",
+    panelCard: "bg-white border-amber-100",
+    inputAreaBg: "bg-[#fffaf0] border-amber-100",
+    inputField: "bg-white focus:bg-white",
+    bubbleOther: "bg-white border-amber-100 text-amber-950",
+    border: "border-amber-100",
+    iconBg: "bg-amber-100",
+    iconText: "text-amber-700",
+    ghostHover: "hover:bg-amber-100 text-amber-700",
+    deviceItemBg: "bg-[#fffaf0] border-amber-100",
+    isDark: false,
+    previewColor: "#fde68a",
+    metaColor: "#fffaf0",
+  },
+
+  {
+    id: "rose",
+    name: "Rose",
+    bg: "bg-[#fff1f2]",
+    headerBg: "bg-[#fff1f2]/95 border-rose-200",
+    text: "text-rose-950",
+    subText: "text-rose-700/70",
+    panelBg: "max-md:bg-white border-rose-200",
+    panelCard: "bg-white border-rose-200",
+    inputAreaBg: "bg-white border-rose-200",
+    inputField: "bg-rose-50 focus:bg-white",
+    bubbleOther: "bg-white border-rose-200 text-rose-950",
+    border: "border-rose-200",
+    iconBg: "bg-rose-100",
+    iconText: "text-rose-600",
+    ghostHover: "hover:bg-rose-100 text-rose-600",
+    deviceItemBg: "bg-rose-50 border-rose-200",
+    isDark: false,
+    previewColor: "#fecdd3",
+    metaColor: "#ffffff",
+  },
+
+  {
+    id: "classic",
+    name: "Classic",
+    bg: "bg-[#effcf6]",
+    headerBg: "bg-[#effcf6]/95 border-emerald-100",
+    text: "text-emerald-950",
+    subText: "text-emerald-700/70",
+    panelBg: "max-md:bg-[#f4fdf8] border-emerald-100",
+    panelCard: "bg-white border-emerald-100",
+    inputAreaBg: "bg-[#f4fdf8] border-emerald-100",
+    inputField: "bg-white text-emerald-950 focus:bg-white",
+    bubbleOther: "bg-white border-emerald-100 text-emerald-950",
+    border: "border-emerald-100",
+    iconBg: "bg-emerald-100",
+    iconText: "text-emerald-600",
+    ghostHover: "hover:bg-emerald-100 text-emerald-700",
+    deviceItemBg: "bg-[#f4fdf8] border-emerald-100",
+    isDark: false,
+    previewColor: "#effcf6",
+    metaColor: "#f4fdf8",
+  },
+
+  {
+    id: "day",
+    name: "Day",
+    bg: "bg-[#F2F2F7]",
+    headerBg: "bg-[#F2F2F7]/95 border-gray-200/50",
+    text: "text-gray-900",
+    subText: "text-gray-500",
+    panelBg: "max-md:bg-white border-gray-200",
+    panelCard: "bg-white border-gray-100",
+    inputAreaBg: "bg-white border-gray-200",
+    inputField: "bg-gray-100 hover:bg-gray-50 focus:bg-white",
+    bubbleOther: "bg-white border-gray-200 text-gray-900",
+    border: "border-gray-200",
+    iconBg: "bg-gray-100",
+    iconText: "text-gray-500",
+    ghostHover: "hover:bg-gray-200 text-gray-600",
+    deviceItemBg: "bg-gray-50 border-gray-100",
+    isDark: false,
+    previewColor: "#bfdbfe",
+    metaColor: "#ffffff",
+  },
+  {
+    id: "mono",
+    name: "Mono",
+    bg: "bg-white",
+    headerBg: "bg-white/95 border-black/10",
+    text: "text-black",
+    subText: "text-black/40",
+    panelBg: "max-md:bg-[#f5f5f5] border-black/10",
+    panelCard: "bg-[#f5f5f5] border-black/10",
+    inputAreaBg: "bg-[#f5f5f5] border-black/10",
+    inputField: "bg-white text-black focus:bg-white border border-black/20",
+    bubbleOther: "bg-[#f5f5f5] border-black/10 text-black",
+    border: "border-black/10",
+    iconBg: "bg-black/20",
+    iconText: "text-white",
+    ghostHover: "hover:bg-black/5 text-black",
+    deviceItemBg: "bg-[#f0f0f0] border-black/10",
+    isDark: false,
+    previewColor: "white",
+    metaColor: "#ffffff",
+  },
 ];
+
+export const opacityAddedColor = (anyColor: string, opacity: number) => {
+  // Create a temporary element to leverage the browser's color parsing
+  const tempElement = document.createElement("div");
+  tempElement.style.color = anyColor;
+  document.body.appendChild(tempElement);
+
+  // Get the computed color in RGB format
+  const computedColor = getComputedStyle(tempElement).color;
+  document.body.removeChild(tempElement);
+
+  // Extract RGB values
+  const rgbMatch = computedColor.match(/rgba?\((\d+), (\d+), (\d+)/);
+  if (!rgbMatch) {
+    throw new Error("Invalid color format");
+  }
+
+  const r = parseInt(rgbMatch[1], 10);
+  const g = parseInt(rgbMatch[2], 10);
+  const b = parseInt(rgbMatch[3], 10);
+
+  // Return the color in RGBA format with the specified opacity
+  return `rgba(${r}, ${g}, ${b}, ${opacity})`;
+  // return `#1a1a9b`;
+};

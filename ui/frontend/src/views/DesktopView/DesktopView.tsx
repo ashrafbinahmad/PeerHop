@@ -77,6 +77,17 @@ export const DesktopView = () => {
   }>({ show: false, message: "" });
   const [isCheckingNetwork, setIsCheckingNetwork] = useState(false);
   const [transactionToCancel, setTransactionToCancel] = useState<any>(null); // Use any or specific type if available
+
+  const [reviewActionCount, setReviewActionCount] = useState<number>(() => {
+    const value = localStorage.getItem("peerhop_review_action_count");
+    const parsed = Number(value ?? "0");
+    return Number.isNaN(parsed) ? 0 : parsed;
+  });
+
+  const [reviewRequested, setReviewRequested] = useState<boolean>(
+    localStorage.getItem("peerhop_review_requested") === "true",
+  );
+
   const [iframeHeight, setIframeHeight] = useState<string | number | undefined>(
     "55px",
   );
@@ -110,7 +121,7 @@ export const DesktopView = () => {
           setFilePaths(paths);
           isUserAtBottomRef.current = true;
           const info = await StartTransfer(paths);
-          alert(JSON.stringify(info));
+          // alert(JSON.stringify(info));
           setServerInfo(info);
           logActivity(
             "shared",
@@ -311,10 +322,19 @@ export const DesktopView = () => {
             logActivity("received", `Received ${charCount} characters text`);
           }
         }
+
+        if (!reviewRequested) {
+          const nextCount = Math.min(9999, reviewActionCount + 1);
+          localStorage.setItem(
+            "peerhop_review_action_count",
+            String(nextCount),
+          );
+          setReviewActionCount(nextCount);
+        }
       }
       prevTransactionStatuses.current[txn.id] = txn.status;
     });
-  }, [transactions, logActivity]);
+  }, [transactions, logActivity, reviewActionCount, reviewRequested]);
 
   // Log app session start / end
   useEffect(() => {
@@ -348,7 +368,7 @@ export const DesktopView = () => {
       );
     } catch (err) {
       console.error("Failed to block/unblock client:", err);
-      alert(t("failed_to_update_client"));
+      // alert(t("failed_to_update_client"));
     }
   };
 
@@ -369,7 +389,29 @@ export const DesktopView = () => {
       );
     } catch (err) {
       console.error("Failed to block/unblock sending for client:", err);
-      alert(t("failed_to_update_client"));
+      // alert(t("failed_to_update_client"));
+    }
+  };
+
+  const storeProductId =
+    (import.meta.env.VITE_STORE_PRODUCT_ID as string | undefined) ||
+    "9N5VVVHD710V";
+  const canPromptReview = !reviewRequested && reviewActionCount >= 5;
+
+  const triggerReviewFlow = async () => {
+    try {
+      await (window as any).go.main.App.RequestReview();
+    } catch (err) {
+      console.warn(
+        "RequestReview call failed, opening Store URL fallback:",
+        err,
+      );
+      BrowserOpenURL(
+        `ms-windows-store://review/?ProductId=${encodeURIComponent(storeProductId)}`,
+      );
+    } finally {
+      localStorage.setItem("peerhop_review_requested", "true");
+      setReviewRequested(true);
     }
   };
 
@@ -469,7 +511,7 @@ export const DesktopView = () => {
     } catch (err) {
       console.error("Failed to restart server:", err);
       setIsCheckingNetwork(false);
-      alert(t("failed_to_restart"));
+      // alert(t("failed_to_restart"));
     }
   };
 
@@ -703,7 +745,7 @@ export const DesktopView = () => {
       setTextInput("");
     } catch (err) {
       console.error(err);
-      alert(t("failed_to_send_text"));
+      // alert(t("failed_to_send_text"));
     }
   };
 
@@ -762,9 +804,14 @@ export const DesktopView = () => {
     }
   }, [activeThemeId, isDarkMode, activeTheme.bg, lang]);
 
+  useEffect(() => {
+    if (isDarkMode && window.document.body.classList.contains("dark")) return;
+    window.document.body.classList.toggle("dark");
+  }, [isDarkMode]);
+
   return (
     <div
-      className={`flex h-screen w-[calc(100vw-1px)] font-sans overflow-hidden transition-colors duration-300 ${theme.bg} ${theme.text} relative hide-scrollbar`}
+      className={`flex h-screen w-[calc(100vw-.5px)] font-sans overflow-hidden transition-colors duration-300 ${theme.bg} ${theme.text} relative hide-scrollbar`}
       style={
         {
           "--wails-drop-target": "drop",
@@ -833,12 +880,12 @@ export const DesktopView = () => {
       </div>
       {/* WINDOW CONTROLS - FIXED TOP RIGHT */}
       <div
-        className="absolute top-0 right-0 z-50 p-2 flex items-center gap-1"
+        className={`absolute top-0 right-0 z-50 p-2 flex items-center gap-1  `}
         style={{ "--wails-draggable": "no-drag" } as React.CSSProperties}
       >
         {/* Tab controls - Different for mobile vs desktop */}
         {/* Mobile: Show all 3 tabs */}
-        <div className="md:hidden flex items-center gap-1  ">
+        <div className={`md:hidden flex items-center gap-1   `}>
           <button
             onClick={() => setActiveTab("chat")}
             className={`p-2 rounded-lg transition-colors ${
@@ -875,7 +922,7 @@ export const DesktopView = () => {
         </div>
 
         {/* Desktop: Show QR and Settings tabs only */}
-        <div className="hidden md:flex items-center gap-1">
+        <div className={`hidden md:flex items-center gap-1 `}>
           <button
             onClick={() => setActiveTab("qr")}
             className={`p-2 rounded-lg transition-colors ${
@@ -967,8 +1014,8 @@ export const DesktopView = () => {
         style={{ "--wails-draggable": "no-drag" } as React.CSSProperties}
       >
         {/* Toggle between Settings and QR Panel */}
-        <div className="flex-1 overflow-y-auto hide-scrollbar p-8 animate-in slide-in-from-right duration-300">
-          <div className="min-h-full flex flex-col items-center justify-start ">
+        <div className="relative flex-1 overflow-y-auto hide-scrollbar   animate-in slide-in-from-right duration-300 overflow-x-hidden">
+          <div className="min-h-full flex flex-col items-center justify-start px-5 p-8 ">
             {activeTab === "settings" ? (
               /* Settings Panel */
               <SettingsPanel
@@ -994,6 +1041,9 @@ export const DesktopView = () => {
                 adminToken={adminToken}
                 handleBlockClient={handleBlockClient}
                 handleBlockSending={handleBlockSending}
+                canPromptReview={canPromptReview}
+                onRequestReview={triggerReviewFlow}
+                setNotification={setNotification}
               />
             ) : (
               <QRPanel

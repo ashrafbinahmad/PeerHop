@@ -46,6 +46,10 @@ export function OpenSourceFile(arg1) {
   return window['go']['main']['App']['OpenSourceFile'](arg1);
 }
 
+export function RequestReview() {
+  return window['go']['main']['App']['RequestReview']();
+}
+
 export function RestartServer() {
   return window['go']['main']['App']['RestartServer']();
 }
