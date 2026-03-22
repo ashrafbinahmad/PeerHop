@@ -59,21 +59,23 @@ export const SettingsPanel = ({
 }: SettingsPanelProps) => {
   const { t } = useTranslation();
   return (
-    <div className="w-full self-start text-left pt-8">
+    <div className="w-full self-start text-left pt-8 ">
       {/* Left-aligned header */}
       <div className="mb-8 flex items-center gap-3">
         <Settings size={24} className={theme.text} />
-        <h1 className={`text-2xl font-bold ${theme.text}`}>{t('settings')}</h1>
+        <h1 className={`text-2xl font-bold ${theme.text}`}>{t("settings")}</h1>
       </div>
 
       {/* Settings Content - No borders, left-aligned */}
       <div className="space-y-6 text-left">
         {/* Theme Setting */}
         <div>
-          <h3 className={`text-sm font-semibold mb-3 ${theme.text}`}>{t('themes')}</h3>
+          <h3 className={`text-sm font-semibold mb-3 ${theme.text}`}>
+            {t("themes")}
+          </h3>
 
           {/* Theme Cards - Horizontal Scroll */}
-          <div className="flex overflow-x-auto gap-3 mb-2 pb-2 -mx-2 px-2 select-none scrollbar-hide">
+          <div className="flex overflow-x-auto gap-3 mb-2 pb-2 -mx-8 px-5 select-none   hide-scrollbar">
             {THEME_PRESETS.map((t) => (
               <button
                 key={t.id}
@@ -147,17 +149,17 @@ export const SettingsPanel = ({
         {/* Features */}
         <div>
           <h3 className={`text-sm font-semibold mb-4 ${theme.text}`}>
-            {t('features')}
+            {t("features")}
           </h3>
           <div className="space-y-3">
             {/* Text Transfer Toggle */}
             <div className="flex items-start justify-between gap-4">
               <div className="flex-1">
                 <p className={`text-sm font-medium ${theme.text}`}>
-                  {t('text_transfer')}
+                  {t("text_transfer")}
                 </p>
                 <p className={`text-xs mt-0.5 ${theme.subText}`}>
-                  {t('enable_sending_receiving')}
+                  {t("enable_sending_receiving")}
                 </p>
               </div>
               <button
@@ -190,10 +192,10 @@ export const SettingsPanel = ({
             <div className="flex items-start justify-between gap-4">
               <div className="flex-1">
                 <p className={`text-sm font-medium ${theme.text}`}>
-                  {t('enable_security')}
+                  {t("enable_security")}
                 </p>
                 <p className={`text-xs mt-0.5 ${theme.subText}`}>
-                  {t('require_token')}
+                  {t("require_token")}
                 </p>
               </div>
               <button
@@ -226,10 +228,10 @@ export const SettingsPanel = ({
             <div className="flex items-start justify-between gap-4">
               <div className="flex-1">
                 <p className={`text-sm font-medium ${theme.text}`}>
-                  {t('multi_client')}
+                  {t("multi_client")}
                 </p>
                 <p className={`text-xs mt-0.5 ${theme.subText}`}>
-                  {t('allow_multiple_devices')}
+                  {t("allow_multiple_devices")}
                 </p>
               </div>
               <button
@@ -264,14 +266,14 @@ export const SettingsPanel = ({
         {serverInfo && (
           <div>
             <h3 className={`text-sm font-semibold mb-4 ${theme.text}`}>
-              {t('server_info')}
+              {t("server_info")}
             </h3>
             <div className="space-y-3">
               <div>
                 <p
                   className={`text-[10px] uppercase tracking-wider mb-1.5 ${theme.subText}`}
                 >
-                  {t('url')}
+                  {t("url")}
                 </p>
                 <div className="flex items-center gap-2">
                   <code className={`text-xs font-mono flex-1 ${theme.text}`}>
@@ -303,7 +305,7 @@ export const SettingsPanel = ({
                   <p
                     className={`text-[10px] uppercase tracking-wider mb-1.5 ${theme.subText}`}
                   >
-                    {t('wifi_network')}
+                    {t("wifi_network")}
                   </p>
                   <code className={`text-xs font-mono ${theme.text}`}>
                     {serverInfo.ssid}
@@ -324,7 +326,7 @@ export const SettingsPanel = ({
                     size={14}
                     className={isCheckingNetwork ? "animate-spin" : ""}
                   />
-                  {isCheckingNetwork ? t('restarting') : t('restart_server')}
+                  {isCheckingNetwork ? t("restarting") : t("restart_server")}
                 </button>
               </div>
             </div>
@@ -335,7 +337,7 @@ export const SettingsPanel = ({
         {multiClientEnabled && clients.length > 0 && (
           <div>
             <h3 className={`text-sm font-semibold mb-4 ${theme.text}`}>
-              {t('connected_devices')} ({clients.length})
+              {t("connected_devices")} ({clients.length})
             </h3>
             <div className="space-y-2">
               {clients.map((client) => (
@@ -354,9 +356,10 @@ export const SettingsPanel = ({
           </div>
         )}
         {/* App Version */}
-        <div className="pt-4 mt-8 border-t border-gray-100 dark:border-slate-800 opacity-30">
-          <p className={`text-[10px] text-center ${theme.subText}`}>
-            {t('app_name')} {t('v')}{APP_VERSION}
+        <div className="pt-4 mt-8 border-t border-gray-100 dark:border-slate-800 opacity-40">
+          <p className={`text-[13px] text-center ${theme.text}`}>
+            {t("app_name")} {t("v")}
+            {APP_VERSION}
           </p>
         </div>
       </div>

@@ -47,7 +47,7 @@ export const QRPanel = ({
         >
           <Upload size={24} />
         </div>
-        <p>{t('starting_server')}</p>
+        <p>{t("starting_server")}</p>
       </div>
     );
   }
@@ -58,12 +58,12 @@ export const QRPanel = ({
       <div className="mb-8 flex flex-col items-center pt-8">
         <h1 className={`flex flex-col items-center text-center ${theme.text}`}>
           <span className="text-sm font-semibold opacity-60 uppercase tracking-wider">
-            {t('connect_device')}
+            {t("connect_device")}
           </span>
           <span
             className={`text-xl font-bold tracking-tight mt-1  uppercase ${theme.text}`}
           >
-            {t('start_sharing')}
+            {t("start_sharing")}
           </span>
         </h1>
       </div>
@@ -74,7 +74,7 @@ export const QRPanel = ({
           <p
             className={`text-xs font-semibold uppercase tracking-wider ${theme.subText}`}
           >
-            {t('step_1_network')}
+            {t("step_1_network")}
           </p>
 
           {serverInfo?.ssid ? (
@@ -94,8 +94,8 @@ export const QRPanel = ({
             >
               <p className={`text-sm ${theme.text} mb-1`}>
                 {isCheckingNetwork
-                  ? t('checking_network')
-                  : t('trouble_detecting_network')}
+                  ? t("checking_network")
+                  : t("trouble_detecting_network")}
               </p>
             </div>
           )}
@@ -109,7 +109,7 @@ export const QRPanel = ({
               <p
                 className={`text-xs font-semibold uppercase tracking-wider ${theme.subText}`}
               >
-                {t('status')}
+                {t("status")}
               </p>
               <div className="flex flex-col items-center gap-6 py-8">
                 <div
@@ -186,7 +186,7 @@ export const QRPanel = ({
                         className={`text-lg font-bold animate-in fade-in duration-300`}
                         style={{ color: "#22c55e" }}
                       >
-                        {t('downloading')}
+                        {t("downloading")}
                       </p>
                       <p
                         className={`text-sm ${theme.subText} truncate max-w-[250px] animate-in fade-in duration-300`}
@@ -199,12 +199,12 @@ export const QRPanel = ({
                       <p
                         className={`text-lg font-bold ${theme.text} animate-in fade-in duration-300`}
                       >
-                        {t('connected')}
+                        {t("connected")}
                       </p>
                       <p
                         className={`text-sm ${theme.subText} animate-in fade-in duration-300`}
                       >
-                        {clients[0].name || clients[0].platform} {t('device')}
+                        {clients[0].name || clients[0].platform} {t("device")}
                       </p>
                     </>
                   )}
@@ -217,7 +217,7 @@ export const QRPanel = ({
               <p
                 className={`text-xs font-semibold uppercase tracking-wider ${theme.subText}`}
               >
-                {t('step_2_scan_qr')}
+                {t("step_2_scan_qr")}
               </p>
 
               <div className="flex justify-center ">
@@ -248,7 +248,7 @@ export const QRPanel = ({
                         logoWidth: 30,
                         logoPaddingStyle: "circle",
                         logoOpacity: 1,
-                        ecLevel: "Q",
+                        ecLevel: "H",
                         eyeRadius: 50,
                         eyeColor: isDarkMode ? "#d6e3ef" : "#1b415e",
                         removeQrCodeBehindLogo: true,
@@ -289,13 +289,13 @@ export const QRPanel = ({
                   <p
                     className={`text-[10px] uppercase tracking-widest font-bold opacity-30`}
                   >
-                    {t('or_enter_url_manually')}
+                    {t("or_enter_url_manually")}
                   </p>
                 </div>
               ) : (
-                  <p className={`text-xs ${theme.subText}`}>
-                    {t('waiting_network')}
-                  </p>
+                <p className={`text-xs ${theme.subText}`}>
+                  {t("waiting_network")}
+                </p>
               )}
             </>
           )}
@@ -317,7 +317,7 @@ export const QRPanel = ({
               size={18}
               className={isCheckingNetwork ? "animate-spin" : ""}
             />
-            {isCheckingNetwork ? t('restarting') : t('restart_server')}
+            {isCheckingNetwork ? t("restarting") : t("restart_server")}
           </button>
         </div>
       </div>
@@ -328,10 +328,10 @@ export const QRPanel = ({
           className={`mt-10 w-full px-4 animate-in slide-in-from-bottom-2 fade-in duration-500`}
         >
           <h3
-             className={`text-xs font-semibold uppercase tracking-wider mb-3 text-center ${theme.subText}`}
-           >
-             {t('connected_devices')}
-           </h3>
+            className={`text-xs font-semibold uppercase tracking-wider mb-3 text-center ${theme.subText}`}
+          >
+            {t("connected_devices")}
+          </h3>
           <div className="flex flex-col gap-2">
             {clients.map((client) => (
               <EditableDeviceName

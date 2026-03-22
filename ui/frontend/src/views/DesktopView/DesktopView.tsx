@@ -28,6 +28,7 @@ import { useTransactions } from "../../hooks/useTransactions";
 import { formatBytes } from "../../utils/format";
 import { useDevices, type Client } from "../../hooks/useDevices";
 import { useActivity } from "../../hooks/useActivity";
+import { useShareTarget } from "../../hooks/useShareTarget";
 import {
   X,
   MessageSquare,
@@ -109,10 +110,11 @@ export const DesktopView = () => {
           setFilePaths(paths);
           isUserAtBottomRef.current = true;
           const info = await StartTransfer(paths);
+          alert(JSON.stringify(info));
           setServerInfo(info);
           logActivity(
             "shared",
-            `${t("sharing_files", { count: paths.length })} via drag & drop: ${paths.map((p) => p.split(/[\\/]/).pop()).join(", ")}`,
+            `[FILE DROP] Sharing file(s) (Count: ${paths.length}, Size: ${formatBytes(info.size)})`,
           );
         }
       } catch (err) {
@@ -260,6 +262,26 @@ export const DesktopView = () => {
   const { clients } = useDevices(serverInfo?.url, true, adminToken);
   // Speed is calculated inline using calculateSpeed helper
 
+  // Hook: Windows Share Target
+  useShareTarget(async (data) => {
+    if (data.files && data.files.length > 0) {
+      setFilePaths(data.files);
+      const info = await StartTransfer(data.files);
+      setServerInfo(info);
+      logActivity(
+        "shared",
+        `[SHARE TARGET] Sharing ${data.files.length} file(s) via Windows Share: ${data.files.map((p: string) => p.split(/[\\/]/).pop()).join(", ")}`,
+      );
+    } else if (data.text || data.url) {
+      const content = data.text || data.url;
+      await sendText(content, "server");
+      logActivity(
+        "shared",
+        `[SHARE TARGET] Shared via Windows: ${content.substring(0, 30)}...`,
+      );
+    }
+  });
+
   // Track previously-seen transaction statuses so we only log once per completion
   const prevTransactionStatuses = useRef<Record<number, string>>({});
 
@@ -274,25 +296,19 @@ export const DesktopView = () => {
             ? ` (${formatBytes(txn.fileSize)})`
             : "";
           if (isMe) {
-            logActivity(
-              "sent",
-              `${t("sent")} ${txn.filename || "file"}${sizeLabel}`,
-            );
+            logActivity("sent", `Sent ${txn.filename || "file"}${sizeLabel}`);
           } else {
             logActivity(
               "received",
-              `${t("received")} ${txn.filename || "file"}${sizeLabel}`,
+              `Received ${txn.filename || "file"}${sizeLabel}`,
             );
           }
         } else if (txn.type === "text") {
           const charCount = txn.textContent?.length || 0;
           if (isMe) {
-            logActivity("sent", `${t("sent")} ${charCount} characters text`);
+            logActivity("sent", `Sent ${charCount} characters text`);
           } else {
-            logActivity(
-              "received",
-              `${t("received")} ${charCount} characters text`,
-            );
+            logActivity("received", `Received ${charCount} characters text`);
           }
         }
       }
@@ -302,15 +318,15 @@ export const DesktopView = () => {
 
   // Log app session start / end
   useEffect(() => {
-    logActivity("started", `${t("app_name")} v${APP_VERSION}`);
+    logActivity("started", `PeerHop v${APP_VERSION}`);
     return () => {
-      logActivity("closed", t("app_session_ended"));
+      logActivity("closed", "App session ended");
     };
-  }, [logActivity, t]);
+  }, [logActivity]);
 
   const handleFileOpened = useCallback(
     (filename: string) => {
-      logActivity("opened", `${t("opened")} ${filename}`);
+      logActivity("opened", `Opened ${filename}`);
     },
     [logActivity],
   );
@@ -328,7 +344,7 @@ export const DesktopView = () => {
       await axios.post(url, { ip: client.ip });
       logActivity(
         "blocked",
-        `${client.blocked ? t("unblocked") : t("blocked")} device: ${client.name || client.platform} (${client.ip})`,
+        `${client.blocked ? "Unblocked" : "Blocked"} device: ${client.name || client.platform} (${client.ip})`,
       );
     } catch (err) {
       console.error("Failed to block/unblock client:", err);
@@ -349,7 +365,7 @@ export const DesktopView = () => {
       await axios.post(url, { ip: client.ip });
       logActivity(
         "blocked",
-        `${client.sendingBlocked ? t("unblock_sending") : t("block_sending")} from: ${client.name || client.platform} (${client.ip})`,
+        `${client.sendingBlocked ? "Unblocked sending from" : "Blocked sending from"} from: ${client.name || client.platform} (${client.ip})`,
       );
     } catch (err) {
       console.error("Failed to block/unblock sending for client:", err);
@@ -373,7 +389,7 @@ export const DesktopView = () => {
       if (!prev.find((p) => p.ip === c.ip)) {
         logActivity(
           "connected",
-          `${t("device_connected")}: ${c.name || c.platform} (${c.ip})`,
+          `Device connected: ${c.name || c.platform} (${c.ip})`,
         );
       }
     });
@@ -382,7 +398,7 @@ export const DesktopView = () => {
       if (!clients.find((curr) => curr.ip === c.ip)) {
         logActivity(
           "disconnected",
-          `${t("device_disconnected")}: ${c.name || c.platform} (${c.ip})`,
+          `Device disconnected: ${c.name || c.platform} (${c.ip})`,
         );
       }
     });
@@ -671,7 +687,7 @@ export const DesktopView = () => {
         setServerInfo(info);
         logActivity(
           "shared",
-          `${t("sharing_files", { count: files.length })}: ${files.map((f) => f.split(/[\\/]/).pop()).join(", ")}`,
+          `[FILE SELECT] Sharing file(s) (Count: ${files.length}, Size: ${formatBytes(info.size)})`,
         );
       }
     } catch (err) {
@@ -748,7 +764,7 @@ export const DesktopView = () => {
 
   return (
     <div
-      className={`flex h-screen w-full font-sans overflow-hidden transition-colors duration-300 ${theme.bg} ${theme.text} relative`}
+      className={`flex h-screen w-[calc(100vw-1px)] font-sans overflow-hidden transition-colors duration-300 ${theme.bg} ${theme.text} relative hide-scrollbar`}
       style={
         {
           "--wails-drop-target": "drop",
@@ -937,7 +953,7 @@ export const DesktopView = () => {
          On Desktop: Static positioning sits side-by-side.
       */}
       <div
-        className={`
+        className={`overflow-x-hidden 
             absolute top-[48px] bottom-0 right-0 w-full z-40 
             md:static md:w-[350px] md:border-l md:z-30 md:pr-1 md:shrink-0
             flex-col shadow-xl transition-all duration-300 
@@ -951,8 +967,8 @@ export const DesktopView = () => {
         style={{ "--wails-draggable": "no-drag" } as React.CSSProperties}
       >
         {/* Toggle between Settings and QR Panel */}
-        <div className="flex-1 overflow-y-auto custom-scrollbar p-8 animate-in slide-in-from-right duration-300">
-          <div className="min-h-full flex flex-col items-center justify-start">
+        <div className="flex-1 overflow-y-auto hide-scrollbar p-8 animate-in slide-in-from-right duration-300">
+          <div className="min-h-full flex flex-col items-center justify-start ">
             {activeTab === "settings" ? (
               /* Settings Panel */
               <SettingsPanel

@@ -721,6 +721,13 @@ func (h *UnifiedHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 		id := h.TxStore.AddTransaction(txn)
 
+		// Broadcast new text transaction
+		if h.WSHub != nil {
+			if txnCopy, exists := h.TxStore.GetTransactionCopy(id); exists {
+				h.WSHub.BroadcastTransactionUpdate(txnCopy)
+			}
+		}
+
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"success": true,
@@ -1306,7 +1313,17 @@ func (h *UnifiedHandler) handleUpload(w http.ResponseWriter, r *http.Request) {
 				ClientIP:           uploadClientIP,
 			}
 			txnID = h.TxStore.AddTransaction(txn)
-			h.TxStore.SetDownloadLink(txnID, fmt.Sprintf("/api/download-file/%d", txnID)) // Enable download with progress
+			link := fmt.Sprintf("/api/download-file/%d", txnID)
+			h.TxStore.SetDownloadLink(txnID, link) // Enable download with progress
+			txn.DownloadLink = link                // Update the local txn object with the download link
+
+			// Broadcast new transaction
+			if h.WSHub != nil {
+				if txnCopy, exists := h.TxStore.GetTransactionCopy(txnID); exists {
+					h.WSHub.BroadcastTransactionUpdate(txnCopy)
+				}
+			}
+
 			transactionIDs = append(transactionIDs, txnID)
 			fmt.Printf("[Upload] Created transaction ID=%d for file: %s (Streaming)\n", txnID, filename)
 		}

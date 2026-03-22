@@ -36,7 +36,6 @@
   "select_files": "Select Files",
   "close_text_input": "Close Text Input",
   "cancelled": "Cancelled",
-  "sharing_files": "Sharing {{count}} file(s)",
   "sent": "Sent",
   "received": "Received",
   "opened": "Opened",

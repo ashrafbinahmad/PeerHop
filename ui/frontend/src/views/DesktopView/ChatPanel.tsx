@@ -121,7 +121,7 @@ export const ChatPanel = ({
       <div
         ref={scrollContainerRef}
         onScroll={handleScroll}
-        className="flex-1 overflow-y-auto px-4 py-4 pt-16 flex flex-col scroll-smooth custom-scrollbar w-full overflow-hidden"
+        className="flex-1 overflow-y-auto px-4 py-4 pt-16 flex flex-col scroll-smooth custom-scrollbar w-full overflow-hidden hide-scrollbar"
       >
         <div className="mt-auto flex flex-col gap-3">
           {visibleTransactions.length === 0 ? (
@@ -232,7 +232,7 @@ export const ChatPanel = ({
 
                     <div className="relative z-10">
                       {transaction.type === "text" && (
-                        <div className="relative min-w-[120px] max-h-[300px] overflow-y-auto">
+                        <div className="relative min-w-12  max-w-[calc(100vw-145px)] md:max-w-[calc(100vw-545px)] max-h-[300px] overflow-y-auto custom-scrollbar">
                           <div className="sticky top-0 right-0 float-right z-10 ml-2">
                             <CopyButton
                               text={transaction.textContent || ""}
@@ -246,7 +246,7 @@ export const ChatPanel = ({
                               iconSize={12}
                             />
                           </div>
-                          <div className="text-[15px] leading-relaxed break-words">
+                          <div className="text-[13px] leading-relaxed break-words">
                             {transaction.textContent}
                           </div>
                         </div>

@@ -18,6 +18,24 @@ export namespace main {
 	        this.ssid = source["ssid"];
 	    }
 	}
+	export class ShareData {
+	    files: string[];
+	    text: string;
+	    url: string;
+	    title: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ShareData(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.files = source["files"];
+	        this.text = source["text"];
+	        this.url = source["url"];
+	        this.title = source["title"];
+	    }
+	}
 
 }
 

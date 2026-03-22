@@ -29,34 +29,42 @@ function exec(command) {
 
 // Configuration
 const APP_DISPLAY_NAME = "PeerHop";
-const APP_IDENTITY_NAME = "Transender.PeerHop"; // From Partner Center
-const PUBLISHER_DISPLAY_NAME = "Peerhop"; // Change this to your actual publisher name if you buy a cert
-const CERT_SUBJECT = "CN=CBE90A45-8594-4076-AEDB-BD3B88F1C249"; // From Partner Center
-const CERT_PASSWORD = "PeerHop123"; // Logic should probably accept this via env var
+const APP_IDENTITY_NAME = "Transender.PeerHop";
+const PUBLISHER_DISPLAY_NAME = "Peerhop";
+const CERT_SUBJECT = "CN=CBE90A45-8594-4076-AEDB-BD3B88F1C249";
+const CERT_PASSWORD = "PeerHop123";
 const SCRIPT_DIR = __dirname;
 const ROOT_DIR = path.join(SCRIPT_DIR, '..');
 const BUILDS_DIR = path.join(ROOT_DIR, 'builds');
-const DIST_DIR = path.join(ROOT_DIR, 'ui', 'build', 'windows', 'msix_dist'); // Temp layout dir
+const DIST_DIR = path.join(ROOT_DIR, 'ui', 'build', 'windows', 'msix_dist');
 
-// Input executable
 const INPUT_EXE = path.join(BUILDS_DIR, 'peerhop_win.exe');
+const SHIM_EXE = path.join(ROOT_DIR, 'share_shim', 'build', 'Release', 'ShareShim.exe');
 const OUTPUT_MSIX = path.join(BUILDS_DIR, 'peerhop_store.msix');
 const CERT_PATH = path.join(SCRIPT_DIR, 'PeerHop_SelfSigned.pfx');
 
-// Check tools
-const SDK_PATH = "C:\\Program Files (x86)\\Windows Kits\\10\\bin\\10.0.22621.0\\x64";
+const SDK_PATH = "C:\\Program Files (x86)\\Windows Kits\\10\\bin\\10.0.26100.0\\x64";
 let makeAppxPath = "MakeAppx.exe";
 let signToolPath = "SignTool.exe";
 
+// Supported file types for share target and file association
+// Add more extensions here as needed — no wildcards, must start with a dot
+const SUPPORTED_FILE_TYPES = [
+  '.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp',
+  '.mp4', '.mov', '.avi', '.mkv', '.wmv',
+  '.mp3', '.wav', '.aac', '.flac',
+  '.pdf', '.txt', '.docx', '.xlsx', '.pptx',
+  '.zip', '.rar', '.7z',
+  // '.apk', '.exe',
+];
+
 function checkTools() {
   try {
-    // Try global path first
     try {
       execSync('MakeAppx.exe /?', { stdio: 'ignore' });
       execSync('SignTool.exe /?', { stdio: 'ignore' });
       return true;
     } catch (e) {
-      // Try explicit path
       const explicitMakeAppx = path.join(SDK_PATH, 'MakeAppx.exe');
       const explicitSignTool = path.join(SDK_PATH, 'SignTool.exe');
 
@@ -76,15 +84,32 @@ function checkTools() {
   }
 }
 
-function generateManifest(version) {
-  // MSIX requires version in X.Y.Z.0 format
-  const storeVersion = `${version}.0`;
+function generateFileTypeElements(indent) {
+  return SUPPORTED_FILE_TYPES
+    .map(ext => `${indent}<uap:FileType>${ext}</uap:FileType>`)
+    .join('\n');
+}
 
+function generateManifest(version) {
+  const storeVersion = `${version}.0`;
+  // const fileTypeElements6 = generateFileTypeElements('            ');  // 12 spaces
+  const fileTypeElements8 = generateFileTypeElements('                ');  // 16 spaces
   const manifestContent = `<?xml version="1.0" encoding="utf-8"?>
 <Package
   xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
   xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
-  xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities">
+  xmlns:uap2="http://schemas.microsoft.com/appx/manifest/uap/windows10/2"
+  xmlns:uap3="http://schemas.microsoft.com/appx/manifest/uap/windows10/3"
+  xmlns:uap7="http://schemas.microsoft.com/appx/manifest/uap/windows10/7"
+  xmlns:uap10="http://schemas.microsoft.com/appx/manifest/uap/windows10/10"
+  xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+  xmlns:desktop="http://schemas.microsoft.com/appx/manifest/desktop/windows10"
+  xmlns:desktop2="http://schemas.microsoft.com/appx/manifest/desktop/windows10/2"
+  xmlns:desktop3="http://schemas.microsoft.com/appx/manifest/desktop/windows10/3"
+  xmlns:desktop4="http://schemas.microsoft.com/appx/manifest/desktop/windows10/4"
+  xmlns:desktop5="http://schemas.microsoft.com/appx/manifest/desktop/windows10/5"
+  xmlns:desktop7="http://schemas.microsoft.com/appx/manifest/desktop/windows10/7"
+  IgnorableNamespaces="uap10 uap3 uap7 desktop desktop2 desktop3">
 
   <Identity
     Name="${APP_IDENTITY_NAME}"
@@ -99,7 +124,7 @@ function generateManifest(version) {
   </Properties>
 
   <Dependencies>
-    <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.17763.0" MaxVersionTested="10.0.19041.0" />
+    <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.17763.0" MaxVersionTested="10.0.26100.0" />
   </Dependencies>
 
   <Resources>
@@ -109,7 +134,8 @@ function generateManifest(version) {
   <Applications>
     <Application Id="App"
       Executable="PeerHop.exe"
-      EntryPoint="Windows.FullTrustApplication">
+      EntryPoint="Windows.FullTrustApplication"
+      uap10:SupportsMultipleInstances="true">
       <uap:VisualElements
         DisplayName="${APP_DISPLAY_NAME}"
         Description="Fast local file transfer"
@@ -117,6 +143,31 @@ function generateManifest(version) {
         Square150x150Logo="Assets\\Square150x150Logo.png"
         Square44x44Logo="Assets\\Square44x44Logo.png">
       </uap:VisualElements>
+      <Extensions>
+        <!-- Share Target: activated when user shares files/text to PeerHop -->
+        <uap:Extension Category="windows.shareTarget" Executable="ShareShim.exe" EntryPoint="Windows.FullTrustApplication">
+          <uap:ShareTarget>
+            <uap:SupportedFileTypes>
+              <uap:SupportsAnyFileType/>
+            </uap:SupportedFileTypes>
+            <uap:DataFormat>StorageItems</uap:DataFormat>
+            <uap:DataFormat>Text</uap:DataFormat>
+            <uap:DataFormat>URI</uap:DataFormat>
+          </uap:ShareTarget>
+        </uap:Extension>
+
+        <!-- File Type Association: adds "Send with PeerHop" to right-click context menu -->
+        <uap:Extension Category="windows.fileTypeAssociation" Executable="ShareShim.exe" EntryPoint="Windows.FullTrustApplication">
+          <uap:FileTypeAssociation Name="peerhop.send">
+            <uap:SupportedFileTypes>
+        ${fileTypeElements8}
+            </uap:SupportedFileTypes>
+            <uap2:SupportedVerbs>
+              <uap3:Verb Id="open" MultiSelectModel="Player" Parameters='"%1"'>Send with PeerHop</uap3:Verb>
+            </uap2:SupportedVerbs>
+          </uap:FileTypeAssociation>
+        </uap:Extension>      
+      </Extensions>
     </Application>
   </Applications>
 
@@ -131,6 +182,18 @@ function generateManifest(version) {
 function buildMSIX(version) {
   log('\nBuilding MSIX Package...', 'cyan');
 
+  // Build ShareShim
+  const SHIM_BUILD_BAT = path.join(ROOT_DIR, 'scripts', 'build-shim.bat');
+  if (fs.existsSync(SHIM_BUILD_BAT)) {
+    log('Building ShareShim utility...', 'cyan');
+    try {
+      execSync(`"${SHIM_BUILD_BAT}"`, { stdio: 'inherit', cwd: ROOT_DIR });
+      log('ShareShim build completed.', 'green');
+    } catch (error) {
+      log('Error: Failed to build ShareShim. Please ensure CMake and Visual Studio are installed.', 'red');
+    }
+  }
+
   if (!fs.existsSync(INPUT_EXE)) {
     log(`Error: Input executable not found: ${INPUT_EXE}`, 'red');
     return false;
@@ -144,31 +207,67 @@ function buildMSIX(version) {
   fs.mkdirSync(DIST_DIR, { recursive: true });
   fs.mkdirSync(path.join(DIST_DIR, 'Assets'), { recursive: true });
 
-  // Copy Executable
+  // Copy main executable
   fs.copyFileSync(INPUT_EXE, path.join(DIST_DIR, 'PeerHop.exe'));
 
-  // Create Dummy Assets (Use real ones if available in assets folder)
-  // For now, we'll try to find them or warn.
-  // TODO: Generate or copy real assets. For this script to work out of box, we need files.
-  // We will assume they exist or copy the appicon.png as placeholder.
-  const sourceIcon = path.join(ROOT_DIR, 'ui', 'build', 'appicon.png');
-  if (fs.existsSync(sourceIcon)) {
-    fs.copyFileSync(sourceIcon, path.join(DIST_DIR, 'Assets', 'StoreLogo.png'));
-    fs.copyFileSync(sourceIcon, path.join(DIST_DIR, 'Assets', 'Square150x150Logo.png'));
-    fs.copyFileSync(sourceIcon, path.join(DIST_DIR, 'Assets', 'Square44x44Logo.png'));
+  // Copy ShareShim
+  if (fs.existsSync(SHIM_EXE)) {
+    fs.copyFileSync(SHIM_EXE, path.join(DIST_DIR, 'ShareShim.exe'));
+    log('Copied ShareShim.exe to layout', 'green');
   } else {
-    log('Warning: appicon.png not found. Creating empty placeholders.', 'yellow');
-    fs.writeFileSync(path.join(DIST_DIR, 'Assets', 'StoreLogo.png'), '');
-    fs.writeFileSync(path.join(DIST_DIR, 'Assets', 'Square150x150Logo.png'), '');
-    fs.writeFileSync(path.join(DIST_DIR, 'Assets', 'Square44x44Logo.png'), '');
+    log(`Error: ShareShim.exe not found at ${SHIM_EXE}.`, 'red');
+    log('Please build it first using: scripts\\build-shim.bat', 'red');
+    process.exit(1);
   }
+
+  // Copy assets
+  const sourceIcon = path.join(ROOT_DIR, 'ui', 'build', 'appicon.png');
+  const source150Icon = path.join(ROOT_DIR, 'ui', 'frontend', 'src', 'assets', 'images', 'appicon150x150.png');
+  const source44Icon = path.join(ROOT_DIR, 'ui', 'frontend', 'src', 'assets', 'images', 'appicon44x44.png');
+  const source44IconAlt44 = path.join(ROOT_DIR, 'ui', 'frontend', 'src', 'assets', 'images', 'appicon44x44.targetsize-44_altform-unplated.png');
+  const source44IconAlt256 = path.join(ROOT_DIR, 'ui', 'frontend', 'src', 'assets', 'images', 'appicon44x44.targetsize-256_altform-unplated.png');
+  const source44IconAlt48 = path.join(ROOT_DIR, 'ui', 'frontend', 'src', 'assets', 'images', 'appicon44x44.targetsize-48_altform-unplated.png');
+  const source44IconIco = path.join(ROOT_DIR, 'ui', 'frontend', 'src', 'assets', 'images', 'appicon44x44.ico');
+  const sourceLogoUniversal = path.join(ROOT_DIR, 'ui', 'frontend', 'src', 'assets', 'images', 'logo-universal.png');
+
+  function copyIfExists(src, dest) {
+    if (fs.existsSync(src)) {
+      fs.copyFileSync(src, dest);
+      return true;
+    }
+    log(`Warning: ${path.relative(ROOT_DIR, src)} not found; skipping ${path.relative(ROOT_DIR, dest)}`, 'yellow');
+    return false;
+  }
+
+  if (!fs.existsSync(sourceIcon)) {
+    log('Error: appicon.png not found. Please build the frontend before packaging MSIX.', 'red');
+    process.exit(1);
+  }
+
+  copyIfExists(sourceIcon, path.join(DIST_DIR, 'Assets', 'StoreLogo.png'));
+  copyIfExists(source150Icon, path.join(DIST_DIR, 'Assets', 'Square150x150Logo.png'));
+  copyIfExists(source150Icon, path.join(DIST_DIR, 'Assets', 'Square150x150Logo.altform-unplated.png'));
+  copyIfExists(source150Icon, path.join(DIST_DIR, 'Assets', 'Square150x150Logo.scale-100.altform-unplated.png'));
+  copyIfExists(source150Icon, path.join(DIST_DIR, 'Assets', 'Square150x150Logo.scale-125.altform-unplated.png'));
+  copyIfExists(source150Icon, path.join(DIST_DIR, 'Assets', 'Square150x150Logo.scale-150.altform-unplated.png'));
+  copyIfExists(source150Icon, path.join(DIST_DIR, 'Assets', 'Square150x150Logo.scale-200.altform-unplated.png'));
+  copyIfExists(source44Icon, path.join(DIST_DIR, 'Assets', 'Square44x44Logo.png'));
+  copyIfExists(source44IconAlt44, path.join(DIST_DIR, 'Assets', 'Peerhop.altform-unplated.png'));
+  copyIfExists(source44IconAlt44, path.join(DIST_DIR, 'Assets', 'Square44x44Logo.scale-100.altform-unplated.png'));
+  copyIfExists(source44IconAlt44, path.join(DIST_DIR, 'Assets', 'Square44x44Logo.scale-125.altform-unplated.png'));
+  copyIfExists(source44IconAlt44, path.join(DIST_DIR, 'Assets', 'Square44x44Logo.scale-150.altform-unplated.png'));
+  copyIfExists(source44IconAlt44, path.join(DIST_DIR, 'Assets', 'Square44x44Logo.scale-200.altform-unplated.png'));
+  copyIfExists(source44IconAlt256, path.join(DIST_DIR, 'Assets', 'Square44x44Logo.targetsize-256_altform-unplated.png'));
+  copyIfExists(source44IconAlt48, path.join(DIST_DIR, 'Assets', 'Square44x44Logo.targetsize-48_altform-unplated.png'));
+  copyIfExists(source44IconIco, path.join(DIST_DIR, 'Assets', 'Square44x44Logo.ico'));
+  copyIfExists(sourceLogoUniversal, path.join(DIST_DIR, 'Assets', 'LogoUniversal.png'));
 
   // 2. Generate Manifest
   log('Generating AppxManifest.xml...', 'white');
   const manifest = generateManifest(version);
   fs.writeFileSync(path.join(DIST_DIR, 'AppxManifest.xml'), manifest);
 
-  // 3. MakeAppx
+  // 3. Pack MSIX
   log('Packing MSIX...', 'white');
   if (fs.existsSync(OUTPUT_MSIX)) fs.unlinkSync(OUTPUT_MSIX);
 
@@ -178,10 +277,8 @@ function buildMSIX(version) {
   // 4. Sign
   log('Signing MSIX...', 'white');
 
-  // Check if we need to generate cert
   if (!fs.existsSync(CERT_PATH)) {
     log('Certificate not found. Generating self-signed cert...', 'yellow');
-    // Execute powershell script
     const psCmd = `powershell -ExecutionPolicy Bypass -File "${path.join(SCRIPT_DIR, 'generate-test-cert.ps1')}"`;
     execSync(psCmd, { stdio: 'inherit' });
   }

@@ -36,7 +36,6 @@
   "select_files": "اختر الملفات",
   "close_text_input": "إغلاق حقل النص",
   "cancelled": "ملغى",
-  "sharing_files": "مشاركة {{count}} ملف(ات)",
   "sent": "تم الإرسال",
   "received": "تم الاستقبال",
   "opened": "مفتوح",

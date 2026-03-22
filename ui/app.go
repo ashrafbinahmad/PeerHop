@@ -77,8 +77,11 @@ func (a *App) startup(ctx context.Context) {
 		logger.Error("Failed to start server: %v", err)
 	}
 
-	// Start monitoring network changes
-	// go a.monitorNetwork()
+	// Check for Windows Share Target activation and context-menu file args.
+	// Called synchronously so currentShareData is populated before the frontend
+	// calls GetSharedFiles() on mount. The named pipe listener is started
+	// inside a goroutine within CheckShareActivation itself.
+	a.CheckShareActivation()
 }
 
 // startPersistentServer starts a server that runs throughout the app lifetime
@@ -263,23 +266,29 @@ func (a *App) StartTransfer(paths []string) (*ServerInfo, error) {
 				SenderID:           server.SenderServer,
 				Filename:           filepath.Base(zipPath),
 				FileSize:           stat.Size(),
-				DownloadLink:       "", // Set after ID generation
+				DownloadLink:       "",
 				ServerFilePath:     zipPath,
 				TransactionPercent: 0,
 				Status:             "pending",
 			}
 			txnID := a.unifiedHandler.TxStore.AddTransaction(txn)
-			a.unifiedHandler.TxStore.SetDownloadLink(txnID, fmt.Sprintf("/api/download-file/%d", txnID))
-			fmt.Printf("[Desktop] Created download transaction ID=%d for zip: %s\n", txnID, filepath.Base(zipPath))
+			link := fmt.Sprintf("/api/download-file/%d", txnID)
+			a.unifiedHandler.TxStore.SetDownloadLink(txnID, link)
+			txn.DownloadLink = link
+
+			if a.unifiedHandler.WSHub != nil {
+				if txnCopy, exists := a.unifiedHandler.TxStore.GetTransactionCopy(txnID); exists {
+					a.unifiedHandler.WSHub.BroadcastTransactionUpdate(txnCopy)
+				}
+			}
+			fmt.Printf("[Desktop] Created and broadcasted download transaction ID=%d for zip: %s\n", txnID, filepath.Base(zipPath))
 		}
 
-		// Update server info
 		if a.serverInfo != nil {
 			a.serverInfo.Filename = filepath.Base(zipPath)
 			a.serverInfo.Size = stat.Size()
 		}
 
-		// Set the first file for legacy download endpoint
 		if a.unifiedHandler != nil {
 			a.unifiedHandler.SetFilePath(zipPath)
 		}
@@ -288,12 +297,18 @@ func (a *App) StartTransfer(paths []string) (*ServerInfo, error) {
 	}
 
 	// Multiple files (no directories) - send each individually
+	var totalSize int64
+	var filenames []string
+
 	for i, filePath := range paths {
 		stat, err := os.Stat(filePath)
 		if err != nil {
 			fmt.Printf("[Desktop] Error stating file %s: %v\n", filePath, err)
 			continue
 		}
+
+		totalSize += stat.Size()
+		filenames = append(filenames, filepath.Base(filePath))
 
 		// Create transaction for each file
 		if a.unifiedHandler != nil && a.unifiedHandler.TxStore != nil {
@@ -302,27 +317,32 @@ func (a *App) StartTransfer(paths []string) (*ServerInfo, error) {
 				SenderID:           server.SenderServer,
 				Filename:           filepath.Base(filePath),
 				FileSize:           stat.Size(),
-				DownloadLink:       "", // Set after ID is generated
+				DownloadLink:       "",
 				ServerFilePath:     filePath,
 				TransactionPercent: 0,
 				Status:             "pending",
 			}
 			txnID := a.unifiedHandler.TxStore.AddTransaction(txn)
-			// Update download link with correct ID
-			a.unifiedHandler.TxStore.SetDownloadLink(txnID, fmt.Sprintf("/api/download-file/%d", txnID))
-			fmt.Printf("[Desktop] Created download transaction ID=%d for file: %s\n", txnID, filepath.Base(filePath))
+			link := fmt.Sprintf("/api/download-file/%d", txnID)
+			a.unifiedHandler.TxStore.SetDownloadLink(txnID, link)
+			txn.DownloadLink = link
+
+			if a.unifiedHandler.WSHub != nil {
+				if txnCopy, exists := a.unifiedHandler.TxStore.GetTransactionCopy(txnID); exists {
+					a.unifiedHandler.WSHub.BroadcastTransactionUpdate(txnCopy)
+				}
+			}
+			fmt.Printf("[Desktop] Created and broadcasted download transaction ID=%d for file [%d/%d]: %s\n", txnID, i+1, len(paths), filepath.Base(filePath))
 		}
 
-		// Set the first file for legacy download endpoint
 		if i == 0 && a.unifiedHandler != nil {
 			a.unifiedHandler.SetFilePath(filePath)
-
-			// Update server info with first file
-			if a.serverInfo != nil {
-				a.serverInfo.Filename = filepath.Base(filePath)
-				a.serverInfo.Size = stat.Size()
-			}
 		}
+	}
+
+	if a.serverInfo != nil {
+		a.serverInfo.Filename = strings.Join(filenames, ", ")
+		a.serverInfo.Size = totalSize
 	}
 
 	return a.serverInfo, nil

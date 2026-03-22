@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Package
+  xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+  xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+  xmlns:uap2="http://schemas.microsoft.com/appx/manifest/uap/windows10/2"
+  xmlns:uap3="http://schemas.microsoft.com/appx/manifest/uap/windows10/3"
+  xmlns:uap7="http://schemas.microsoft.com/appx/manifest/uap/windows10/7"
+  xmlns:uap10="http://schemas.microsoft.com/appx/manifest/uap/windows10/10"
+  xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+  xmlns:desktop="http://schemas.microsoft.com/appx/manifest/desktop/windows10"
+  xmlns:desktop2="http://schemas.microsoft.com/appx/manifest/desktop/windows10/2"
+  xmlns:desktop3="http://schemas.microsoft.com/appx/manifest/desktop/windows10/3"
+  IgnorableNamespaces="uap10 uap3 uap7 desktop desktop2 desktop3">
+
+  <Identity
+    Name="Transender.PeerHop"
+    Version="2.5.1.0"
+    Publisher="CN=CBE90A45-8594-4076-AEDB-BD3B88F1C249"
+    ProcessorArchitecture="x64" />
+
+  <Properties>
+    <DisplayName>PeerHop</DisplayName>
+    <PublisherDisplayName>Peerhop</PublisherDisplayName>
+    <Logo>Assets\StoreLogo.png</Logo>
+  </Properties>
+
+  <Dependencies>
+    <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.17763.0" MaxVersionTested="10.0.19041.0" />
+  </Dependencies>
+
+  <Resources>
+    <Resource Language="en-us"/>
+  </Resources>
+
+  <Applications>
+    <Application Id="App"
+      Executable="PeerHop.exe"
+      EntryPoint="Windows.FullTrustApplication"
+      uap10:SupportsMultipleInstances="true">
+      <uap:VisualElements
+        DisplayName="PeerHop"
+        Description="Fast local file transfer"
+        BackgroundColor="transparent"
+        Square150x150Logo="Assets\StoreLogo.png"
+        Square44x44Logo="Assets\Square44x44Logo.png">
+      </uap:VisualElements>
+      <Extensions>
+        <!-- Share Target: activated when user shares files/text to PeerHop -->
+        <uap:Extension Category="windows.shareTarget" Executable="ShareShim.exe" EntryPoint="Windows.FullTrustApplication">
+          <uap:ShareTarget>
+            <uap:SupportedFileTypes>
+            <uap:FileType>.jpg</uap:FileType>
+            <uap:FileType>.jpeg</uap:FileType>
+            <uap:FileType>.png</uap:FileType>
+            <uap:FileType>.gif</uap:FileType>
+            <uap:FileType>.webp</uap:FileType>
+            <uap:FileType>.bmp</uap:FileType>
+            <uap:FileType>.mp4</uap:FileType>
+            <uap:FileType>.mov</uap:FileType>
+            <uap:FileType>.avi</uap:FileType>
+            <uap:FileType>.mkv</uap:FileType>
+            <uap:FileType>.wmv</uap:FileType>
+            <uap:FileType>.mp3</uap:FileType>
+            <uap:FileType>.wav</uap:FileType>
+            <uap:FileType>.aac</uap:FileType>
+            <uap:FileType>.flac</uap:FileType>
+            <uap:FileType>.pdf</uap:FileType>
+            <uap:FileType>.txt</uap:FileType>
+            <uap:FileType>.docx</uap:FileType>
+            <uap:FileType>.xlsx</uap:FileType>
+            <uap:FileType>.pptx</uap:FileType>
+            <uap:FileType>.zip</uap:FileType>
+            <uap:FileType>.rar</uap:FileType>
+            <uap:FileType>.7z</uap:FileType>
+            </uap:SupportedFileTypes>
+            <uap:DataFormat>StorageItems</uap:DataFormat>
+            <uap:DataFormat>Text</uap:DataFormat>
+            <uap:DataFormat>URI</uap:DataFormat>
+          </uap:ShareTarget>
+        </uap:Extension>
+
+        <!-- File Type Association: adds "Send with PeerHop" to right-click context menu -->
+        <uap:Extension Category="windows.fileTypeAssociation">
+          <uap:FileTypeAssociation Name="peerhop.send">
+            <uap:SupportedFileTypes>
+                <uap:FileType>.jpg</uap:FileType>
+                <uap:FileType>.jpeg</uap:FileType>
+                <uap:FileType>.png</uap:FileType>
+                <uap:FileType>.gif</uap:FileType>
+                <uap:FileType>.webp</uap:FileType>
+                <uap:FileType>.bmp</uap:FileType>
+                <uap:FileType>.mp4</uap:FileType>
+                <uap:FileType>.mov</uap:FileType>
+                <uap:FileType>.avi</uap:FileType>
+                <uap:FileType>.mkv</uap:FileType>
+                <uap:FileType>.wmv</uap:FileType>
+                <uap:FileType>.mp3</uap:FileType>
+                <uap:FileType>.wav</uap:FileType>
+                <uap:FileType>.aac</uap:FileType>
+                <uap:FileType>.flac</uap:FileType>
+                <uap:FileType>.pdf</uap:FileType>
+                <uap:FileType>.txt</uap:FileType>
+                <uap:FileType>.docx</uap:FileType>
+                <uap:FileType>.xlsx</uap:FileType>
+                <uap:FileType>.pptx</uap:FileType>
+                <uap:FileType>.zip</uap:FileType>
+                <uap:FileType>.rar</uap:FileType>
+                <uap:FileType>.7z</uap:FileType>
+            </uap:SupportedFileTypes>
+            <uap2:SupportedVerbs>
+              <uap3:Verb Id="SendWithPeerHop" Parameters='"%1"' MultiSelectModel="Player">Send with PeerHop</uap3:Verb>
+            </uap2:SupportedVerbs>
+          </uap:FileTypeAssociation>
+        </uap:Extension>
+      </Extensions>
+    </Application>
+  </Applications>
+
+  <Capabilities>
+    <rescap:Capability Name="runFullTrust" />
+  </Capabilities>
+</Package>

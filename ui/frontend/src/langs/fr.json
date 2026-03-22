@@ -36,7 +36,6 @@
   "select_files": "Sélectionner des fichiers",
   "close_text_input": "Fermer la saisie de texte",
   "cancelled": "Annulé",
-  "sharing_files": "Partage de {{count}} fichier(s)",
   "sent": "Envoyé",
   "received": "Reçu",
   "opened": "Ouvert",
