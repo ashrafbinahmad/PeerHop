@@ -68,7 +68,6 @@ export const MobileUpload: React.FC = () => {
       setFinished(true);
     } catch (err) {
       console.error(err);
-      alert("Upload failed.");
       setStarted(false);
     }
   };

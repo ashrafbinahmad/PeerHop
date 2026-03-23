@@ -362,12 +362,7 @@ export const ChatPanel = ({
                               >
                                 {transaction.status === "in_progress" ? (
                                   <div className="flex flex-col gap-0.5 mt-1 font-mono">
-                                    <span>
-                                      {calculateSpeed(
-                                        transaction.bytesTransferred || 0,
-                                        transaction.timestamp,
-                                      )}
-                                    </span>
+                                    <span>{calculateSpeed(transaction)}</span>
                                     <span>
                                       {formatBytes(
                                         (transaction.fileSize || 0) *

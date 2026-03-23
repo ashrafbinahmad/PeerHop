@@ -1,7 +1,11 @@
 import React, { useState, useRef, useEffect } from "react";
 import axios from "axios";
 import { useTransactions } from "../hooks/useTransactions";
-import { formatBytes, calculateSpeed } from "../utils/format";
+import {
+  formatBytes,
+  calculateSpeed,
+  calculateSpeedForClient,
+} from "../utils/format";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { CopyButton } from "../components/CopyButton";
 import {
@@ -1140,7 +1144,7 @@ export const MobileUnified: React.FC<Props> = ({
                                         signalLogic.getLayers(mbps);
                                       return (
                                         <>
-                                          {calculateSpeed(
+                                          {calculateSpeedForClient(
                                             bytes,
                                             transaction.timestamp,
                                           )}

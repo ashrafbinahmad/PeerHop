@@ -99,7 +99,9 @@ export const DesktopView = () => {
   const [iframIsLoaded, setIframeIsLoaded] = useState(false);
   const { t, lang } = useTranslation();
 
-  const { logActivity } = useActivity();
+  const adRef = useRef<HTMLIFrameElement>(null);
+
+  const { logActivity } = useActivity(adRef);
 
   useEffect(() => {
     const handler = (event: MessageEvent) => {
@@ -126,11 +128,10 @@ export const DesktopView = () => {
           setFilePaths(paths);
           isUserAtBottomRef.current = true;
           const info = await StartTransfer(paths);
-          // alert(JSON.stringify(info));
           setServerInfo(info);
           logActivity(
-            "shared",
-            `[FILE DROP] Sharing file(s) (Count: ${paths.length}, Size: ${formatBytes(info.size)})`,
+            "sent",
+            `[FILE DROP] Sharing file(s) (Count: ${paths?.length}, Size: ${formatBytes(info.size)}), Files:: ${info.filename}`,
           );
         }
       } catch (err) {
@@ -261,7 +262,6 @@ export const DesktopView = () => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const isUserAtBottomRef = useRef(true);
-  const adRef = useRef<HTMLIFrameElement>(null);
 
   // Hook: WebSocket for transactions
   const { transactions, sendText } = useTransactions(
@@ -271,6 +271,7 @@ export const DesktopView = () => {
     true,
     adminToken, // Desktop uses admin token
     securityEnabled,
+    logActivity,
   );
 
   // Hook: WebSocket for devices/clients
@@ -285,14 +286,14 @@ export const DesktopView = () => {
       const info = await StartTransfer(data.files);
       setServerInfo(info);
       logActivity(
-        "shared",
-        `[SHARE TARGET] Sharing ${data.files.length} file(s) via Windows Share: ${data.files.map((p: string) => p.split(/[\\/]/).pop()).join(", ")}`,
+        "sent",
+        `[SHARE TARGET] Sharing file(s) (Count: ${data.files?.length}, Size: ${formatBytes(info.size)}), Files:: ${info.filename}`,
       );
     } else if (data.text || data.url) {
       const content = data.text || data.url;
       await sendText(content, "server");
       logActivity(
-        "shared",
+        "sent",
         `[SHARE TARGET] Shared via Windows: ${content.substring(0, 30)}...`,
       );
     }
@@ -312,19 +313,28 @@ export const DesktopView = () => {
             ? ` (${formatBytes(txn.fileSize)})`
             : "";
           if (isMe) {
-            logActivity("sent", `Sent ${txn.filename || "file"}${sizeLabel}`);
+            logActivity(
+              "sending_completed",
+              `Sent ${txn.filename || "file"}${sizeLabel}`,
+            );
           } else {
             logActivity(
-              "received",
+              "receiving_completed",
               `Received ${txn.filename || "file"}${sizeLabel}`,
             );
           }
         } else if (txn.type === "text") {
           const charCount = txn.textContent?.length || 0;
           if (isMe) {
-            logActivity("sent", `Sent ${charCount} characters text`);
+            logActivity(
+              "sending_completed",
+              `Sent ${charCount} characters text`,
+            );
           } else {
-            logActivity("received", `Received ${charCount} characters text`);
+            logActivity(
+              "receiving_completed",
+              `Received ${charCount} characters text`,
+            );
           }
         }
 
@@ -373,7 +383,6 @@ export const DesktopView = () => {
       );
     } catch (err) {
       console.error("Failed to block/unblock client:", err);
-      // alert(t("failed_to_update_client"));
     }
   };
 
@@ -394,7 +403,6 @@ export const DesktopView = () => {
       );
     } catch (err) {
       console.error("Failed to block/unblock sending for client:", err);
-      // alert(t("failed_to_update_client"));
     }
   };
 
@@ -517,7 +525,6 @@ export const DesktopView = () => {
     } catch (err) {
       console.error("Failed to restart server:", err);
       setIsCheckingNetwork(false);
-      // alert(t("failed_to_restart"));
     }
   };
 
@@ -734,8 +741,8 @@ export const DesktopView = () => {
         const info = await StartTransfer(files);
         setServerInfo(info);
         logActivity(
-          "shared",
-          `[FILE SELECT] Sharing file(s) (Count: ${files.length}, Size: ${formatBytes(info.size)})`,
+          "sent",
+          `[FILE SELECT] Sharing file(s) (Count: ${files?.length}, Size: ${formatBytes(info.size)}), Files:: ${info.filename}`,
         );
       }
     } catch (err) {
@@ -751,7 +758,6 @@ export const DesktopView = () => {
       setTextInput("");
     } catch (err) {
       console.error(err);
-      // alert(t("failed_to_send_text"));
     }
   };
 

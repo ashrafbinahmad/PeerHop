@@ -29,7 +29,6 @@ export const TransactionActions = ({
       await ShowInFolder(resolvedPath);
     } catch (err) {
       console.error(err);
-      // alert("Failed to show in folder");
     }
   };
 
@@ -38,7 +37,6 @@ export const TransactionActions = ({
       await ShowOpenWithDialog(resolvedPath);
     } catch (err) {
       console.error(err);
-      // alert("Failed to open 'Open With' dialog");
     }
   };
 
@@ -48,7 +46,6 @@ export const TransactionActions = ({
       onOpen?.(transaction.filename || resolvedPath);
     } catch (err) {
       console.error(err);
-      // alert("Failed to open file");
     }
   };
 

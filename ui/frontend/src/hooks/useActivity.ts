@@ -20,10 +20,11 @@ const ACTIVITY_CAP = 200; // maximum entries retained
 export type ActivityType =
   | "sent" // file or text transfer completed (desktop → client)
   | "received" // file or text transfer completed (client → desktop)
+  | "sending_completed" // file or text transfer completed (desktop → client), more specific than "sent"
+  | "receiving_completed" // file or text transfer completed (client → desktop), more specific than "received"
   | "opened" // user opened a file
   | "closed" // app session ended
   | "started" // app launched
-  | "shared" // file(s) selected / dropped / pasted to share
   | "cancelled" // transfer cancelled
   | "connected" // device connected
   | "disconnected" // device disconnected
@@ -71,13 +72,12 @@ export function appendActivity(entry: Omit<ActivityEntry, "timestamp">): void {
   }
 }
 
-/** Count activities with type "shared" or "received" in the current log. */
+/** Count activities with type "sent" or "received" in the current log. */
 export function countShareAndReceiveActivities(): number {
   try {
     const activities = readActivity();
-    return activities.filter(
-      (a) => a.type === "shared" || a.type === "received",
-    ).length;
+    return activities.filter((a) => a.type === "sent" || a.type === "received")
+      .length;
   } catch {
     return 0;
   }
@@ -126,10 +126,25 @@ export function checkAndShowFeedbackPopup(): void {
  * Hook that exposes a stable `logActivity` function.
  * Can be also used as a standalone utility without the hook.
  */
-export function useActivity() {
-  const logActivity = useCallback((type: ActivityType, details: string) => {
-    appendActivity({ type, details });
-  }, []);
+export function useActivity(iframeRef: React.RefObject<HTMLIFrameElement>) {
+  const logActivity = useCallback(
+    (type: ActivityType, details: string) => {
+      appendActivity({ type, details });
+      if (!iframeRef.current?.contentWindow) return;
+      iframeRef.current?.contentWindow?.postMessage(
+        {
+          type: "activity",
+          data: {
+            type,
+            details: details,
+            timestamp: new Date().toISOString(),
+          },
+        },
+        "*",
+      );
+    },
+    [iframeRef],
+  );
 
   return { logActivity, readActivity };
 }
