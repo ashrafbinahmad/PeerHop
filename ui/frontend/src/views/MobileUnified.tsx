@@ -23,7 +23,11 @@ import {
   User,
   Smartphone,
   RefreshCw,
+  ShieldAlert,
+  Coffee,
+  Globe,
 } from "lucide-react";
+import logo from "../assets/images/logo-universal.png";
 import { ACCENT_COLORS, THEME_PRESETS } from "../themeConstants";
 import { useTranslation } from "../hooks/useTranslation";
 
@@ -564,6 +568,16 @@ export const MobileUnified: React.FC<Props> = ({
   const handleDownload = (e: React.MouseEvent, transaction: any) => {
     e.stopPropagation();
 
+    // Check if blocked
+    if (isBlocked) {
+      setNotification({
+        show: true,
+        message: (t as any)("you_are_blocked") || "You are Blocked",
+      });
+      setTimeout(() => setNotification({ show: false, message: "" }), 3000);
+      return;
+    }
+
     // Set downloading state immediately for instant feedback
     setDownloadingTransactionId(transaction.id);
 
@@ -679,6 +693,84 @@ export const MobileUnified: React.FC<Props> = ({
     );
   }
 
+  // Blocked overlay
+  if (isBlocked) {
+    return (
+      <div
+        className={`min-h-screen flex flex-col justify-between px-10 py-12 ${theme.bg}`}
+      >
+        {/* Main Content */}
+        <div className="flex flex-col items-start justify-center flex-1 max-w-md">
+          {/* Icon */}
+          <div className="mb-10">
+            <div
+              className={`w-20 h-20 rounded-3xl flex items-center justify-center border ${theme.panelCard} ${theme.border}`}
+            >
+              <ShieldAlert
+                size={40}
+                className="text-red-500/80"
+                strokeWidth={2}
+              />
+            </div>
+          </div>
+
+          {/* Text */}
+          <div className="space-y-5 text-start">
+            <div className="space-y-2">
+              <h2
+                className={`text-4xl  font-black italic uppercase tracking-tight leading-tight ${theme.text}`}
+              >
+                {(t as any)("you_are_blocked") || "You are Blocked"}
+              </h2>
+
+              <div className="h-1 w-12 rounded-full bg-gray-200 dark:bg-gray-800">
+                <div
+                  className="h-full w-1/2 rounded-full"
+                  style={{ backgroundColor: theme.accentColor }}
+                />
+              </div>
+            </div>
+
+            <p className="text-gray-500 dark:text-gray-400 text-lg font-medium max-w-sm">
+              {(t as any)("blocked_description") ||
+                "The host has restricted your access."}
+            </p>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="flex flex-col gap-6 pt-10">
+          <div className="flex items-center gap-3">
+            <img src={logo} alt="PeerHop Logo" className="w-10 h-10" />
+            <span className={`text-2xl font-black ${theme.text}`}>PeerHop</span>
+          </div>
+
+          <div className="flex flex-col gap-3 text-xs font-bold tracking-widest uppercase opacity-60">
+            <a
+              href="https://peerhop.in"
+              target="_blank"
+              rel="noopener noreferrer"
+              className={`flex items-center gap-2 hover:opacity-100 ${theme.text}`}
+            >
+              <Globe size={14} strokeWidth={3} />
+              peerhop.in
+            </a>
+
+            <a
+              href="https://buymeacoffee.com/peerhop"
+              target="_blank"
+              rel="noopener noreferrer"
+              className={`flex items-center gap-2 hover:opacity-100 ${theme.text}`}
+            >
+              <Coffee size={14} strokeWidth={3} />
+              {(t as any)("buy_developer_a_coffee") || "BUY ME A COFFEE"}
+            </a>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div
       className={`grid grid-rows-[max-content_auto_1fr_max-content] fixed inset-0 h-[100dvh] w-full font-sans overflow-hidden _bg-background transition-colors duration-300 ${theme.bg} ${theme.text}`}
@@ -748,54 +840,79 @@ export const MobileUnified: React.FC<Props> = ({
         <div className="mt-auto flex flex-col gap-4 pb-2">
           {visibleTransactions.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full gap-6 animate-in fade-in zoom-in-95 duration-500 pb-20 mt-auto mb-auto">
-              {/* Big Share File Button */}
-              <button
-                onClick={handleSelectFiles}
-                disabled={isSendingDisabled}
-                className={`group relative flex flex-col items-center justify-center gap-4 w-64 h-52 rounded-[2.5rem] border shadow-sm transition-all duration-300 active:scale-[0.98] ${
-                  theme.border
-                } ${theme.iconBg} ${isSendingDisabled ? "opacity-50 cursor-not-allowed" : ""}`}
-              >
-                <Plus
-                  size={54}
-                  strokeWidth={2.5}
-                  className={`mb-2 transition-all duration-300 opacity-70 ${theme.text}`}
-                />
-                <div className="flex flex-col items-center gap-1">
-                  <span className={`text-xl font-bold tracking-tight opacity-70 ${theme.text}`}>
-                    {isSendingDisabled
-                      ? t("sending_disabled")
-                      : t("share_file")}
-                  </span>
-                  <span className={`text-xs opacity-60 font-medium ${theme.text}`}>
-                    {t("tap_browse")}
-                  </span>
-                </div>
-              </button>
+              {!isSendingDisabled ? (
+                <>
+                  {/* Big Share File Button */}
+                  <button
+                    onClick={handleSelectFiles}
+                    disabled={isSendingDisabled}
+                    className={`group relative flex flex-col items-center justify-center gap-4 w-64 h-52 rounded-[2.5rem] border shadow-sm transition-all duration-300 active:scale-[0.98] ${
+                      theme.border
+                    } ${theme.iconBg} ${isSendingDisabled ? "opacity-50 cursor-not-allowed" : ""}`}
+                  >
+                    <Plus
+                      size={54}
+                      strokeWidth={2.5}
+                      className={`mb-2 transition-all duration-300 opacity-70 ${theme.text}`}
+                    />
+                    <div className="flex flex-col items-center gap-1">
+                      <span
+                        className={`text-xl font-bold tracking-tight opacity-70 ${theme.text}`}
+                      >
+                        {t("share_file")}
+                      </span>
+                      <span
+                        className={`text-xs opacity-60 font-medium ${theme.text}`}
+                      >
+                        {t("tap_browse")}
+                      </span>
+                    </div>
+                  </button>
 
-              {/* Small Send Text Button - Only if enabled */}
-              {textTransferEnabled && (
-                <button
-                  onClick={() => {
-                    if (isSendingDisabled) return;
-                    setShowTextInput(true);
-                  }}
-                  disabled={isSendingDisabled}
-                  className={`flex items-center gap-2 px-5 py-2.5 rounded-full border shadow-sm transition-all duration-300 active:scale-95 ${
-                    theme.border
-                  } ${theme.iconBg} ${
-                    isSendingDisabled ? "opacity-50 cursor-not-allowed" : ""
-                  }`}
-                >
-                  <MessageSquare
-                    size={16}
-                    strokeWidth={2}
-                    className={`opacity-70 ${theme.text}`}
-                  />
-                  <span className={`text-sm font-bold opacity-70 ${theme.text}`}>
-                    {t("send_text")}
-                  </span>
-                </button>
+                  {/* Small Send Text Button - Only if enabled */}
+                  {textTransferEnabled && (
+                    <button
+                      onClick={() => {
+                        setShowTextInput(true);
+                      }}
+                      className={`flex items-center gap-2 px-5 py-2.5 rounded-full border shadow-sm transition-all duration-300 active:scale-95 ${
+                        theme.border
+                      } ${theme.iconBg}`}
+                    >
+                      <MessageSquare
+                        size={16}
+                        strokeWidth={2}
+                        className={`opacity-70 ${theme.text}`}
+                      />
+                      <span
+                        className={`text-sm font-bold opacity-70 ${theme.text}`}
+                      >
+                        {t("send_text")}
+                      </span>
+                    </button>
+                  )}
+                </>
+              ) : (
+                <div className="flex flex-col items-center gap-4 text-center px-8">
+                  <div
+                    className={`w-16 h-16 rounded-3xl flex items-center justify-center opacity-20 ${theme.iconBg}`}
+                  >
+                    <Plus size={32} className={theme.text} />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <span
+                      className={`text-lg font-bold opacity-40 ${theme.text}`}
+                    >
+                      {t("sending_disabled")}
+                    </span>
+                    <span
+                      className={`text-xs opacity-30 font-medium ${theme.text}`}
+                    >
+                      {(t as any)("host_restricted_sending") ||
+                        "The host has restricted sending from this device"}
+                    </span>
+                  </div>
+                </div>
               )}
             </div>
           ) : (
@@ -1380,7 +1497,7 @@ export const MobileUnified: React.FC<Props> = ({
         <div
           className={`shrink-0 border-t z-30 pb-safe-bottom transition-colors duration-300 ${theme.inputArea}`}
         >
-          {showTextInput && (
+          {showTextInput && !isSendingDisabled && (
             <div className={`p-4 border-t ${activeTheme.border}`}>
               <div className="flex gap-2">
                 <input
@@ -1388,23 +1505,15 @@ export const MobileUnified: React.FC<Props> = ({
                   value={textInput}
                   onChange={(e) => setTextInput(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && handleSendText()}
-                  placeholder={
-                    isSendingDisabled
-                      ? t("sending_disabled")
-                      : t("type_a_message")
-                  }
-                  disabled={isSendingDisabled}
+                  placeholder={t("type_a_message")}
                   className={`flex-1 px-4 py-2 rounded-xl outline-none ${
                     theme.inputField
-                  } ${isSendingDisabled ? "opacity-50" : ""}`}
-                  autoFocus={!isSendingDisabled}
+                  }`}
+                  autoFocus
                 />
                 <button
                   onClick={handleSendText}
-                  disabled={isSendingDisabled}
-                  className={`p-2 rounded-xl text-white transition-colors ${
-                    isSendingDisabled ? "opacity-50 cursor-not-allowed" : ""
-                  }`}
+                  className={`p-2 rounded-xl text-white transition-colors`}
                   style={{ backgroundColor: theme.accentColor }}
                 >
                   <ArrowUp size={20} />
@@ -1413,24 +1522,17 @@ export const MobileUnified: React.FC<Props> = ({
             </div>
           )}
 
-          {visibleTransactions.length > 0 && (
+          {visibleTransactions.length > 0 && !isSendingDisabled && (
             <div className="p-4 pt-2">
               <div className="flex gap-3">
                 <button
                   onClick={handleSelectFiles}
-                  disabled={isSendingDisabled}
                   className={`flex-1 py-3 rounded-xl font-medium flex items-center justify-center gap-2 border transition-colors ${
                     theme.selectBtn
-                  } ${
-                    isSendingDisabled ? "opacity-50 cursor-not-allowed" : ""
                   }`}
                 >
                   <Upload size={18} style={{ color: theme.accentColor }} />
-                  <span>
-                    {isSendingDisabled
-                      ? t("sending_disabled")
-                      : t("select_files")}
-                  </span>
+                  <span>{t("select_files")}</span>
                 </button>
 
                 {/* Hidden Input */}

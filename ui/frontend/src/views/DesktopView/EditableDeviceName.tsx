@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 import { PlatformIcon } from "../../components/PlatformIcon";
-import { Pencil } from "lucide-react";
+import { Pencil, ShieldCheck, ShieldX, Ban, UserCheck, Globe, MoreHorizontal } from "lucide-react";
 import type { Client } from "../../hooks/useDevices";
 
 export const EditableDeviceName = ({
@@ -26,7 +26,6 @@ export const EditableDeviceName = ({
   const [isEditing, setIsEditing] = useState(false);
   const [name, setName] = useState(client.name || client.platform);
 
-  // Update name if client data changes from backend
   useEffect(() => {
     if (client.name && !isEditing) {
       setName(client.name);
@@ -51,7 +50,6 @@ export const EditableDeviceName = ({
       setIsEditing(false);
     } catch (err) {
       console.error("Failed to update name:", err);
-      // Revert name on error
       setName(client.name || client.platform);
       setIsEditing(false);
     }
@@ -59,90 +57,100 @@ export const EditableDeviceName = ({
 
   return (
     <div
-      className={`flex items-center gap-3 p-3 rounded-xl border transition-all ${theme.deviceItemBg}`}
+      className={`group relative p-3 rounded-2xl border transition-all duration-300 ${theme.deviceItemBg} ${theme.border} hover:border-blue-500/30`}
     >
-      <div
-        className={`w-8 h-8 rounded-full flex items-center justify-center ${theme.iconBg} ${theme.iconText}`}
-      >
-        <PlatformIcon platform={client.platform} size={16} />
-      </div>
-      <div className="flex-1 min-w-0 text-left">
-        {isEditing ? (
-          <div className="flex items-center gap-2">
-            <input
-              type="text"
-              value={name}
-              disabled={disabled}
-              onChange={(e) => setName(e.target.value)}
-              onBlur={handleUpdateName}
-              onKeyDown={(e) => e.key === "Enter" && handleUpdateName()}
-              className={`text-sm font-medium w-full px-1 py-0.5 rounded border ${
-                isDarkMode
-                  ? "bg-slate-900 border-slate-700 text-white"
-                  : "bg-white border-gray-200 text-gray-900"
-              } ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
-              autoFocus
-            />
-          </div>
-        ) : (
-          <div className="flex items-center gap-1.5 group">
-            <div className={`text-sm font-medium truncate ${theme.text}`}>
-              {client.name || client.platform}
-            </div>
-            <button
-              onClick={() => !disabled && setIsEditing(true)}
-              disabled={disabled}
-              className={`opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-black/5 transition-opacity ${disabled ? "hidden" : ""}`}
-              title="Edit name"
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-3">
+          {/* Smaller Icon Container */}
+          <div className="relative">
+            <div
+              className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-inner ${theme.iconBg} ${theme.iconText}`}
             >
-              <Pencil
-                size={10}
-                className={isDarkMode ? "text-slate-400" : "text-gray-400"}
-              />
-            </button>
+              <PlatformIcon platform={client.platform} size={20} />
+            </div>
+            {/* Smaller Status Badge */}
+            <div className={`absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 ${isDarkMode ? "border-slate-800" : "border-white"} ${
+              client.blocked ? "bg-red-500" : client.sendingBlocked ? "bg-amber-500" : "bg-emerald-500"
+            }`}>
+              {!client.blocked && (
+                <div className={`absolute inset-0 rounded-full animate-ping opacity-20 ${client.sendingBlocked ? "bg-amber-400" : "bg-emerald-400"}`}></div>
+              )}
+            </div>
           </div>
-        )}
-        <div className={`text-[10px] truncate font-mono ${theme.subText}`}>
-          {client.ip}
+
+          <div className="flex flex-col min-w-0">
+            {isEditing ? (
+              <input
+                type="text"
+                value={name}
+                disabled={disabled}
+                onChange={(e) => setName(e.target.value)}
+                onBlur={handleUpdateName}
+                onKeyDown={(e) => e.key === "Enter" && handleUpdateName()}
+                className={`text-sm font-bold w-full bg-transparent border-b border-blue-500 outline-none ${theme.text}`}
+                autoFocus
+              />
+            ) : (
+              <div className="flex items-center gap-1.5 overflow-hidden">
+                <h3 className={`text-sm font-bold truncate ${theme.text}`}>
+                  {client.name || client.platform}
+                </h3>
+                <button
+                  onClick={() => !disabled && setIsEditing(true)}
+                  className="opacity-0 group-hover:opacity-40 transition-opacity"
+                >
+                  <Pencil size={11} className={theme.text} />
+                </button>
+              </div>
+            )}
+            <div className={`flex items-center gap-1 text-[10px] font-mono opacity-50 ${theme.subText}`}>
+              <Globe size={10} className="shrink-0" />
+              {client.ip}
+            </div>
+          </div>
         </div>
 
-        <div className="flex gap-2 mt-1">
-          {/* Block Sending Button */}
-          <button
-            onClick={() => onBlockSending(client)}
-            disabled={disabled}
-            className={`text-[10px] px-2 py-0.5 rounded transition-colors ${
-              client.sendingBlocked
-                ? "bg-yellow-500/20 text-yellow-600 hover:bg-yellow-500/30 dark:text-yellow-400"
-                : "bg-gray-200 text-gray-600 hover:bg-gray-300 dark:bg-slate-700 dark:text-slate-300 dark:hover:bg-slate-600"
-            } ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
-          >
-            {client.sendingBlocked ? "Allow Sending" : "Block Sending"}
-          </button>
-
-          {/* Block/Unblock Button */}
-          <button
-            onClick={() => onBlock(client)}
-            disabled={disabled}
-            className={`text-[10px] px-2 py-0.5 rounded transition-colors ${
-              client.blocked
-                ? "bg-green-500/20 text-green-600 hover:bg-green-500/30"
-                : "bg-red-500/20 text-red-600 hover:bg-red-500/30"
-            } ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
-          >
-            {client.blocked ? "🔓 Unblock" : "🚫 Block"}
-          </button>
-        </div>
+        <button className={`p-1.5 rounded-full opacity-0 group-hover:opacity-40 hover:opacity-100 transition-all ${theme.text}`}>
+          <MoreHorizontal size={14} />
+        </button>
       </div>
-      <div
-        className={`w-1.5 h-1.5 rounded-full ${
-          client.blocked
-            ? "bg-red-500"
-            : client.sendingBlocked
-              ? "bg-yellow-500"
-              : "bg-green-500"
-        }`}
-      ></div>
+
+      {/* More Compact Action Buttons */}
+      <div className="grid grid-cols-2 gap-2">
+        <button
+          onClick={() => onBlockSending(client)}
+          disabled={disabled}
+          className={`flex items-center justify-center gap-1.5 py-2 px-2 rounded-xl font-bold text-[9px] uppercase tracking-wider transition-all active:scale-[0.97] border ${
+            client.sendingBlocked
+              ? "bg-amber-500/10 border-amber-500/20 text-amber-600"
+              : "bg-blue-500/10 border-blue-500/10 text-blue-600"
+          } ${disabled ? "opacity-30 cursor-not-allowed" : ""}`}
+        >
+          {client.sendingBlocked ? (
+            <>Allow <ShieldCheck size={12} /></>
+          ) : (
+            <>Restrict <ShieldX size={12} /></>
+          )}
+        </button>
+
+        <button
+          onClick={() => onBlock(client)}
+          disabled={disabled}
+          className={`flex items-center justify-center gap-1.5 py-2 px-2 rounded-xl font-bold text-[9px] uppercase tracking-wider transition-all active:scale-[0.97] border ${
+            client.blocked
+              ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-600"
+              : "bg-red-500/10 border-red-500/20 text-red-600"
+          } ${disabled ? "opacity-30 cursor-not-allowed" : ""}`}
+        >
+          {client.blocked ? (
+            <>Unblock <UserCheck size={12} /></>
+          ) : (
+            <>Block <Ban size={12} /></>
+          )}
+        </button>
+      </div>
     </div>
   );
 };
+
+

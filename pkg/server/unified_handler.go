@@ -385,7 +385,7 @@ func (h *UnifiedHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			if idx := strings.LastIndex(clientIP, ":"); idx != -1 {
 				clientIP = clientIP[:idx]
 			}
-			if h.ClientStore.IsSendingBlocked(clientIP) {
+			if h.ClientStore.IsBlocked(clientIP) || h.ClientStore.IsSendingBlocked(clientIP) {
 				http.Error(w, "Sending is blocked", http.StatusForbidden)
 				return
 			}
@@ -685,7 +685,7 @@ func (h *UnifiedHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			if idx := strings.LastIndex(clientIP, ":"); idx != -1 {
 				clientIP = clientIP[:idx]
 			}
-			if h.ClientStore.IsSendingBlocked(clientIP) {
+			if h.ClientStore.IsBlocked(clientIP) || h.ClientStore.IsSendingBlocked(clientIP) {
 				http.Error(w, "Sending is blocked", http.StatusForbidden)
 				return
 			}
@@ -911,13 +911,25 @@ func (h *UnifiedHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		// Cancel all active transfers for this client (uploads and downloads)
+		if h.TxStore != nil {
+			h.TxStore.CancelClientTransactions(req.IP)
+		}
+
 		// Note: We do NOT disconnect WebSocket completely anymore,
 		// so the client can receive the update that it is blocked.
 		// However, we still rely on the ServeHTTP blocked check to prevent actions.
 
-		// Broadcast update
+		// Broadcast update (Devices and Transactions)
 		if h.WSHub != nil {
 			h.WSHub.BroadcastDevicesUpdate()
+			// Also broadcast all transactions after bulk cancellation
+			if h.TxStore != nil {
+				txns := h.TxStore.GetAllTransactions()
+				h.WSHub.Broadcast("transactions_update", map[string]interface{}{
+					"transactions": txns,
+				})
+			}
 		}
 
 		w.Header().Set("Content-Type", "application/json")
@@ -949,9 +961,26 @@ func (h *UnifiedHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		// Note: we can also cancel active uploads from this client specifically if needed
+		if h.TxStore != nil {
+			// Find and cancel transactions where SenderID == req.IP
+			txns := h.TxStore.GetAllTransactions()
+			for _, txn := range txns {
+				if txn.SenderID == req.IP && txn.Status == "in_progress" {
+					h.TxStore.CancelTransaction(txn.ID)
+				}
+			}
+		}
+
 		// Broadcast update
 		if h.WSHub != nil {
 			h.WSHub.BroadcastDevicesUpdate()
+			// Also broadcast transaction updates
+			if h.TxStore != nil {
+				h.WSHub.Broadcast("transactions_update", map[string]interface{}{
+					"transactions": h.TxStore.GetAllTransactions(),
+				})
+			}
 		}
 
 		w.Header().Set("Content-Type", "application/json")
@@ -1289,6 +1318,16 @@ func (h *UnifiedHandler) proxyWebSocket(w http.ResponseWriter, r *http.Request) 
 }
 
 func (h *UnifiedHandler) serveFile(w http.ResponseWriter, r *http.Request, filePath string, forceTxnID int) {
+	// Redundant check for blocked status (extra safety)
+	clientIP := r.RemoteAddr
+	if idx := strings.LastIndex(clientIP, ":"); idx != -1 {
+		clientIP = clientIP[:idx]
+	}
+	if h.ClientStore != nil && h.ClientStore.IsBlocked(clientIP) {
+		http.Error(w, "Access denied: Client blocked", http.StatusForbidden)
+		return
+	}
+
 	f, err := os.Open(filePath)
 	if err != nil {
 		http.Error(w, "File not found", http.StatusNotFound)

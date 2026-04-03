@@ -588,3 +588,62 @@ func (ts *TransactionStore) IsCancelled(id int) bool {
 
 	return false
 }
+
+// CancelClientTransactions cancels all active transfers (uploads and downloads) for a specific client (by IP)
+func (ts *TransactionStore) CancelClientTransactions(clientIP string) {
+	ts.mu.Lock()
+	defer ts.mu.Unlock()
+
+	for id, txn := range ts.transactions {
+		// Only cancel active transactions
+		if txn.Status == "completed" || txn.Status == "failed" || txn.Status == "cancelled" {
+			// Even if global status is done, check client-specific status for downloads
+			if txn.ClientStatus != nil {
+				if status, exists := txn.ClientStatus[clientIP]; exists {
+					if status != "completed" && status != "failed" && status != "cancelled" {
+						txn.ClientStatus[clientIP] = "cancelled"
+						cancelKey := fmt.Sprintf("%d_%s", id, clientIP)
+						if ts.clientCancelled == nil {
+							ts.clientCancelled = make(map[string]bool)
+						}
+						ts.clientCancelled[cancelKey] = true
+					}
+				}
+			}
+			continue
+		}
+
+		shouldCancel := false
+
+		// Case 1: Client is the SENDER (uploading to us)
+		if txn.SenderID == clientIP {
+			shouldCancel = true
+		}
+
+		// Case 2: Client is the RECEIVER (downloading from us)
+		if txn.ClientIP == clientIP {
+			shouldCancel = true
+		}
+
+		// Case 3: Client is in the ClientStatus map (specifically for downloads they initiated)
+		if txn.ClientStatus != nil {
+			if _, exists := txn.ClientStatus[clientIP]; exists {
+				// Don't mark global transaction as cancelled if others might be downloading
+				// but cancel it for THIS client
+				if txn.ClientStatus[clientIP] != "completed" && txn.ClientStatus[clientIP] != "failed" && txn.ClientStatus[clientIP] != "cancelled" {
+					txn.ClientStatus[clientIP] = "cancelled"
+					cancelKey := fmt.Sprintf("%d_%s", id, clientIP)
+					if ts.clientCancelled == nil {
+						ts.clientCancelled = make(map[string]bool)
+					}
+					ts.clientCancelled[cancelKey] = true
+				}
+			}
+		}
+
+		if shouldCancel {
+			ts.cancelled[id] = true
+			txn.Status = "cancelled"
+		}
+	}
+}
