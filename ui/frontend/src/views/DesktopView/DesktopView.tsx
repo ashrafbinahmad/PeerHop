@@ -100,6 +100,9 @@ export const DesktopView = () => {
   );
   const [iframIsLoaded, setIframeIsLoaded] = useState(false);
   const [isMaximized, setIsMaximized] = useState(false);
+  const [userEmail, setUserEmail] = useState<string>(
+    localStorage.getItem("userEmail") || "",
+  );
   const { t, lang } = useTranslation();
 
   const adRef = useRef<HTMLIFrameElement>(null);
@@ -619,6 +622,23 @@ export const DesktopView = () => {
       .catch((e) => console.error("Failed to sync theme:", e));
   }, [activeThemeId, activeAccentId, serverInfo?.url, adminToken]);
 
+  // Discover user email and sync to localStorage
+  useEffect(() => {
+    if (serverInfo?.url && adminToken) {
+      axios
+        .get(`${serverInfo.url}/api/user-hint?admin=${adminToken}`)
+        .then((res) => {
+          if (res.data?.email) {
+            setUserEmail(res.data.email);
+            localStorage.setItem("userEmail", res.data.email);
+          }
+        })
+        .catch((err) => {
+          console.warn("Failed to discover user email:", err);
+        });
+    }
+  }, [serverInfo?.url, adminToken]);
+
   // Sync device name to localStorage for useActivity to access synchronously
   useEffect(() => {
     if (deviceName) {
@@ -855,9 +875,9 @@ export const DesktopView = () => {
     const bgParam = activeTheme.bg.replace("bg-[", "").replace("]", "");
     return `${baseUrl}/desktop-ad?bg=${encodeURIComponent(
       bgParam,
-    )}&theme=${encodeURIComponent(activeThemeId)}&isDark=${String(isDarkMode)}&version=${APP_VERSION}&lang=${lang}&deviceName=${encodeURIComponent(deviceName)}`;
+    )}&theme=${encodeURIComponent(activeThemeId)}&isDark=${String(isDarkMode)}&version=${APP_VERSION}&lang=${lang}&deviceName=${encodeURIComponent(deviceName)}&email=${encodeURIComponent(userEmail)}`;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [deviceName]);
+  }, [deviceName, userEmail]);
 
   // Communicate theme changes to the ad iframe without reloading it
   useEffect(() => {
@@ -871,11 +891,12 @@ export const DesktopView = () => {
           version: APP_VERSION,
           lang: lang,
           deviceName: deviceName,
+          email: userEmail,
         },
         "*",
       );
     }
-  }, [activeThemeId, isDarkMode, activeTheme.bg, lang, deviceName]);
+  }, [activeThemeId, isDarkMode, activeTheme.bg, lang, deviceName, userEmail]);
   useEffect(() => {
     if (isDarkMode && window.document.body.classList.contains("dark")) return;
     window.document.body.classList.toggle("dark");
@@ -1138,6 +1159,7 @@ export const DesktopView = () => {
                 setNotification={setNotification}
                 deviceName={deviceName}
                 onUpdateDeviceName={handleUpdateDesktopName}
+                userEmail={userEmail}
               />
             ) : (
               <QRPanel

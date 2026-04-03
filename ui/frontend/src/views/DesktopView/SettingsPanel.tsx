@@ -1,4 +1,5 @@
 import React from "react";
+import axios from "axios";
 import {
   Settings,
   Check,
@@ -60,6 +61,7 @@ interface SettingsPanelProps {
   setNotification: (notification: { show: boolean; message: string }) => void;
   deviceName: string;
   onUpdateDeviceName: (name: string) => void;
+  userEmail: string;
 }
 
 export const SettingsPanel = ({
@@ -97,14 +99,15 @@ export const SettingsPanel = ({
   const { t } = useTranslation();
   const [isFeatureDrawerOpen, setFeatureDrawerOpen] = React.useState(false);
   const [isEditingPort, setIsEditingPort] = React.useState(false);
-  const [portInputValue, setPortInputValue] = React.useState<string>(String(staticPort));
+  const [portInputValue, setPortInputValue] = React.useState<string>(
+    String(staticPort),
+  );
   const [pendingAction, setPendingAction] = React.useState<{
     type: "toggle" | "change";
     value: boolean | number;
   } | null>(null);
 
-  const hasActiveConnections =
-    clients.length > 0 || transactionsCount > 0;
+  const hasActiveConnections = clients.length > 0 || transactionsCount > 0;
 
   const handlePortChangeAction = (action: {
     type: "toggle" | "change";
@@ -234,6 +237,8 @@ export const SettingsPanel = ({
           logActivity={logActivity}
           setNotification={setNotification}
           theme={theme}
+          initialEmail={""}
+          initialName={deviceName}
         />
 
         {/* General / Profile */}
@@ -372,7 +377,6 @@ export const SettingsPanel = ({
                 accentColor={activeAccent}
               />
             </div>
-
 
             {/* Static Port Toggle */}
             <div className="flex items-center justify-between gap-4 group">

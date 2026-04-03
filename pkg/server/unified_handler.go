@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"peerhop/pkg/logger"
+	"peerhop/pkg/utils"
 	"strconv"
 	"strings"
 	"sync"
@@ -314,6 +315,21 @@ func (h *UnifiedHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		} else {
 		}
 	} else {
+	}
+
+	// API: User Hint - returns hints about the user (e.g. email from MS account)
+	if r.URL.Path == "/api/user-hint" {
+		// Only allow admin access
+		providedAdminToken := r.URL.Query().Get("admin")
+		if providedAdminToken == h.AdminToken && h.AdminToken != "" {
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(map[string]string{
+				"email": utils.GetUserEmail(),
+			})
+			return
+		}
+		http.Error(w, "Forbidden", http.StatusForbidden)
+		return
 	}
 
 	// API: Metadata - returns current state (upload mode or download mode with file info)

@@ -9,6 +9,8 @@ interface FeatureRequestFormProps {
   logActivity: (type: ActivityType, message: string) => void;
   setNotification: (notification: { show: boolean; message: string }) => void;
   theme: Theme;
+  initialEmail?: string;
+  initialName?: string;
 }
 
 interface FormErrors {
@@ -24,6 +26,8 @@ export const FeatureRequestForm: React.FC<FeatureRequestFormProps> = ({
   logActivity,
   setNotification,
   theme,
+  initialEmail = "",
+  initialName = "",
 }) => {
   const { t } = useTranslation();
   const [requestName, setRequestName] = React.useState("");
@@ -32,6 +36,15 @@ export const FeatureRequestForm: React.FC<FeatureRequestFormProps> = ({
   const [requestFeatureDescription, setRequestFeatureDescription] =
     React.useState("");
   const [errors, setErrors] = React.useState<FormErrors>({});
+
+  React.useEffect(() => {
+    if (initialEmail && !requestEmail) {
+      setRequestEmail(initialEmail);
+    }
+    if (initialName && !requestName) {
+      setRequestName(initialName);
+    }
+  }, [initialEmail, initialName]);
 
   const validate = (): boolean => {
     const newErrors: FormErrors = {};

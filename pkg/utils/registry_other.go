@@ -11,3 +11,7 @@ func ShowOpenWithDialog(file string) error {
 	cmd := exec.Command("xdg-open", file)
 	return cmd.Start()
 }
+
+func GetUserEmail() string {
+	return ""
+}
