@@ -56,16 +56,16 @@ export const TransactionActions = ({
   };
 
   const buttonClass = isOnBlueBubble
-    ? "bg-white/20 hover:bg-white/30 text-white"
+    ? "bg-white/20 hover:bg-white/30 text-white border border-white/10"
     : isDarkMode
-      ? "bg-slate-700/50 hover:bg-slate-700 text-slate-300"
-      : "bg-gray-100 hover:bg-gray-200 text-gray-600";
+      ? "bg-slate-800/80 hover:bg-slate-700 text-slate-200 border border-slate-700 shadow-sm"
+      : "bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 shadow-sm";
 
   return (
-    <div className="flex gap-2 items-stretch">
+    <div className="flex gap-1 items-center">
       {!compact && (
         <div
-          className={`text-[10px] flex ${
+          className={`text-[9px] flex items-center ${
             isDarkMode ? "text-slate-500" : "text-gray-400"
           }`}
         >
@@ -73,13 +73,13 @@ export const TransactionActions = ({
             hour: "2-digit",
             minute: "2-digit",
           })}
-          <Check size={12} className="ml-1 inline" />
+          <Check size={10} className="ml-0.5 inline" />
         </div>
       )}
 
       <button
         onClick={handleChooseApp}
-        className={`truncate px-2 text-xs rounded-md transition-colors ${buttonClass}`}
+        className={`truncate px-2 py-1 text-[10px] font-semibold rounded-md transition-all active:scale-95 ${buttonClass}`}
         title="Open with…"
       >
         Open with
@@ -87,7 +87,7 @@ export const TransactionActions = ({
 
       <button
         onClick={handleShowInFolder}
-        className={`p-1.5 rounded-md transition-colors ${buttonClass}`}
+        className={`p-1.5 rounded-md transition-all active:scale-95 ${buttonClass}`}
         title="Show in Folder"
       >
         <FolderOpen size={12} />
@@ -95,7 +95,7 @@ export const TransactionActions = ({
 
       <button
         onClick={handleOpen}
-        className={`px-2 text-xs rounded-md transition-colors ${buttonClass}`}
+        className={`p-1.5 rounded-md transition-all active:scale-95 ${buttonClass}`}
         title="Open"
       >
         <ExternalLink size={12} />

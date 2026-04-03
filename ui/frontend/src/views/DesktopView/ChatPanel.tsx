@@ -13,6 +13,7 @@ import {
 import { PlatformIcon } from "../../components/PlatformIcon";
 import { CopyButton } from "../../components/CopyButton";
 import { TransactionActions } from "./TransactionActions";
+import { ConfirmDialog } from "../../components/ConfirmDialog";
 import {
   formatBytes,
   calculateSpeed,
@@ -76,6 +77,10 @@ export const ChatPanel = ({
   iframeIsLoaded,
 }: ChatPanelProps) => {
   const { t } = useTranslation();
+  const [clientToCancelLocal, setClientToCancelLocal] = useState<{
+    txn: any;
+    ip: string;
+  } | null>(null);
   const handleScroll = () => {
     if (!scrollContainerRef.current) return;
     const { scrollTop, scrollHeight, clientHeight } =
@@ -175,7 +180,7 @@ export const ChatPanel = ({
               )}
             </div>
           ) : (
-            visibleTransactions.map((transaction) => {
+            visibleTransactions.map((transaction, index) => {
               const isMe = transaction.senderId === "server";
               const isFile = transaction.type === "file";
               const alignClass = isMe ? "justify-end" : "justify-start";
@@ -192,10 +197,17 @@ export const ChatPanel = ({
                 if (client) clientPlatform = client.platform;
               }
 
+              const prevIsMe = index > 0 && visibleTransactions[index - 1].senderId === "server";
+              const isLast = index === visibleTransactions.length - 1;
+              const needsTopMargin = !isMe && prevIsMe;
+              const needsBottomMargin = !isMe && isLast;
+
               return (
                 <div
                   key={transaction.id}
-                  className={`flex ${alignClass} animate-in fade-in slide-in-from-bottom-2 duration-300 gap-2 items-end`}
+                  className={`flex ${alignClass} animate-in fade-in slide-in-from-bottom-2 duration-300 gap-2 items-end ${
+                    needsTopMargin ? "mt-4" : ""
+                  } ${needsBottomMargin ? "mb-10" : ""}`}
                 >
                   {/* Avatar for Client (Left Side) */}
                   {!isMe && (
@@ -219,18 +231,7 @@ export const ChatPanel = ({
                     }`}
                     style={isMe ? theme.bubbleMeStyle : undefined}
                   >
-                    {/* Background Progress Fill (Both Incoming and Outgoing) */}
-                    {transaction.status === "in_progress" && (
-                      <div
-                        className={`absolute top-0 left-0 h-full ${
-                          isMe ? "bg-white/20" : ""
-                        } pointer-events-none transition-all duration-300`}
-                        style={{
-                          width: `${transaction.transactionPercent}%`,
-                          backgroundColor: !isMe ? "#22c55e20" : undefined,
-                        }}
-                      />
-                    )}
+                    {/* Progress indicator removed for cleaner look, now using explicit bars */}
 
                     <div className="relative z-10">
                       {transaction.type === "text" && (
@@ -334,161 +335,157 @@ export const ChatPanel = ({
 
                               return (
                                 <div
-                                  className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${
+                                  className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 shadow-inner ${
                                     isMe
                                       ? "bg-white/20 text-white"
                                       : theme.iconBg + " " + theme.iconText
                                   }`}
                                 >
-                                  <File size={20} />
+                                  <File size={24} />
                                 </div>
                               );
                             })()}
-                            <div className="min-w-[140px] flex-1 text-left">
-                              <div
-                                className="font-normal text-sm truncate max-w-[200px]"
-                                title={transaction.filename}
-                              >
-                                {transaction.filename}
-                              </div>
-                              <div
-                                className={`text-xs mt-0.5 ${
-                                  isMe
-                                    ? "text-white/80"
-                                    : isDarkMode
-                                      ? "text-slate-400"
-                                      : "text-gray-500"
-                                }`}
-                              >
-                                {transaction.status === "in_progress" ? (
-                                  <div className="flex flex-col gap-0.5 mt-1 font-mono">
-                                    <span>{calculateSpeed(transaction)}</span>
-                                    <span>
-                                      {formatBytes(
-                                        (transaction.fileSize || 0) *
-                                          (transaction.transactionPercent /
-                                            100),
-                                      )}{" "}
-                                      /{" "}
-                                      {formatBytes(transaction.fileSize, [
-                                        "GB",
-                                        "TB",
-                                        "PB",
-                                      ])}
-                                    </span>
-                                    <span
-                                      className={`text-lg font-bold ${
-                                        isMe ? "text-white" : ""
-                                      }`}
-                                      style={{
-                                        color: !isMe ? "#22c55e" : undefined,
-                                      }}
-                                    >
-                                      {transaction.transactionPercent.toFixed(
-                                        2,
-                                      )}
-                                      %
-                                    </span>
-                                  </div>
-                                ) : transaction.status !== "cancelled" ? (
-                                  formatBytes(transaction.fileSize)
-                                ) : null}
-                                {transaction.status === "cancelled" && (
-                                  <span className="font-medium text-red-500/70">
-                                    Cancelled
-                                  </span>
-                                )}
-                              </div>
-
-                              {/* Multiple progress bars for client downloads */}
-                              {transaction.clientProgress &&
-                                Object.keys(transaction.clientProgress).length >
-                                  0 && (
-                                  <div className="mt-2 space-y-1.5">
-                                    {Object.entries(
-                                      transaction.clientProgress,
-                                    ).map(([clientIp, progress]) => {
-                                      const clientSt =
-                                        transaction.clientStatus?.[clientIp];
-                                      const client = clients.find(
-                                        (c) => c.ip === clientIp,
-                                      );
-
-                                      // Only show if in progress
-                                      if (clientSt !== "in_progress")
-                                        return null;
-
-                                      return (
-                                        <div
-                                          key={clientIp}
-                                          className="flex items-center gap-2"
-                                        >
-                                          <div
-                                            className={`w-4 h-4 rounded-full flex items-center justify-center shrink-0 ${theme.iconBg} ${theme.iconText}`}
-                                          >
-                                            <PlatformIcon
-                                              platform={
-                                                client?.platform || "unknown"
-                                              }
-                                              size={10}
-                                            />
-                                          </div>
-                                          <div className="flex-1 h-1 bg-gray-200/30 rounded-full overflow-hidden">
-                                            <div
-                                              className="h-full transition-all duration-300"
-                                              style={{
-                                                width: `${progress}%`,
-                                                backgroundColor: "#22c55e",
-                                              }}
-                                            />
-                                          </div>
-                                          <span
-                                            className={`text-[10px] font-mono text-slate-400 w-16 text-right`}
-                                          >
-                                            {formatLiveSpeed(
-                                              transaction.clientSpeed?.[
-                                                clientIp
-                                              ] || 0,
-                                            )}
-                                          </span>
-                                          <span
-                                            className={`text-xs font-bold w-10 text-right text-slate-200`}
-                                          >
-                                            {(progress as number).toFixed(2)}%
-                                          </span>
-                                          {transaction.status !==
-                                            "cancelled" && (
-                                            <button
-                                              onClick={async () => {
-                                                try {
-                                                  await axios.post(
-                                                    `/api/cancel-download/${transaction.id}?security=${securityToken}`,
-                                                    { clientIp: clientIp },
-                                                  );
-                                                } catch (err) {
-                                                  console.error(
-                                                    "Failed to cancel:",
-                                                    err,
-                                                  );
-                                                }
-                                              }}
-                                              className={`p-0.5 rounded hover:bg-red-100 text-red-500 transition-colors ${
-                                                isDarkMode
-                                                  ? "hover:bg-red-900/20"
-                                                  : ""
-                                              }`}
-                                              title={`Cancel download for ${
-                                                client?.platform || "client"
-                                              }`}
-                                            >
-                                              <X size={12} />
-                                            </button>
-                                          )}
-                                        </div>
-                                      );
-                                    })}
-                                  </div>
-                                )}
+                              <div className="min-w-[140px] flex-1 text-left">
+                               <div
+                                 className={`font-semibold text-[15px] truncate max-w-[280px] ${
+                                   isMe
+                                     ? "text-white"
+                                     : isDarkMode
+                                       ? "text-slate-100"
+                                       : "text-slate-800"
+                                 }`}
+                                 title={transaction.filename}
+                               >
+                                 {transaction.filename}
+                               </div>
+                               <div
+                                 className={`text-[12px] font-medium mt-0.5 opacity-80 ${
+                                   isMe
+                                     ? "text-white"
+                                     : isDarkMode
+                                       ? "text-slate-300"
+                                       : "text-slate-500"
+                                 }`}
+                               >
+                                 {transaction.status === "in_progress" ? (
+                                   <div className="flex flex-col gap-2 mt-2 font-mono">
+                                     <div className="flex items-center justify-between text-[10px] sm:text-[11px] opacity-75">
+                                       <span>{calculateSpeed(transaction)}</span>
+                                       <span>
+                                           {formatBytes(
+                                             (transaction.fileSize || 0) *
+                                               (transaction.transactionPercent / 100)
+                                           )} / {formatBytes(transaction.fileSize, ["GB", "TB"])}
+                                       </span>
+                                     </div>
+                                     <div className="h-1.5 w-full bg-white/10 dark:bg-white/5 rounded-full overflow-hidden shadow-inner flex relative">
+                                       <div 
+                                         className={`h-full transition-all duration-300 rounded-full relative overflow-hidden ${
+                                           isMe ? "bg-white" : isDarkMode ? "bg-green-400" : "bg-green-500"
+                                         }`}
+                                         style={{ width: `${transaction.transactionPercent}%` }}
+                                       >
+                                           <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent animate-shimmer" />
+                                       </div>
+                                     </div>
+                                     <span className={`text-xl font-black text-right ${
+                                       isMe ? "text-white" : isDarkMode ? "text-green-400" : "text-green-600"
+                                     }`}>
+                                       {transaction.transactionPercent.toFixed(2)}%
+                                     </span>
+                                   </div>
+                                 ) : transaction.status !== "cancelled" ? (
+                                   formatBytes(transaction.fileSize)
+                                 ) : null}
+                                 {transaction.status === "cancelled" && (
+                                   <span className="font-medium text-red-500/70">
+                                     Cancelled
+                                   </span>
+                                 )}
+                               </div>
+ 
+                               {/* Multiple progress bars for client downloads */}
+                               {transaction.clientProgress &&
+                                 Object.keys(transaction.clientProgress).length >
+                                   0 && (
+                                   <div className="mt-4 space-y-3 px-1">
+                                     {Object.entries(
+                                       transaction.clientProgress,
+                                     ).map(([clientIp, progress]) => {
+                                       const clientSt =
+                                         transaction.clientStatus?.[clientIp];
+                                       const client = clients.find(
+                                         (c) => c.ip === clientIp,
+                                       );
+ 
+                                       // Only show if in progress
+                                       if (clientSt !== "in_progress")
+                                         return null;
+ 
+                                       return (
+                                         <div
+                                           key={clientIp}
+                                           className="flex items-center gap-3 group/progress"
+                                         >
+                                           <div
+                                             className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 shadow-sm ${
+                                                 isMe ? "bg-white/20 text-white" : isDarkMode ? "bg-slate-700 text-slate-200" : "bg-green-500/10 text-green-600"
+                                             }`}
+                                           >
+                                             <PlatformIcon
+                                               platform={client?.platform || "unknown"}
+                                               size={14}
+                                             />
+                                           </div>
+                                           
+                                           <div className="flex-1 flex flex-col gap-1.5">
+                                             <div className="h-1.5 bg-white/10 rounded-full overflow-hidden relative">
+                                                 <div
+                                                   className="h-full transition-all duration-500 ease-out rounded-full relative overflow-hidden"
+                                                   style={{
+                                                     width: `${progress}%`,
+                                                     backgroundColor: isMe ? '#fff' : '#22c55e',
+                                                     boxShadow: isMe ? '0 0 8px rgba(255,255,255,0.4)' : '0 0 8px rgba(34,197,94,0.4)'
+                                                   }}
+                                                 >
+                                                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent animate-shimmer" />
+                                                 </div>
+                                             </div>
+                                             <div className="flex justify-between items-center px-0.5">
+                                               <span className={`text-[10px] font-bold opacity-60 ${
+                                                 isMe ? "text-white" : isDarkMode ? "text-slate-300" : "text-slate-500"
+                                               }`}>
+                                                 {formatLiveSpeed(transaction.clientSpeed?.[clientIp] || 0)}
+                                               </span>
+                                               <span className={`text-[11px] font-black ${
+                                                 isMe ? "text-white" : isDarkMode ? "text-slate-200" : "text-slate-700"
+                                               }`}>
+                                                 {(progress as number).toFixed(2)}%
+                                               </span>
+                                             </div>
+                                           </div>
+ 
+                                           {transaction.status !== "cancelled" && (
+                                             <button
+                                               onClick={ (e) => {
+                                                 e.stopPropagation();
+                                                  setClientToCancelLocal({ txn: transaction, ip: clientIp });
+                                               }}
+                                               className={`p-1.5 rounded-full transition-all active:scale-90 ${
+                                                 isMe 
+                                                   ? "text-white/40 hover:bg-white/20 hover:text-white" 
+                                                   : "text-slate-400 hover:bg-red-50 hover:text-red-500"
+                                               }`}
+                                               title={`Cancel download`}
+                                             >
+                                               <X size={14} />
+                                             </button>
+                                           )}
+                                         </div>
+                                       );
+                                     })}
+                                   </div>
+                                 )}
                             </div>{" "}
                             {!isMe &&
                               transaction.status === "in_progress" &&
@@ -519,12 +516,8 @@ export const ChatPanel = ({
                           {isFile &&
                             !isMe &&
                             transaction.status === "completed" && (
-                              <div className="mt-3 pt-2 border-t border-gray-100/10 flex items-center w-full gap-2">
-                                <div
-                                  className={`text-[11px] ${
-                                    isDarkMode ? theme.subText : theme.subText
-                                  }`}
-                                >
+                              <div className={`mt-3 pt-2 border-t flex items-center w-full gap-2 ${isDarkMode ? 'border-white/10' : 'border-black/5'}`}>
+                                <div className="text-[11px] opacity-60">
                                   {new Date(transaction.timestamp)
                                     .toLocaleTimeString([], {
                                       hour: "2-digit",
@@ -663,6 +656,35 @@ export const ChatPanel = ({
           )}
         </div>
       )}
+
+      <ConfirmDialog
+        isOpen={!!clientToCancelLocal}
+        title={t("cancel_transfer")}
+        message={
+          "Stop sending files to " +
+          (clients.find((c) => c.ip === clientToCancelLocal?.ip)?.name ||
+            clients.find((c) => c.ip === clientToCancelLocal?.ip)?.platform ||
+            "this device") +
+          "?"
+        }
+        confirmText={t("stop")}
+        onConfirm={async () => {
+          if (clientToCancelLocal) {
+            try {
+              await axios.post(
+                `/api/cancel-download/${clientToCancelLocal.txn.id}?security=${securityToken}`,
+                { clientIp: clientToCancelLocal.ip },
+              );
+            } catch (err) {
+              console.error("Failed to cancel:", err);
+            }
+            setClientToCancelLocal(null);
+          }
+        }}
+        onCancel={() => setClientToCancelLocal(null)}
+        destructive={true}
+        isDarkMode={isDarkMode}
+      />
     </div>
   );
 };
