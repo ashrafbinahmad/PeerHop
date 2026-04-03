@@ -59,7 +59,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
 
       {/* Dialog */}
       <div
-        className={`relative backdrop-blur-xl rounded-2xl shadow-2xl w-full max-w-[280px] overflow-hidden animate-in zoom-in-95 duration-200 ${
+        className={`relative backdrop-blur-xl rounded-xl shadow-2xl w-full max-w-[280px] overflow-hidden animate-in zoom-in-95 duration-200 ${
           isDarkMode ? "bg-[#1e293b]/95 text-slate-100" : "bg-white/95"
         }`}
       >

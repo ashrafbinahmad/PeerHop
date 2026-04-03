@@ -57,14 +57,14 @@ export const EditableDeviceName = ({
 
   return (
     <div
-      className={`group relative p-3 rounded-2xl border transition-all duration-300 ${theme.deviceItemBg} ${theme.border} hover:border-blue-500/30`}
+      className={`group relative p-3 rounded-xl border transition-all duration-300 ${theme.deviceItemBg} ${theme.border} hover:border-blue-500/30`}
     >
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-3">
           {/* Smaller Icon Container */}
           <div className="relative">
             <div
-              className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-inner ${theme.iconBg} ${theme.iconText}`}
+              className={`w-10 h-10 rounded-lg flex items-center justify-center shadow-inner ${theme.iconBg} ${theme.iconText}`}
             >
               <PlatformIcon platform={client.platform} size={20} />
             </div>
@@ -120,10 +120,10 @@ export const EditableDeviceName = ({
         <button
           onClick={() => onBlockSending(client)}
           disabled={disabled}
-          className={`flex items-center justify-center gap-1.5 py-2 px-2 rounded-xl font-bold text-[9px] uppercase tracking-wider transition-all active:scale-[0.97] border ${
+          className={`flex items-center justify-center gap-1.5 py-2 px-2 rounded-lg font-bold text-[9px] uppercase tracking-wider transition-all active:scale-[0.97] border ${
             client.sendingBlocked
-              ? "bg-amber-500/10 border-amber-500/20 text-amber-600"
-              : "bg-blue-500/10 border-blue-500/10 text-blue-600"
+              ? "bg-amber-500/5 border-amber-500/10 text-amber-600/70"
+              : "bg-slate-500/5 border-slate-500/10 text-slate-500 hover:text-blue-500 hover:bg-blue-500/5"
           } ${disabled ? "opacity-30 cursor-not-allowed" : ""}`}
         >
           {client.sendingBlocked ? (
@@ -136,10 +136,10 @@ export const EditableDeviceName = ({
         <button
           onClick={() => onBlock(client)}
           disabled={disabled}
-          className={`flex items-center justify-center gap-1.5 py-2 px-2 rounded-xl font-bold text-[9px] uppercase tracking-wider transition-all active:scale-[0.97] border ${
+          className={`flex items-center justify-center gap-1.5 py-2 px-2 rounded-lg font-bold text-[9px] uppercase tracking-wider transition-all active:scale-[0.97] border ${
             client.blocked
-              ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-600"
-              : "bg-red-500/10 border-red-500/20 text-red-600"
+              ? "bg-emerald-500/5 border-emerald-500/10 text-emerald-600/70"
+              : "bg-slate-500/5 border-slate-500/10 text-slate-500 hover:text-red-500 hover:bg-red-500/5"
           } ${disabled ? "opacity-30 cursor-not-allowed" : ""}`}
         >
           {client.blocked ? (

@@ -229,7 +229,7 @@ export const ChatPanel = ({
                   )}
 
                   <div
-                    className={`relative rounded-2xl p-3 shadow-sm ${widthClass} ${
+                    className={`relative rounded-xl p-3 shadow-sm ${widthClass} ${
                       isMe ? theme.bubbleMe : theme.bubbleOther
                     } transition-all duration-300 overflow-hidden ${
                       transaction.status === "cancelled"
@@ -642,7 +642,7 @@ export const ChatPanel = ({
                 onChange={(e) => setTextInput(e.target.value)}
                 onKeyPress={(e) => e.key === "Enter" && handleSendText()}
                 placeholder={t("type_message")}
-                className={`flex-1 px-4 py-2 border-transparent border transition-all rounded-2xl text-[15px] outline-none ${theme.inputField}`}
+                className={`flex-1 px-4 py-2 border-transparent border transition-all rounded-xl text-[15px] outline-none ${theme.inputField}`}
                 autoFocus
               />
               <button
@@ -659,7 +659,7 @@ export const ChatPanel = ({
             <div className="flex items-center gap-3">
               <button
                 onClick={handleSelectFiles}
-                className={`flex-1 h-12 rounded-2xl font-semibold flex items-center justify-center gap-2 border shadow-sm transition-all group ${theme.panelCard} ${theme.border} ${theme.text}`}
+                className={`flex-1 h-12 rounded-xl font-semibold flex items-center justify-center gap-2 border shadow-sm transition-all group ${theme.panelCard} ${theme.border} ${theme.text}`}
               >
                 <Upload
                   size={18}

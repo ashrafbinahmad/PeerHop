@@ -81,7 +81,7 @@ export const QRPanel = ({
 
             {serverInfo?.ssid ? (
               <div
-                className={`inline-flex items-center gap-2 px-4 py-2 rounded-2xl font-mono text-sm font-semibold transition-all hover:scale-[1.02] ${
+                className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl font-mono text-sm font-semibold transition-all hover:scale-[1.02] ${
                   isDarkMode
                     ? "bg-slate-800/40 text-emerald-400 border border-slate-700/50"
                     : "bg-white/50 text-emerald-700 border border-emerald-100"
@@ -94,7 +94,7 @@ export const QRPanel = ({
               </div>
             ) : (
               <div
-                className={`px-4 py-2.5 rounded-2xl border border-dashed text-center min-w-[200px] opacity-60 ${theme.border}`}
+                className={`px-4 py-2.5 rounded-xl border border-dashed text-center min-w-[200px] opacity-60 ${theme.border}`}
               >
                 <p className={`text-xs font-medium ${theme.subText}`}>
                   {isCheckingNetwork
@@ -251,7 +251,7 @@ export const QRPanel = ({
               {serverInfo?.url ? (
                 <div className="w-[200px] space-y-4 pt-1">
                   <div
-                    className={`flex items-center justify-between gap-3 pl-3 pr-1 py-1 rounded-2xl transition-all duration-300 ${
+                    className={`flex items-center justify-between gap-3 pl-3 pr-1 py-1 rounded-xl transition-all duration-300 ${
                       isDarkMode
                         ? "bg-slate-900/30 text-slate-400"
                         : "bg-gray-100/50 text-gray-500"

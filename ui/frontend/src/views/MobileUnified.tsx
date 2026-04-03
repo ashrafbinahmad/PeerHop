@@ -839,7 +839,7 @@ export const MobileUnified: React.FC<Props> = ({
                   <button
                     onClick={handleSelectFiles}
                     disabled={isSendingDisabled}
-                    className={`group relative flex flex-col items-center justify-center gap-4 w-64 h-52 rounded-[2.5rem] border shadow-sm transition-all duration-300 active:scale-[0.98] ${
+                    className={`group relative flex flex-col items-center justify-center gap-4 w-64 h-52 rounded-2xl border shadow-sm transition-all duration-300 active:scale-[0.98] ${
                       theme.border
                     } ${theme.iconBg} ${isSendingDisabled ? "opacity-50 cursor-not-allowed" : ""}`}
                   >
@@ -888,7 +888,7 @@ export const MobileUnified: React.FC<Props> = ({
               ) : (
                 <div className="flex flex-col items-center gap-4 text-center px-8">
                   <div
-                    className={`w-16 h-16 rounded-3xl flex items-center justify-center opacity-20 ${theme.iconBg}`}
+                    className={`w-16 h-16 rounded-2xl flex items-center justify-center opacity-20 ${theme.iconBg}`}
                   >
                     <Plus size={32} className={theme.text} />
                   </div>
@@ -1069,7 +1069,7 @@ export const MobileUnified: React.FC<Props> = ({
                   )}
 
                   <div
-                    className={`relative rounded-2xl overflow-hidden shadow-sm ${widthClass} ${bubbleClass} transition-all duration-300 ${
+                    className={`relative rounded-xl overflow-hidden shadow-sm ${widthClass} ${bubbleClass} transition-all duration-300 ${
                       transaction.status === "cancelled"
                         ? "opacity-60 grayscale-[0.5]"
                         : ""
