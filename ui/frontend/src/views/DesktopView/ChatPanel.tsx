@@ -9,6 +9,7 @@ import {
   Play,
   Plus,
   X,
+  Trash2,
 } from "lucide-react";
 import { PlatformIcon } from "../../components/PlatformIcon";
 import { CopyButton } from "../../components/CopyButton";
@@ -569,6 +570,42 @@ export const ChatPanel = ({
                                     onOpen={handleFileOpened}
                                     onDelete={() => setTransactionToDelete(transaction)}
                                   />
+                                </div>
+                              </div>
+                            )}
+
+                          {/* Divider and Actions for Cancelled/Failed Files */}
+                          {isFile && (transaction.status === "cancelled" || transaction.status === "failed") && (
+                              <div className={`mt-3 pt-2 border-t flex items-center w-full gap-2 ${isMe ? 'border-white/10' : isDarkMode ? 'border-white/10' : 'border-black/5'}`}>
+                                <div className={`text-[11px] ${isMe ? 'text-white/50' : 'opacity-60'}`}>
+                                  {new Date(transaction.timestamp)
+                                    .toLocaleTimeString([], {
+                                      hour: "2-digit",
+                                      minute: "2-digit",
+                                    })
+                                    .toLowerCase()}
+                                </div>
+                                <div className="ml-auto">
+                                   <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        if (transaction.status === "cancelled" || transaction.status === "failed") {
+                                          deleteTransaction(transaction.id, false);
+                                        } else {
+                                          setTransactionToDelete(transaction);
+                                        }
+                                      }}
+                                      className={`p-1.5 rounded-md transition-all active:scale-95 flex items-center gap-1 ${
+                                        isMe 
+                                          ? "bg-white/20 hover:bg-white/30 text-white border border-white/10 shadow-sm" 
+                                          : isDarkMode 
+                                            ? "bg-slate-800/80 hover:bg-slate-700 text-slate-200 border border-slate-700 shadow-sm"
+                                            : "bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 shadow-sm"
+                                      }`}
+                                      title="Delete"
+                                    >
+                                      <Trash2 size={12} />
+                                    </button>
                                 </div>
                               </div>
                             )}
