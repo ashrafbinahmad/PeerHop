@@ -26,10 +26,11 @@ type WSMessage struct {
 
 // SafeConn wraps websocket.Conn to ensure thread-safe writes
 type SafeConn struct {
-	conn      *websocket.Conn
-	mu        sync.Mutex
-	clientIP  string // Track client IP for blocking
-	isDesktop bool   // Whether this is a desktop app connection
+	conn       *websocket.Conn
+	mu         sync.Mutex
+	clientIP   string // Track client IP for blocking
+	remoteAddr string // Track full remote address for logging
+	isDesktop  bool   // Whether this is a desktop app connection
 }
 
 // WriteMessage sends a message to the connection in a thread-safe manner
@@ -136,8 +137,10 @@ func (hub *WebSocketHub) Broadcast(msgType string, data interface{}) {
 		}
 
 		err := conn.WriteMessage(websocket.TextMessage, jsonData)
-		if err != nil {
-			logger.Warn("[WebSocket] Error writing to connection: %v", err)
+		if err == nil {
+			logger.Info("[WebSocket] Broadcasted '%s' to %s", msgType, conn.remoteAddr)
+		} else {
+			logger.Warn("[WebSocket] Error writing to connection %s: %v", conn.remoteAddr, err)
 			// Connection will be cleaned up by the read loop or keep-alive
 		}
 	}
@@ -388,9 +391,10 @@ func (hub *WebSocketHub) HandleWebSocket(w http.ResponseWriter, r *http.Request)
 
 	// Create thread-safe connection wrapper with client IP
 	safeConn := &SafeConn{
-		conn:      conn,
-		clientIP:  clientIP,
-		isDesktop: isDesktop,
+		conn:       conn,
+		clientIP:   clientIP,
+		remoteAddr: r.RemoteAddr,
+		isDesktop:  isDesktop,
 	}
 
 	hub.AddConnection(safeConn)
@@ -402,6 +406,15 @@ func (hub *WebSocketHub) HandleWebSocket(w http.ResponseWriter, r *http.Request)
 		hub.clientStore.AddOrUpdateClient(userAgent, clientIP)
 	} else if isDesktop {
 		logger.Info("[WebSocket] SKIPPING desktop app - IP: %s, isDesktop: %v", clientIP, isDesktop)
+	}
+
+	// Helper to write and log
+	writeInitMessage := func(msgType string, msgData []byte) {
+		if err := safeConn.WriteMessage(websocket.TextMessage, msgData); err == nil {
+			logger.Info("[WebSocket] Sent '%s' to %s", msgType, safeConn.remoteAddr)
+		} else {
+			logger.Warn("[WebSocket] Error sending '%s' to %s: %v", msgType, safeConn.remoteAddr, err)
+		}
 	}
 
 	// Send initial data
@@ -416,7 +429,7 @@ func (hub *WebSocketHub) HandleWebSocket(w http.ResponseWriter, r *http.Request)
 				"transactions": transactions,
 			},
 		})
-		safeConn.WriteMessage(websocket.TextMessage, jsonData)
+		writeInitMessage("transactions_init", jsonData)
 	}
 
 	if hub.clientStore != nil {
@@ -427,7 +440,7 @@ func (hub *WebSocketHub) HandleWebSocket(w http.ResponseWriter, r *http.Request)
 				"clients": clients,
 			},
 		})
-		safeConn.WriteMessage(websocket.TextMessage, jsonData)
+		writeInitMessage("devices_init", jsonData)
 	}
 
 	// Send desktop name
@@ -440,7 +453,7 @@ func (hub *WebSocketHub) HandleWebSocket(w http.ResponseWriter, r *http.Request)
 			"name": desktopName,
 		},
 	})
-	safeConn.WriteMessage(websocket.TextMessage, jsonData)
+	writeInitMessage("desktop_name_init", jsonData)
 
 	// Send text transfer and multi-client settings
 	hub.mu.RLock()
@@ -454,7 +467,7 @@ func (hub *WebSocketHub) HandleWebSocket(w http.ResponseWriter, r *http.Request)
 			"multiClientEnabled":  multiClientEnabled,
 		},
 	})
-	safeConn.WriteMessage(websocket.TextMessage, settingsData)
+	writeInitMessage("settings_init", settingsData)
 
 	// Send theme settings
 	hub.mu.RLock()
@@ -468,7 +481,7 @@ func (hub *WebSocketHub) HandleWebSocket(w http.ResponseWriter, r *http.Request)
 			"accentId": accentID,
 		},
 	})
-	safeConn.WriteMessage(websocket.TextMessage, themeData)
+	writeInitMessage("theme_init", themeData)
 
 	// Keep connection alive and handle incoming messages
 	go func() {

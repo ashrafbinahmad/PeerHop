@@ -74,6 +74,9 @@ const WifiSignalIcon = ({
   </svg>
 );
 
+// Configuration to enable/disable auto-downloading of files
+const SHOUL_AUTO_DOWNLOAD = false;
+
 export const MobileUnified: React.FC<Props> = ({
   downloadFilename,
   downloadSize,
@@ -159,6 +162,23 @@ export const MobileUnified: React.FC<Props> = ({
 
   const [isUnauthorized, setIsUnauthorized] = useState(false);
 
+  // ALL hooks MUST be called before any conditional returns (React Rules of Hooks)
+  const {
+    transactions,
+    clients,
+    sendText,
+    isDarkMode,
+    activeThemeId,
+    activeAccentId,
+    isConnected,
+    deviceName,
+    textTransferEnabled,
+    multiClientEnabled,
+  } = useTransactions(2000, undefined, false, false, securityToken, true); // Pass security token and enable security
+
+  // Track downloaded transaction IDs to prevent re-downloading
+  const downloadedIdsRef = useRef<Set<number>>(new Set());
+
   useEffect(() => {
     // Check security status on mount
     const checkSecurity = async () => {
@@ -175,49 +195,6 @@ export const MobileUnified: React.FC<Props> = ({
     checkSecurity();
   }, [securityToken]);
 
-  if (isUnauthorized) {
-    return (
-      <div className="fixed inset-0 bg-gray-50 dark:bg-slate-900 flex flex-col items-center justify-center p-6 text-center z-50">
-        <div className="w-20 h-20 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mb-6">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="40"
-            height="40"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className="text-red-500 dark:text-red-400"
-          >
-            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
-            <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
-          </svg>
-        </div>
-        <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-          {t("access_denied")}
-        </h2>
-        <p className="text-gray-600 dark:text-gray-400 max-w-sm">
-          {t("protected_server")}
-        </p>
-      </div>
-    );
-  }
-
-  const {
-    transactions,
-    clients,
-    sendText,
-    isDarkMode,
-    activeThemeId,
-    activeAccentId,
-    isConnected,
-    deviceName,
-    textTransferEnabled,
-    multiClientEnabled,
-  } = useTransactions(2000, undefined, false, false, securityToken, true); // Pass security token and enable security
-
   const myClient = clients.find((c) => c.ip === myIp);
   const isBlocked = myClient?.blocked || false;
   // If fully blocked, sending is also implicitly blocked (in UI terms)
@@ -226,9 +203,6 @@ export const MobileUnified: React.FC<Props> = ({
   const isSendingDisabled = isBlocked || myClient?.sendingBlocked || false;
   const isSendingBlockedOnly =
     !isBlocked && (myClient?.sendingBlocked || false);
-
-  // Track downloaded transaction IDs to prevent re-downloading
-  const downloadedIdsRef = useRef<Set<number>>(new Set());
 
   const activeTheme =
     // THEME_PRESETS.find((t) => t.id === activeThemeId) ||
@@ -251,6 +225,12 @@ export const MobileUnified: React.FC<Props> = ({
 
   // Auto-download when multi-client is disabled
   useEffect(() => {
+    // Only auto-download if enabled via constant
+    if (!SHOUL_AUTO_DOWNLOAD) {
+      console.log("[Auto-Download] Disabled by configuration");
+      return;
+    }
+
     console.log(
       `[Auto-Download] Effect triggered - multiClientEnabled: ${multiClientEnabled}, myIp: ${myIp}, transactions: ${transactions.length}`,
     );
@@ -666,6 +646,37 @@ export const MobileUnified: React.FC<Props> = ({
 
   // Show all transactions (including uploads)
   const visibleTransactions = transactions;
+
+  // Unauthorized screen (rendered AFTER all hooks have been called)
+  if (isUnauthorized) {
+    return (
+      <div className="fixed inset-0 bg-gray-50 dark:bg-slate-900 flex flex-col items-center justify-center p-6 text-center z-50">
+        <div className="w-20 h-20 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mb-6">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="40"
+            height="40"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="text-red-500 dark:text-red-400"
+          >
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+            <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+          </svg>
+        </div>
+        <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+          {t("access_denied")}
+        </h2>
+        <p className="text-gray-600 dark:text-gray-400 max-w-sm">
+          {t("protected_server")}
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div

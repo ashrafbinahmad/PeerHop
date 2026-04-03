@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
-	"io"
 	"net/http"
 	"os"
 	"os/exec"
@@ -102,33 +101,25 @@ func (a *App) startPersistentServer() error {
 	a.currentPort = port
 
 	// Detect development mode by checking if PeerHop's Vite dev server is running
-	// We only check this in dev builds to prevent production builds from proxying to unrelated dev servers
 	devServerURL := ""
 	env := runtime.Environment(a.ctx)
 	if env.BuildType == "dev" {
-		if resp, err := http.Get("http://localhost:5173"); err == nil {
-			// Read response to check if it's PeerHop's dev server
-			// PeerHop's dev server should return HTML with "PeerHop" or typical Vite dev server response
-			body, readErr := io.ReadAll(resp.Body)
-			resp.Body.Close()
+		// Always try to use dev server in dev mode
+		devServerURL = "http://localhost:5173"
 
-			if readErr == nil {
-				bodyStr := string(body)
-				// Check if response contains PeerHop-specific markers or Vite dev server markers
-				// Vite dev server typically returns HTML with script tags for /@vite/client
-				isPeerHopDevServer := strings.Contains(bodyStr, "/@vite/client") ||
-					strings.Contains(bodyStr, "PeerHop") ||
-					strings.Contains(bodyStr, "/src/main.tsx") ||
-					strings.Contains(bodyStr, "/src/main.jsx")
-
-				if isPeerHopDevServer {
-					devServerURL = "http://localhost:5173"
-					logger.Info("Development mode detected - proxying to PeerHop Vite dev server")
-				} else {
-					logger.Info("Port 5173 is in use but not by PeerHop - serving embedded dist")
+		// Initial check for logging
+		go func() {
+			// Wait a few seconds for Vite to start if it hasn't already
+			for i := 0; i < 5; i++ {
+				if resp, err := http.Get(devServerURL); err == nil {
+					resp.Body.Close()
+					logger.Info("Development mode: Vite dev server is responsive at %s", devServerURL)
+					return
 				}
+				time.Sleep(1 * time.Second)
 			}
-		}
+			logger.Warn("Development mode: Vite dev server not responding after 5 seconds, will retry on request")
+		}()
 	}
 
 	// Create unified handler with optional dev server URL
@@ -253,6 +244,7 @@ func (a *App) RequestReview() error {
 	}`, storeID, fws)
 
 	cmd := exec.Command("powershell", "-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", psCmd)
+	utils.HideWindow(cmd)
 	if err := cmd.Run(); err != nil {
 		logger.Warn("RequestReview PowerShell failed: %v", err)
 		if a.ctx != nil {

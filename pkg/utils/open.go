@@ -19,6 +19,7 @@ func OpenFileDefault(path string) error {
 	switch runtime.GOOS {
 	case "windows":
 		cmd = exec.Command("cmd", "/c", "start", "", path)
+		HideWindow(cmd)
 	case "darwin":
 		cmd = exec.Command("open", path)
 	default: // linux, etc
@@ -39,6 +40,7 @@ func ShowInFolder(path string) error {
 	switch runtime.GOOS {
 	case "windows":
 		cmd = exec.Command("explorer", "/select,", absPath)
+		HideWindow(cmd)
 	case "darwin":
 		cmd = exec.Command("open", "-R", absPath)
 	default: // linux

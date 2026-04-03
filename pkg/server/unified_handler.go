@@ -8,13 +8,16 @@ import (
 	"io"
 	"io/fs"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
+	"peerhop/pkg/logger"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/gorilla/websocket"
 	"github.com/schollz/progressbar/v3"
 )
 
@@ -1062,8 +1065,9 @@ func (h *UnifiedHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// Development mode: Proxy to Vite dev server
 	if h.DevServerURL != "" {
-		h.proxyToDevServer(w, r)
-		return
+		if h.proxyToDevServer(w, r) {
+			return
+		}
 	}
 
 	// Serve Static Assets or Index
@@ -1082,6 +1086,10 @@ func (h *UnifiedHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Otherwise serve index.html (SPA)
+	if r.URL.Path == "/" || r.URL.Path == "/index.html" {
+		logger.Info("[UI] Serving mobile UI from embedded dist")
+	}
+
 	index, err := fsys.Open("index.html")
 	if err != nil {
 		http.Error(w, "UI not found", http.StatusInternalServerError)
@@ -1097,17 +1105,27 @@ func (h *UnifiedHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// proxyToDevServer proxies requests to the Vite dev server
-func (h *UnifiedHandler) proxyToDevServer(w http.ResponseWriter, r *http.Request) {
+// proxyToDevServer proxies requests to the Vite dev server. Returns true if proxying was successful.
+func (h *UnifiedHandler) proxyToDevServer(w http.ResponseWriter, r *http.Request) bool {
+	// Handle WebSocket proxying for HMR
+	if websocket.IsWebSocketUpgrade(r) {
+		h.proxyWebSocket(w, r)
+		return true
+	}
+
 	targetURL := h.DevServerURL + r.URL.Path
+	if r.URL.Path == "/" || r.URL.Path == "/index.html" {
+		logger.Info("[Proxy] Serving mobile UI from dev server at %s", h.DevServerURL)
+	}
+
 	if r.URL.RawQuery != "" {
 		targetURL += "?" + r.URL.RawQuery
 	}
 
 	proxyReq, err := http.NewRequest(r.Method, targetURL, r.Body)
 	if err != nil {
-		http.Error(w, "Proxy error", http.StatusInternalServerError)
-		return
+		logger.Error("[Proxy] Error creating request: %v", err)
+		return false
 	}
 
 	// Copy headers
@@ -1117,11 +1135,17 @@ func (h *UnifiedHandler) proxyToDevServer(w http.ResponseWriter, r *http.Request
 		}
 	}
 
-	client := &http.Client{}
+	// Important for Vite/HMR
+	proxyReq.Header.Set("Host", "localhost:5173")
+
+	client := &http.Client{
+		Timeout: 5 * time.Second,
+	}
 	resp, err := client.Do(proxyReq)
 	if err != nil {
-		http.Error(w, "Dev server not available", http.StatusBadGateway)
-		return
+		// Log once in a while to avoid spamming if server is down
+		logger.Warn("[Proxy] Dev server %s not reachable: %v (Falling back to embedded UI)", h.DevServerURL, err)
+		return false
 	}
 	defer resp.Body.Close()
 
@@ -1134,6 +1158,88 @@ func (h *UnifiedHandler) proxyToDevServer(w http.ResponseWriter, r *http.Request
 
 	w.WriteHeader(resp.StatusCode)
 	io.Copy(w, resp.Body)
+	return true
+}
+
+func (h *UnifiedHandler) proxyWebSocket(w http.ResponseWriter, r *http.Request) {
+	u, _ := url.Parse(h.DevServerURL)
+	targetAddr := "ws://" + u.Host + r.URL.Path
+	if r.URL.RawQuery != "" {
+		targetAddr += "?" + r.URL.RawQuery
+	}
+
+	logger.Info("[Proxy] Proxying WebSocket: %s", targetAddr)
+
+	// Connect to Backend WebSocket with custom dialer for faster timeout
+	dialer := &websocket.Dialer{
+		Proxy:            http.ProxyFromEnvironment,
+		HandshakeTimeout: 5 * time.Second,
+	}
+	
+	confBody := r.Header.Clone()
+	confBody.Del("Upgrade")
+	confBody.Del("Connection")
+	confBody.Del("Sec-Websocket-Key")
+	confBody.Del("Sec-Websocket-Version")
+	confBody.Del("Sec-Websocket-Extensions")
+	confBody.Del("Sec-Websocket-Protocol")
+	
+	// Crucial for Vite HMR server to accept the connection without hanging or complaining
+	confBody.Set("Host", "localhost:5173")
+	confBody.Set("Origin", "http://localhost:5173")
+
+	backendConn, _, err := dialer.Dial(targetAddr, confBody)
+	if err != nil {
+		logger.Error("[Proxy] WebSocket dial error: %v", err)
+		http.Error(w, "WebSocket proxy error", http.StatusBadGateway)
+		return
+	}
+	defer backendConn.Close()
+
+	// Upgrade Client Connection
+	upgrader := websocket.Upgrader{
+		CheckOrigin: func(r *http.Request) bool { return true },
+	}
+	clientConn, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		logger.Error("[Proxy] WebSocket upgrade error: %v", err)
+		return
+	}
+	defer clientConn.Close()
+
+	// Proxy data
+	errChan := make(chan error, 2)
+	go func() {
+		for {
+			mt, message, err := clientConn.ReadMessage()
+			if err != nil {
+				errChan <- err
+				return
+			}
+			err = backendConn.WriteMessage(mt, message)
+			if err != nil {
+				errChan <- err
+				return
+			}
+		}
+	}()
+
+	go func() {
+		for {
+			mt, message, err := backendConn.ReadMessage()
+			if err != nil {
+				errChan <- err
+				return
+			}
+			err = clientConn.WriteMessage(mt, message)
+			if err != nil {
+				errChan <- err
+				return
+			}
+		}
+	}()
+
+	<-errChan
 }
 
 func (h *UnifiedHandler) serveFile(w http.ResponseWriter, r *http.Request, filePath string, forceTxnID int) {

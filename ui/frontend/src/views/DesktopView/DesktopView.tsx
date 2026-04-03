@@ -23,6 +23,7 @@ import {
   OnFileDrop,
   OnFileDropOff,
   BrowserOpenURL,
+  WindowIsMaximised,
 } from "../../../wailsjs/runtime/runtime";
 import { useTransactions } from "../../hooks/useTransactions";
 import { formatBytes } from "../../utils/format";
@@ -39,6 +40,7 @@ import {
   Upload,
   Minus,
   Maximize2,
+  Minimize2,
   QrCode,
   Settings,
 } from "lucide-react";
@@ -97,6 +99,7 @@ export const DesktopView = () => {
     "55px",
   );
   const [iframIsLoaded, setIframeIsLoaded] = useState(false);
+  const [isMaximized, setIsMaximized] = useState(false);
   const { t, lang } = useTranslation();
 
   const adRef = useRef<HTMLIFrameElement>(null);
@@ -143,6 +146,20 @@ export const DesktopView = () => {
       OnFileDropOff();
     };
   }, [logActivity]);
+
+  // Sync maximization state
+  useEffect(() => {
+    const handleResize = () => {
+      WindowIsMaximised().then(setIsMaximized).catch(console.error);
+    };
+
+    window.addEventListener("resize", handleResize);
+    handleResize(); // Initial check
+
+    return () => {
+      window.removeEventListener("resize", handleResize);
+    };
+  }, []);
 
   // Drag and Drop Handlers
   const handleDragEnter = (e: React.DragEvent) => {
@@ -972,7 +989,7 @@ export const DesktopView = () => {
           onClick={handleMaximizeToggle}
           className={`p-2 rounded-lg transition-colors ${theme.ghostHover}`}
         >
-          <Maximize2 size={16} />
+          {isMaximized ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
         </button>
         <button
           onClick={handleClose}

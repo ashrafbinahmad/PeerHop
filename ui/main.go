@@ -98,8 +98,8 @@ func main() {
 	// Create application with options
 	werr := wails.Run(&options.App{
 		Title:     "PeerHop",
-		Width:     424,
-		Height:    768,
+		Width:     768,
+		Height:    680,
 		MinWidth:  424,
 		MinHeight: 500,
 		AssetServer: &assetserver.Options{
