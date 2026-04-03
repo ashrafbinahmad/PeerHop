@@ -107,7 +107,7 @@ export function checkAndShowFeedbackPopup(): void {
     if (hasUserReviewed()) return; // Already reviewed, don't show again
 
     const count = countShareAndReceiveActivities();
-    const thresholds = [5, 10, 30, 40, 50]; // Show at these counts
+    const thresholds = [2, 5, 8, 10, 20, 30, 40, 50]; // Show at these counts
 
     if (thresholds.includes(count)) {
       // Emit custom event that components can listen to
