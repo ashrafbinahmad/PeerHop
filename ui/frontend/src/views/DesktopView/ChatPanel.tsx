@@ -7,6 +7,7 @@ import {
   ArrowUp,
   Monitor,
   Play,
+  Plus,
   X,
 } from "lucide-react";
 import { PlatformIcon } from "../../components/PlatformIcon";
@@ -132,24 +133,20 @@ export const ChatPanel = ({
               {/* Big Share File Button */}
               <button
                 onClick={handleSelectFiles}
-                className={`group relative flex flex-col items-center justify-center gap-4 w-60 h-48 rounded-[2rem] border transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] ${
+                className={`group relative flex flex-col items-center justify-center gap-4 w-64 h-52 rounded-[2.5rem] border shadow-sm transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] ${
                   theme.border
-                } ${isDarkMode ? "hover:bg-slate-800/50" : "hover:bg-gray-50"}`}
+                } ${theme.iconBg}`}
               >
-                <div
-                  className="p-4 rounded-full transition-all duration-300 group-hover:scale-110"
-                  style={{
-                    backgroundColor: theme.accentColor + "10",
-                    color: theme.accentColor,
-                  }}
-                >
-                  <Upload size={32} strokeWidth={1.5} />
-                </div>
+                <Plus
+                  size={54}
+                  strokeWidth={2.5}
+                  className={`mb-2 transition-all duration-300 group-hover:scale-110 opacity-70 ${theme.text}`}
+                />
                 <div className="flex flex-col items-center gap-1">
-                  <span className="text-lg font-medium tracking-tight opacity-90">
+                  <span className={`text-xl font-bold tracking-tight opacity-70 ${theme.text}`}>
                     {t("share_file")}
                   </span>
-                  <span className={`text-xs opacity-50`}>
+                  <span className={`text-xs opacity-60 font-medium ${theme.text}`}>
                     {t("click_to_browse")}
                   </span>
                 </div>
