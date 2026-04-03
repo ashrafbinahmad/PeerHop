@@ -159,16 +159,16 @@ export const ChatPanel = ({
                     if (!textTransferEnabled) setShowTextInput(true);
                     setShowTextInput(true);
                   }}
-                  className={`flex items-center gap-2 px-5 py-2.5 rounded-full border transition-all duration-300 hover:scale-105 active:scale-95 ${
+                  className={`flex items-center gap-2 px-5 py-2.5 rounded-full border shadow-sm transition-all duration-300 hover:scale-105 active:scale-95 ${
                     theme.border
-                  } ${isDarkMode ? "hover:bg-slate-800/50" : "hover:bg-gray-50"}`}
+                  } ${theme.iconBg}`}
                 >
                   <MessageSquare
                     size={16}
-                    strokeWidth={1.5}
-                    style={{ color: theme.accentColor }}
+                    strokeWidth={2}
+                    className={`opacity-70 ${theme.text}`}
                   />
-                  <span className="text-sm font-medium opacity-90">
+                  <span className={`text-sm font-bold opacity-70 ${theme.text}`}>
                     {t("send_text")}
                   </span>
                 </button>
