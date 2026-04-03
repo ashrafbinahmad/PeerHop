@@ -266,12 +266,6 @@ export const DesktopView = () => {
     return saved !== null ? saved === "true" : true;
   });
 
-  const [multiClientEnabled, setMultiClientEnabled] = useState(() => {
-    const saved = localStorage.getItem("multiClientEnabled");
-    // Default to false (disabled)
-    return saved !== null ? saved === "true" : false;
-  });
-
   const [staticPortEnabled, setStaticPortEnabled] = useState(() => {
     const saved = localStorage.getItem("staticPortEnabled");
     return saved !== null ? saved === "true" : false;
@@ -639,7 +633,6 @@ export const DesktopView = () => {
   // Save text transfer and multi-client settings to localStorage and sync with server
   useEffect(() => {
     localStorage.setItem("textTransferEnabled", String(textTransferEnabled));
-    localStorage.setItem("multiClientEnabled", String(multiClientEnabled));
 
     if (!serverInfo?.url) return;
 
@@ -653,7 +646,6 @@ export const DesktopView = () => {
       .post(url, {
         textTransferEnabled,
         securityEnabled,
-        multiClientEnabled,
         staticPortEnabled,
         staticPort,
       })
@@ -661,7 +653,6 @@ export const DesktopView = () => {
   }, [
     textTransferEnabled,
     securityEnabled,
-    multiClientEnabled,
     staticPortEnabled,
     staticPort,
     serverInfo?.url,
@@ -809,7 +800,7 @@ export const DesktopView = () => {
 
   // Track active download for single-client mode
   const activeClientDownload = useMemo(() => {
-    if (multiClientEnabled || clients.length === 0) return null;
+    if (clients.length === 0) return null;
     const client = clients[0];
     return transactions.find(
       (t) =>
@@ -817,7 +808,7 @@ export const DesktopView = () => {
         t.senderId === "server" &&
         t.clientStatus?.[client.ip] === "in_progress",
     );
-  }, [transactions, clients, multiClientEnabled]);
+  }, [transactions, clients]);
 
   // --- Theme Variables ---
 
@@ -1074,7 +1065,7 @@ export const DesktopView = () => {
       >
         {/* Toggle between Settings and QR Panel */}
         <div className="relative flex-1 overflow-y-auto hide-scrollbar   animate-in slide-in-from-right duration-300 overflow-x-hidden">
-          <div className="min-h-full flex flex-col items-center justify-start px-5 p-8 ">
+          <div className="min-h-full flex flex-col items-center justify-start px-2 py-8 ">
             {activeTab === "settings" ? (
               /* Settings Panel */
               <SettingsPanel
@@ -1088,8 +1079,6 @@ export const DesktopView = () => {
                 setTextTransferEnabled={setTextTransferEnabled}
                 securityEnabled={securityEnabled}
                 setSecurityEnabled={setSecurityEnabled}
-                multiClientEnabled={multiClientEnabled}
-                setMultiClientEnabled={setMultiClientEnabled}
                 staticPortEnabled={staticPortEnabled}
                 setStaticPortEnabled={(val) => {
                   setStaticPortEnabled(val);
@@ -1122,7 +1111,6 @@ export const DesktopView = () => {
                 serverInfo={serverInfo}
                 securityEnabled={securityEnabled}
                 securityToken={securityToken}
-                multiClientEnabled={multiClientEnabled}
                 clients={clients}
                 activeClientDownload={activeClientDownload}
                 theme={theme}

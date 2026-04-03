@@ -180,7 +180,6 @@ export const MobileUnified: React.FC<Props> = ({
     isConnected,
     deviceName,
     textTransferEnabled,
-    multiClientEnabled,
   } = useTransactions(2000, undefined, false, false, securityToken, true); // Pass security token and enable security
 
   // Track downloaded transaction IDs to prevent re-downloading
@@ -242,120 +241,6 @@ export const MobileUnified: React.FC<Props> = ({
       activeTheme.panelCard + " " + activeTheme.border + " " + activeTheme.text,
   };
 
-  // Auto-download when multi-client is disabled
-  useEffect(() => {
-    // Only auto-download if enabled via constant
-    if (!SHOUL_AUTO_DOWNLOAD) {
-      console.log("[Auto-Download] Disabled by configuration");
-      return;
-    }
-
-    console.log(
-      `[Auto-Download] Effect triggered - multiClientEnabled: ${multiClientEnabled}, myIp: ${myIp}, transactions: ${transactions.length}`,
-    );
-
-    if (multiClientEnabled) {
-      console.log(
-        "[Auto-Download] Multi-client enabled - skipping auto-download",
-      );
-      return;
-    }
-
-    if (!myIp) {
-      console.log("[Auto-Download] No myIp yet - skipping auto-download");
-      return;
-    }
-
-    // Find pending downloads (not sent by me, file type, pending or not yet started)
-    const pendingDownloads = transactions.filter((txn) => {
-      if (txn.type !== "file") return false;
-      if (txn.senderId === myIp) return false; // Skip my own uploads
-
-      // Check if already downloaded
-      if (downloadedIdsRef.current.has(txn.id)) {
-        console.log(
-          `[Auto-Download] Skipping txn ${txn.id} - already downloaded`,
-        );
-        return false;
-      }
-
-      // Check client-specific status
-      const clientStatus =
-        myIp && txn.clientStatus ? txn.clientStatus[myIp] : undefined;
-      const clientProgress =
-        myIp && txn.clientProgress ? txn.clientProgress[myIp] : undefined;
-
-      console.log(
-        `[Auto-Download] Txn ${txn.id}: status=${clientStatus}, progress=${clientProgress}, globalStatus=${txn.status}`,
-      );
-
-      // Auto-download if:
-      // 1. No client status yet (new transaction)
-      // 2. Client status is "pending"
-      // 3. Client status doesn't exist but global status is pending
-      const shouldDownload =
-        !clientStatus ||
-        clientStatus === "pending" ||
-        (clientStatus === undefined && txn.status === "pending");
-
-      if (shouldDownload) {
-        console.log(
-          `[Auto-Download] Txn ${txn.id} (${txn.filename}) is eligible for download`,
-        );
-      }
-
-      return shouldDownload;
-    });
-
-    console.log(
-      `[Auto-Download] Found ${pendingDownloads.length} pending downloads`,
-    );
-
-    // Sort by ID to download in order
-    pendingDownloads.sort((a, b) => a.id - b.id);
-
-    // Download the first pending file
-    if (pendingDownloads.length > 0) {
-      const txn = pendingDownloads[0];
-      if (txn.downloadLink) {
-        console.log(
-          `[Auto-Download] ✅ ${t("connected")} download for transaction ${txn.id}: ${txn.filename}`,
-        );
-
-        // Mark as downloaded to prevent re-trigger
-        downloadedIdsRef.current.add(txn.id);
-
-        // Capture downloadLink and filename to preserve type narrowing in setTimeout
-        const downloadLink = txn.downloadLink;
-        const filename = txn.filename || "file";
-
-        // Trigger download - use setTimeout to ensure it's in a clean execution context
-        setTimeout(() => {
-          const link = document.createElement("a");
-          const downloadUrl = securityToken
-            ? `${downloadLink}${
-                downloadLink.includes("?") ? "&" : "?"
-              }security=${securityToken}`
-            : downloadLink;
-          link.href = downloadUrl;
-          link.download = filename;
-          link.target = "_blank"; // iOS compatibility
-          document.body.appendChild(link);
-
-          console.log(`[Auto-Download] Clicking download link: ${downloadUrl}`);
-          link.click();
-
-          setTimeout(() => {
-            document.body.removeChild(link);
-          }, 100);
-        }, 100);
-      } else {
-        console.log(
-          `[Auto-Download] ❌ No download link for transaction ${txn.id}`,
-        );
-      }
-    }
-  }, [transactions, multiClientEnabled, myIp, securityToken]);
 
   // Update document title when device name changes
   useEffect(() => {

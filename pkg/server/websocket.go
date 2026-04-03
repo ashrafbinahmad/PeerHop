@@ -68,7 +68,6 @@ type WebSocketHub struct {
 	clientStore         *ClientStore
 	desktopName         string // Desktop device name
 	textTransferEnabled bool   // Text transfer setting
-	multiClientEnabled  bool   // Multi-client mode setting
 	themeID             string // Current theme ID
 	accentID            string // Current accent ID
 
@@ -213,7 +212,6 @@ func (hub *WebSocketHub) SetTextTransferEnabled(enabled bool) {
 	hub.mu.Unlock()
 	hub.Broadcast("settings_update", map[string]interface{}{
 		"textTransferEnabled": enabled,
-		"multiClientEnabled":  hub.multiClientEnabled,
 	})
 }
 
@@ -223,22 +221,6 @@ func (hub *WebSocketHub) GetTextTransferEnabled() bool {
 	return hub.textTransferEnabled
 }
 
-// SetMultiClientEnabled sets the multi-client mode setting and broadcasts the update
-func (hub *WebSocketHub) SetMultiClientEnabled(enabled bool) {
-	hub.mu.Lock()
-	hub.multiClientEnabled = enabled
-	hub.mu.Unlock()
-	hub.Broadcast("settings_update", map[string]interface{}{
-		"textTransferEnabled": hub.textTransferEnabled,
-		"multiClientEnabled":  enabled,
-	})
-}
-
-func (hub *WebSocketHub) GetMultiClientEnabled() bool {
-	hub.mu.RLock()
-	defer hub.mu.RUnlock()
-	return hub.multiClientEnabled
-}
 
 // SetTheme sets the theme settings and broadcasts the update
 func (hub *WebSocketHub) SetTheme(themeId, accentId string) {
@@ -456,13 +438,11 @@ func (hub *WebSocketHub) HandleWebSocket(w http.ResponseWriter, r *http.Request)
 	// Send text transfer and multi-client settings
 	hub.mu.RLock()
 	textTransferEnabled := hub.textTransferEnabled
-	multiClientEnabled := hub.multiClientEnabled
 	hub.mu.RUnlock()
 	settingsData, _ := json.Marshal(WSMessage{
 		Type: "settings_init",
 		Data: map[string]interface{}{
 			"textTransferEnabled": textTransferEnabled,
-			"multiClientEnabled":  multiClientEnabled,
 		},
 	})
 	writeInitMessage("settings_init", settingsData)

@@ -504,7 +504,6 @@ func (h *UnifiedHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			var req struct {
 				TextTransferEnabled bool `json:"textTransferEnabled"`
 				SecurityEnabled     bool `json:"securityEnabled"`
-				MultiClientEnabled  bool `json:"multiClientEnabled"`
 				StaticPortEnabled   bool   `json:"staticPortEnabled"`
 				StaticPort          int    `json:"staticPort"`
 			}
@@ -518,10 +517,6 @@ func (h *UnifiedHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				h.WSHub.SetTextTransferEnabled(req.TextTransferEnabled)
 			}
 
-			// Update multi-client mode setting
-			if h.WSHub != nil {
-				h.WSHub.SetMultiClientEnabled(req.MultiClientEnabled)
-			}
 
 			// Update security enabled setting
 			h.mu.Lock()
@@ -541,7 +536,6 @@ func (h *UnifiedHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				settings := h.SettingsManager.LoadSettings()
 				settings.TextTransferEnabled = req.TextTransferEnabled
 				settings.SecurityEnabled = req.SecurityEnabled
-				settings.MultiClientEnabled = req.MultiClientEnabled
 				settings.StaticPortEnabled = req.StaticPortEnabled
 				settings.StaticPort = req.StaticPort
 				h.SettingsManager.SaveSettings(settings)
@@ -553,10 +547,8 @@ func (h *UnifiedHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 		// GET
 		enabled := false
-		multiClientEnabled := false
 		if h.WSHub != nil {
 			enabled = h.WSHub.GetTextTransferEnabled()
-			multiClientEnabled = h.WSHub.GetMultiClientEnabled()
 		}
 
 		h.mu.RLock()
@@ -575,7 +567,6 @@ func (h *UnifiedHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		response := map[string]interface{}{
 			"textTransferEnabled": enabled,
 			"securityEnabled":     securityEnabled,
-			"multiClientEnabled":  multiClientEnabled,
 			"staticPortEnabled":   false, // Initial fallback
 			"staticPort":          9090,  // Initial fallback
 			"isDesktop":           isWailsDesktop, 
@@ -1712,7 +1703,6 @@ func NewUnifiedHandler(devServerURL string) *UnifiedHandler {
 
 	// Apply saved settings to WebSocket hub
 	wsHub.SetTextTransferEnabled(savedSettings.TextTransferEnabled)
-	wsHub.SetMultiClientEnabled(savedSettings.MultiClientEnabled)
 	if savedSettings.ThemeID != "" && savedSettings.AccentID != "" {
 		wsHub.SetTheme(savedSettings.ThemeID, savedSettings.AccentID)
 	}

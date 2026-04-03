@@ -98,5 +98,8 @@
   "delete_transaction": "Delete Transaction",
   "delete_history_confirm": "Are you sure you want to delete this transaction from history?",
   "remove_from_history_only": "Remove from transfer history only",
-  "delete": "Delete"
+  "delete": "Delete",
+  "connect_more_devices": "Connect more devices",
+  "tap_to_reveal_qr": "Tap to reveal QR and Network info",
+  "tap_to_hide_qr": "Tap to hide connection details"
 }

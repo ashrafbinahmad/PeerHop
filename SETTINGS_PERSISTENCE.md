@@ -13,7 +13,6 @@ Implemented persistent settings storage to ensure all user preferences are saved
 - **Settings Persisted**:
   - `textTransferEnabled`: Whether text transfer is enabled
   - `securityEnabled`: Whether security token validation is enabled
-  - `multiClientEnabled`: Whether multi-client mode is enabled
   - `isDarkMode`: Dark/light theme preference
   - `themeId`: Selected theme ID (e.g., "night", "day")
   - `accentId`: Selected accent color ID (e.g., "blue", "green")
@@ -39,7 +38,7 @@ Updated the following endpoints to save settings when they change:
 
 #### Settings Endpoint (`/api/settings`)
 
-- Saves `textTransferEnabled`, `securityEnabled`, and `multiClientEnabled`
+- Saves `textTransferEnabled` and `securityEnabled`
 - Settings persist across server restarts
 
 #### Desktop Name Endpoint (`/api/desktop-name`)
@@ -98,7 +97,6 @@ To verify the implementation works:
 {
   "textTransferEnabled": true,
   "securityEnabled": true,
-  "multiClientEnabled": false,
   "isDarkMode": true,
   "themeId": "night",
   "accentId": "blue",

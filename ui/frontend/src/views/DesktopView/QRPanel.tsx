@@ -1,4 +1,5 @@
-import { Check, RefreshCw, Upload } from "lucide-react";
+import React, { useState } from "react";
+import { Check, RefreshCw, Upload, Plus, ChevronDown, ChevronUp } from "lucide-react";
 import { CopyButton } from "../../components/CopyButton";
 import { EditableDeviceName } from "./EditableDeviceName";
 import type { Client } from "../../hooks/useDevices";
@@ -11,7 +12,6 @@ interface QRPanelProps {
   serverInfo: any;
   securityEnabled: boolean;
   securityToken: string;
-  multiClientEnabled: boolean;
   clients: Client[];
   activeClientDownload: any;
   theme: Theme;
@@ -27,7 +27,6 @@ export const QRPanel = ({
   serverInfo,
   securityEnabled,
   securityToken,
-  multiClientEnabled,
   clients,
   activeClientDownload,
   theme,
@@ -39,6 +38,10 @@ export const QRPanel = ({
   adminToken,
 }: QRPanelProps) => {
   const { t } = useTranslation();
+  const [showDetails, setShowDetails] = useState(false);
+
+  // If no clients, always show details. If clients exist, only show if toggled.
+  const isVisible = clients.length === 0 || showDetails;
   if (!serverInfo) {
     return (
       <div className={`text-center ${theme.subText}`}>
@@ -54,30 +57,104 @@ export const QRPanel = ({
 
   return (
     <>
-      {/* Header */}
-      <div className="mb-8 flex flex-col items-center pt-8">
+      {/* Connected Clients - Now at the absolute top */}
+      {clients.length > 0 && (
         <div
-          className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-[0.2em] mb-2 opacity-50 ${theme.text}`}
+          className={`mt-4 mb-4 w-full max-w-full mx-auto px-2 animate-in slide-in-from-top-4 fade-in duration-700`}
         >
-          {t("connect_device")}
-        </div>
-        <h1
-          className={`text-xl font-bold tracking-tight text-center ${theme.text}`}
-        >
-          {t("start_sharing")}
-        </h1>
-      </div>
+          <div className="flex items-center gap-4 mb-4">
+            <div className="h-[1px] flex-1 bg-current opacity-5"></div>
+            <h3
+              className={`text-[9px] font-bold uppercase tracking-[0.2em] whitespace-nowrap opacity-40 ${theme.subText}`}
+            >
+              {t("connected_devices")}
+            </h3>
+            <div className="h-[1px] flex-1 bg-current opacity-5"></div>
+          </div>
 
-      <div className="w-full max-w-[340px] mx-auto">
+          <div className="grid grid-cols-1 gap-2.5">
+            {clients.map((client) => (
+              <EditableDeviceName
+                key={client.ip}
+                client={client}
+                isDarkMode={isDarkMode}
+                theme={theme}
+                serverUrl={serverInfo?.url || ""}
+                adminToken={adminToken}
+                onBlock={handleBlockClient}
+                onBlockSending={handleBlockSending}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Header - Only show if no clients connected */}
+      {clients.length === 0 && (
+        <div className="mb-8 flex flex-col items-center pt-8">
+          <div
+            className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-[0.2em] mb-2 opacity-50 ${theme.text}`}
+          >
+            {t("connect_device")}
+          </div>
+          <h1
+            className={`text-xl font-bold tracking-tight text-center ${theme.text}`}
+          >
+            {t("start_sharing")}
+          </h1>
+        </div>
+      )}
+
+      {/* Connect More Toggle - Styled as a Client Item */}
+      {clients.length > 0 && (
+        <div className="flex justify-center mb-4 w-full max-w-full mx-auto px-2">
+          <button
+            onClick={() => setShowDetails(!showDetails)}
+            className={`w-full flex items-center justify-between p-3 rounded-xl border transition-all duration-300 active:scale-[0.98] ${
+              showDetails
+                ? theme.iconBg + " " + theme.border
+                : theme.deviceItemBg + " " + theme.border + " hover:border-blue-500/30"
+            }`}
+          >
+            <div className="flex items-center gap-3">
+              <div
+                className={`w-10 h-10 rounded-lg flex items-center justify-center shadow-inner transition-colors ${
+                  showDetails ? (theme.isDark ? "bg-white/10" : "bg-white/50") : theme.iconBg
+                } ${showDetails ? theme.iconText : theme.iconText}`}
+              >
+                <Plus size={20} className={showDetails ? "rotate-45 transition-transform duration-300" : "transition-transform duration-300"} />
+              </div>
+              <div className="flex flex-col items-start translate-y-[-1px]">
+                <h3 className={`text-sm font-bold text-start transition-colors ${showDetails ? theme.iconText : theme.text}`}>
+                  {t("connect_more_devices")}
+                </h3>
+                <p className={`text-[10px] font-medium text-start opacity-50 transition-colors ${showDetails ? theme.iconText : theme.subText}`}>
+                  {showDetails ? t("tap_to_hide_qr") : t("tap_to_reveal_qr")}
+                </p>
+              </div>
+            </div>
+            <div className={`transition-colors ${showDetails ? theme.iconText : theme.text}`}>
+              {showDetails ? <ChevronUp size={18} className="opacity-40" /> : <ChevronDown size={18} className="opacity-40" />}
+            </div>
+          </button>
+        </div>
+      )}
+
+
+      <div className="w-full max-w-full mx-auto px-2">
         {/* Connection Area - No background/border as requested */}
-        <div className="relative space-y-10">
+        <div className={`relative space-y-4 transition-all duration-500 overflow-hidden ${
+          isVisible ? "opacity-100 max-h-[1000px]" : "opacity-0 max-h-0 pointer-events-none"
+        }`}>
           {/* Network Section */}
           <div className="flex flex-col items-center gap-2">
-            <span
-              className={`text-[10px] font-bold uppercase tracking-widest opacity-30 ${theme.text}`}
-            >
-              {t("step_1_network")}
-            </span>
+            {clients.length === 0 && (
+              <span
+                className={`text-[10px] font-bold uppercase tracking-widest opacity-30 ${theme.text}`}
+              >
+                {t("step_1_network")}
+              </span>
+            )}
 
             {serverInfo?.ssid ? (
               <div
@@ -105,112 +182,8 @@ export const QRPanel = ({
             )}
           </div>
 
-          {/* App Icon / Connectivity Status logic */}
-          {!multiClientEnabled && clients.length > 0 ? (
-            <div className="flex flex-col items-center gap-6 py-4">
-              <div
-                className="w-24 h-24 rounded-full flex items-center justify-center relative transition-all duration-500 shadow-inner"
-                style={{
-                  backgroundColor: activeClientDownload
-                    ? "#22c55e10"
-                    : theme.accentColor + "10",
-                }}
-              >
-                {activeClientDownload ? (
-                  <div className="flex flex-col items-center animate-in zoom-in duration-300">
-                    <span
-                      className="text-3xl font-black tracking-tighter"
-                      style={{ color: "#22c55e" }}
-                    >
-                      {(
-                        activeClientDownload.clientProgress?.[clients[0]?.ip] ||
-                        0
-                      ).toFixed(0)}
-                      <span className="text-xs ml-0.5">%</span>
-                    </span>
-                  </div>
-                ) : (
-                  <div className="relative">
-                    <Check
-                      size={44}
-                      style={{ color: theme.accentColor }}
-                      strokeWidth={2.5}
-                      className="animate-in zoom-in duration-500"
-                    />
-                    <div
-                      className="absolute -inset-1 rounded-full border-2 border-dashed animate-spin-slow opacity-20"
-                      style={{ borderColor: theme.accentColor }}
-                    ></div>
-                  </div>
-                )}
-
-                {/* Circular progress background if downloading */}
-                {activeClientDownload && (
-                  <svg className="absolute inset-0 w-full h-full -rotate-90 scale-110">
-                    <circle
-                      cx="48"
-                      cy="48"
-                      r="46"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="3"
-                      className="text-gray-200/5"
-                    />
-                    <circle
-                      cx="48"
-                      cy="48"
-                      r="46"
-                      fill="none"
-                      stroke="#22c55e"
-                      strokeWidth="3"
-                      strokeDasharray={2 * Math.PI * 46}
-                      strokeDashoffset={
-                        2 *
-                        Math.PI *
-                        46 *
-                        (1 -
-                          (activeClientDownload.clientProgress?.[
-                            clients[0]?.ip
-                          ] || 0) /
-                            100)
-                      }
-                      strokeLinecap="round"
-                      className="transition-all duration-500 ease-out"
-                    />
-                  </svg>
-                )}
-              </div>
-
-              <div className="text-center space-y-1 pt-2">
-                {activeClientDownload ? (
-                  <>
-                    <p className="text-lg font-bold tracking-tight text-emerald-500 animate-in fade-in duration-300">
-                      {t("downloading")}
-                    </p>
-                    <p
-                      className={`text-xs ${theme.subText} font-medium px-4 truncate max-w-[240px] opacity-70`}
-                    >
-                      {activeClientDownload.filename}
-                    </p>
-                  </>
-                ) : (
-                  <>
-                    <p
-                      className={`text-lg font-bold tracking-tight ${theme.text} animate-in fade-in duration-300`}
-                    >
-                      {t("connected")}
-                    </p>
-                    <p
-                      className={`text-xs ${theme.subText} font-medium opacity-50`}
-                    >
-                      {clients[0].name || clients[0].platform} {t("device")}
-                    </p>
-                  </>
-                )}
-              </div>
-            </div>
-          ) : (
-            /* QR Section */
+          {/* QR Section - Always show to allow multi-client connections */}
+          <div>
             <div className="flex flex-col items-center gap-8">
               <div className="relative group">
                 <div
@@ -284,11 +257,13 @@ export const QRPanel = ({
                       isDarkMode={isDarkMode}
                     />
                   </div>
-                  <p
-                    className={`text-[9px] text-center font-bold uppercase tracking-[0.25em] opacity-20 ${theme.text}`}
-                  >
-                    {t("or_enter_url_manually")}
-                  </p>
+                    {clients.length === 0 && (
+                      <p
+                        className={`text-[9px] text-center font-bold uppercase tracking-[0.25em] opacity-20 ${theme.text}`}
+                      >
+                        {t("or_enter_url_manually")}
+                      </p>
+                    )}
                 </div>
               ) : (
                 <div className="w-[200px] flex items-center justify-center gap-2 py-4 animate-pulse">
@@ -299,7 +274,7 @@ export const QRPanel = ({
                 </div>
               )}
             </div>
-          )}
+          </div>
         </div>
 
         {/* Server Controls */}
@@ -321,37 +296,6 @@ export const QRPanel = ({
         </div>
       </div>
 
-      {/* Connected Clients - Only show when multi-client is enabled */}
-      {multiClientEnabled && clients.length > 0 && (
-        <div
-          className={`mt-10 w-full max-w-[400px] mx-auto px-4 animate-in slide-in-from-bottom-4 fade-in duration-700`}
-        >
-          <div className="flex items-center gap-4 mb-4">
-            <div className="h-[1px] flex-1 bg-current opacity-5"></div>
-            <h3
-              className={`text-[9px] font-bold uppercase tracking-[0.2em] whitespace-nowrap opacity-40 ${theme.subText}`}
-            >
-              {t("connected_devices")}
-            </h3>
-            <div className="h-[1px] flex-1 bg-current opacity-5"></div>
-          </div>
-
-          <div className="grid grid-cols-1 gap-2.5">
-            {clients.map((client) => (
-              <EditableDeviceName
-                key={client.ip}
-                client={client}
-                isDarkMode={isDarkMode}
-                theme={theme}
-                serverUrl={serverInfo?.url || ""}
-                adminToken={adminToken}
-                onBlock={handleBlockClient}
-                onBlockSending={handleBlockSending}
-              />
-            ))}
-          </div>
-        </div>
-      )}
     </>
   );
 };

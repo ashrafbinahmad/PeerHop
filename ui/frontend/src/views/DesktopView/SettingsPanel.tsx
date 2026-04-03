@@ -40,8 +40,6 @@ interface SettingsPanelProps {
   setTextTransferEnabled: (val: boolean) => void;
   securityEnabled: boolean;
   setSecurityEnabled: (val: boolean) => void;
-  multiClientEnabled: boolean;
-  setMultiClientEnabled: (val: boolean) => void;
   staticPortEnabled: boolean;
   setStaticPortEnabled: (val: boolean) => void;
   staticPort: number;
@@ -73,8 +71,6 @@ export const SettingsPanel = ({
   setTextTransferEnabled,
   securityEnabled,
   setSecurityEnabled,
-  multiClientEnabled,
-  setMultiClientEnabled,
   staticPortEnabled,
   setStaticPortEnabled,
   staticPort,
@@ -165,7 +161,7 @@ export const SettingsPanel = ({
   ];
 
   return (
-    <div className="w-full self-start text-left pt-8 ">
+    <div className="w-full self-start text-left pt-8 px-2">
       {/* Left-aligned header */}
       <div className="mb-8 flex items-center gap-3">
         <Settings size={24} className={theme.text} />
@@ -276,28 +272,6 @@ export const SettingsPanel = ({
               />
             </div>
 
-            {/* Multi-Client Toggle */}
-            <div className="flex items-start justify-between gap-4">
-              <div className="flex-1">
-                <p className={`text-sm font-medium ${theme.text}`}>
-                  {t("multi_client")}
-                </p>
-              </div>
-              <Switch
-                checked={multiClientEnabled}
-                onChange={(next) => {
-                  setMultiClientEnabled(next);
-                  logActivity(
-                    "settings_changed",
-                    `Multi-Client: ${next ? "enabled" : "disabled"}`,
-                  );
-                }}
-                disabled={isCheckingNetwork}
-                theme={theme}
-                ariaLabel={t("multi_client")}
-                accentColor={activeAccent}
-              />
-            </div>
 
             {/* Static Port Toggle */}
             <div className="flex items-center justify-between gap-4 group">
@@ -470,8 +444,8 @@ export const SettingsPanel = ({
           </div>
         )}
 
-        {/* Connected Devices - Only show when multi-client is enabled */}
-        {multiClientEnabled && clients.length > 0 && (
+        {/* Connected Devices - Always show in multi-client mode */}
+        {clients.length > 0 && (
           <div>
             <h3 className={`text-sm font-semibold mb-4 ${theme.text}`}>
               {t("connected_devices")} ({clients.length})

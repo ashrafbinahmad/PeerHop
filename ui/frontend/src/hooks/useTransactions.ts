@@ -58,7 +58,6 @@ interface UseTransactionsResult {
   isConnected: boolean;
   deviceName: string;
   textTransferEnabled: boolean;
-  multiClientEnabled: boolean;
   clients: Client[];
   sendText: (text: string, senderId: string) => Promise<void>;
   deleteTransaction: (id: number, deleteFile: boolean) => Promise<void>;
@@ -84,7 +83,6 @@ export const useTransactions = (
   const [isConnected, setIsConnected] = useState(true); // Optimistic - assume connected until proven otherwise
   const [deviceName, setDeviceName] = useState("PeerHop"); // Default to "PeerHop"
   const [textTransferEnabled, setTextTransferEnabled] = useState(false); // Default to false
-  const [multiClientEnabled, setMultiClientEnabled] = useState(false); // Default to false (disabled)
 
   // Helper function to add security token to URL
   const addSecurityToken = useCallback(
@@ -133,7 +131,6 @@ export const useTransactions = (
       isConnected: true,
       deviceName: "PeerHop",
       textTransferEnabled: false,
-      multiClientEnabled: false,
       sendText: async () => {
         /* no-op */
       },
@@ -338,14 +335,7 @@ export const useTransactions = (
           ) {
             setTextTransferEnabled(message.data.textTransferEnabled);
           }
-          if (
-            message.data &&
-            typeof message.data.multiClientEnabled === "boolean"
-          ) {
-            setMultiClientEnabled(message.data.multiClientEnabled);
-          }
           break;
-
         case "transaction_update":
           setTransactions((prevTransactions) => {
             const updatedTxn = message.data as Transaction;
@@ -532,7 +522,6 @@ export const useTransactions = (
     isConnected,
     deviceName,
     textTransferEnabled,
-    multiClientEnabled,
     clients,
     sendText,
     deleteTransaction,

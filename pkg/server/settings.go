@@ -11,7 +11,6 @@ import (
 type PersistentSettings struct {
 	TextTransferEnabled bool   `json:"textTransferEnabled"`
 	SecurityEnabled     bool   `json:"securityEnabled"`
-	MultiClientEnabled  bool   `json:"multiClientEnabled"`
 	IsDarkMode          bool   `json:"isDarkMode"`
 	ThemeID             string `json:"themeId"`
 	AccentID            string `json:"accentId"`
@@ -57,7 +56,6 @@ func (sm *SettingsManager) LoadSettings() PersistentSettings {
 	defaults := PersistentSettings{
 		TextTransferEnabled: false,
 		SecurityEnabled:     true,
-		MultiClientEnabled:  false,
 		IsDarkMode:          true,
 		ThemeID:             "night",
 		AccentID:            "blue",
