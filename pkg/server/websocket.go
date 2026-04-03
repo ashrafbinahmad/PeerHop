@@ -137,9 +137,7 @@ func (hub *WebSocketHub) Broadcast(msgType string, data interface{}) {
 		}
 
 		err := conn.WriteMessage(websocket.TextMessage, jsonData)
-		if err == nil {
-			logger.Info("[WebSocket] Broadcasted '%s' to %s", msgType, conn.remoteAddr)
-		} else {
+		if err != nil {
 			logger.Warn("[WebSocket] Error writing to connection %s: %v", conn.remoteAddr, err)
 			// Connection will be cleaned up by the read loop or keep-alive
 		}

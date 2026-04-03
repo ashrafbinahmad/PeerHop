@@ -1,12 +1,13 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 
 interface ConfirmDialogProps {
   isOpen: boolean;
   title: string;
   message: React.ReactNode;
   confirmText?: string;
+  confirmingText?: string;
   cancelText?: string;
-  onConfirm: () => void;
+  onConfirm: () => void | Promise<void>;
   onCancel: () => void;
   destructive?: boolean;
   isDarkMode?: boolean;
@@ -17,12 +18,30 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   title,
   message,
   confirmText = "Confirm",
+  confirmingText = "Confirming...",
   cancelText = "Cancel",
   onConfirm,
   onCancel,
   destructive = false,
   isDarkMode = false,
 }) => {
+  const [isConfirming, setIsConfirming] = useState(false);
+
+  useEffect(() => {
+    if (isOpen) {
+      setIsConfirming(false);
+    }
+  }, [isOpen]);
+
+  const handleConfirm = async () => {
+    setIsConfirming(true);
+    try {
+      await onConfirm();
+    } finally {
+      setIsConfirming(false);
+    }
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -30,7 +49,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
       {/* Backdrop */}
       <div
         className="absolute inset-0 bg-black/40 backdrop-blur-sm"
-        onClick={onCancel}
+        onClick={isConfirming ? undefined : onCancel}
       />
 
       {/* Dialog */}
@@ -69,7 +88,10 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
           {/* Cancel Button */}
           <button
             onClick={onCancel}
+            disabled={isConfirming}
             className={`px-4 py-3 text-[17px] font-normal transition-colors bg-transparent ${
+              isConfirming ? "opacity-50 cursor-not-allowed " : ""
+            }${
               isDarkMode
                 ? "text-[#0A84FF] hover:bg-slate-700/50 active:bg-slate-700"
                 : "text-[#007AFF] hover:bg-gray-50 active:bg-gray-100"
@@ -87,8 +109,11 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
 
           {/* Confirm Button */}
           <button
-            onClick={onConfirm}
+            onClick={handleConfirm}
+            disabled={isConfirming}
             className={`px-4 py-3 text-[17px] font-semibold transition-colors bg-transparent ${
+              isConfirming ? "opacity-50 cursor-not-allowed " : ""
+            }${
               destructive
                 ? isDarkMode
                   ? "text-red-500"
@@ -102,7 +127,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
                 : "hover:bg-gray-50 active:bg-gray-100"
             }`}
           >
-            {confirmText}
+            {isConfirming ? confirmingText : confirmText}
           </button>
         </div>
       </div>

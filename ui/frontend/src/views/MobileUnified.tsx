@@ -1513,6 +1513,7 @@ export const MobileUnified: React.FC<Props> = ({
           </>
         }
         confirmText={t("stop")}
+        confirmingText="Stopping..."
         cancelText={t("continue")}
         onConfirm={confirmCancelDownload}
         onCancel={cancelCancelDownload}
@@ -1531,6 +1532,7 @@ export const MobileUnified: React.FC<Props> = ({
           </>
         }
         confirmText={t("stop_sending")}
+        confirmingText="Stopping..."
         cancelText={t("continue")}
         onConfirm={confirmCancelUpload}
         onCancel={cancelCancelUpload}

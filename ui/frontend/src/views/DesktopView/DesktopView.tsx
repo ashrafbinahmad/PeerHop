@@ -1109,6 +1109,7 @@ export const DesktopView = () => {
           </>
         }
         confirmText={t("stop")}
+        confirmingText="Stopping..."
         cancelText={t("continue")}
         onConfirm={async () => {
           if (transactionToCancel) {

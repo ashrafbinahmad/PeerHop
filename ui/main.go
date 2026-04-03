@@ -99,7 +99,7 @@ func main() {
 	werr := wails.Run(&options.App{
 		Title:     "PeerHop",
 		Width:     768,
-		Height:    680,
+		Height:    740,
 		MinWidth:  424,
 		MinHeight: 500,
 		AssetServer: &assetserver.Options{
