@@ -65,7 +65,7 @@ export const TransactionActions = ({
     <div className="flex gap-2 items-stretch">
       {!compact && (
         <div
-          className={`text-[10px] ${
+          className={`text-[10px] flex ${
             isDarkMode ? "text-slate-500" : "text-gray-400"
           }`}
         >
@@ -79,7 +79,7 @@ export const TransactionActions = ({
 
       <button
         onClick={handleChooseApp}
-        className={`px-2 text-xs rounded-md transition-colors ${buttonClass}`}
+        className={`truncate px-2 text-xs rounded-md transition-colors ${buttonClass}`}
         title="Open with…"
       >
         Open with

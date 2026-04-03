@@ -234,7 +234,7 @@ export const ChatPanel = ({
 
                     <div className="relative z-10">
                       {transaction.type === "text" && (
-                        <div className="relative min-w-12  max-w-[calc(100vw-145px)] md:max-w-[calc(100vw-545px)] max-h-[300px] overflow-y-auto custom-scrollbar">
+                        <div className="relative min-w-12  max-w-[calc(100vw-145px)] md:max-w-[calc(100vw-420px)] lg:max-w-[calc(100vw-545px)] max-h-[300px] overflow-y-auto custom-scrollbar">
                           <div className="sticky top-0 right-0 float-right z-10 ml-2">
                             <CopyButton
                               text={transaction.textContent || ""}

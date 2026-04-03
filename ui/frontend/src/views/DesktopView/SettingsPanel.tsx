@@ -113,9 +113,9 @@ export const SettingsPanel = ({
 
       {/* Settings Content - No borders, left-aligned */}
       <div className="space-y-6 text-left">
-        <div className="flex flex-wrap gap-4 mt-4 text-left w-full transition-all ">
+        <div className="flex flex-wrap gap-2 mt-4 text-left w-full transition-all ">
           {ADDITIONAL_ACTIONS.map((action) => (
-            <div className="grow w-[45%]">
+            <div className="grow lg:w-[45%] md:w-full ">
               <button
                 onClick={action.onClick}
                 className={`px-4 py-2 rounded-lg w-full   text-sm font-medium  transition-colors  gap-3  ${isDarkMode ? "hover:!text-white" : "hover:!text-black"}   `}
@@ -254,7 +254,9 @@ export const SettingsPanel = ({
                   {t("url")}
                 </p>
                 <div className="flex items-center gap-2">
-                  <code className={`text-xs font-mono flex-1 ${theme.text}`}>
+                  <code
+                    className={`truncate text-xs font-mono flex-1 ${theme.text}`}
+                  >
                     {serverInfo.url
                       ? securityEnabled && securityToken
                         ? `${serverInfo.url}?security=${securityToken}`

@@ -1033,7 +1033,7 @@ export const DesktopView = () => {
       <div
         className={`overflow-x-hidden 
             absolute top-[48px] bottom-0 right-0 w-full z-40 
-            md:static md:w-[350px] md:border-l md:z-30 md:pr-1 md:shrink-0
+            md:static md:w-[280px] lg:w-[350px] md:border-l md:z-30 md:pr-1 md:shrink-0
             flex-col shadow-xl transition-all duration-300 
             ${theme.panelBg}
             ${
