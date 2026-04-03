@@ -840,7 +840,7 @@ export const DesktopView = () => {
 
   return (
     <div
-      className={`flex h-screen w-[calc(100vw-.5px)] font-sans overflow-hidden transition-colors duration-300 ${theme.bg} ${theme.text} relative hide-scrollbar`}
+      className={`flex h-screen w-[calc(100vw)] font-sans overflow-hidden transition-colors duration-300 ${theme.bg} ${theme.text} relative hide-scrollbar`}
       style={
         {
           "--wails-drop-target": "drop",
