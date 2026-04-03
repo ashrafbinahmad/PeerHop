@@ -12,6 +12,7 @@ export const EditableDeviceName = ({
   adminToken,
   onBlock,
   onBlockSending,
+  disabled = false,
 }: {
   client: Client;
   isDarkMode: boolean;
@@ -20,6 +21,7 @@ export const EditableDeviceName = ({
   adminToken: string;
   onBlock: (client: Client) => void;
   onBlockSending: (client: Client) => void;
+  disabled?: boolean;
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [name, setName] = useState(client.name || client.platform);
@@ -70,6 +72,7 @@ export const EditableDeviceName = ({
             <input
               type="text"
               value={name}
+              disabled={disabled}
               onChange={(e) => setName(e.target.value)}
               onBlur={handleUpdateName}
               onKeyDown={(e) => e.key === "Enter" && handleUpdateName()}
@@ -77,7 +80,7 @@ export const EditableDeviceName = ({
                 isDarkMode
                   ? "bg-slate-900 border-slate-700 text-white"
                   : "bg-white border-gray-200 text-gray-900"
-              }`}
+              } ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
               autoFocus
             />
           </div>
@@ -87,8 +90,9 @@ export const EditableDeviceName = ({
               {client.name || client.platform}
             </div>
             <button
-              onClick={() => setIsEditing(true)}
-              className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-black/5 transition-opacity"
+              onClick={() => !disabled && setIsEditing(true)}
+              disabled={disabled}
+              className={`opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-black/5 transition-opacity ${disabled ? "hidden" : ""}`}
               title="Edit name"
             >
               <Pencil
@@ -106,11 +110,12 @@ export const EditableDeviceName = ({
           {/* Block Sending Button */}
           <button
             onClick={() => onBlockSending(client)}
+            disabled={disabled}
             className={`text-[10px] px-2 py-0.5 rounded transition-colors ${
               client.sendingBlocked
                 ? "bg-yellow-500/20 text-yellow-600 hover:bg-yellow-500/30 dark:text-yellow-400"
                 : "bg-gray-200 text-gray-600 hover:bg-gray-300 dark:bg-slate-700 dark:text-slate-300 dark:hover:bg-slate-600"
-            }`}
+            } ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
           >
             {client.sendingBlocked ? "Allow Sending" : "Block Sending"}
           </button>
@@ -118,11 +123,12 @@ export const EditableDeviceName = ({
           {/* Block/Unblock Button */}
           <button
             onClick={() => onBlock(client)}
+            disabled={disabled}
             className={`text-[10px] px-2 py-0.5 rounded transition-colors ${
               client.blocked
                 ? "bg-green-500/20 text-green-600 hover:bg-green-500/30"
                 : "bg-red-500/20 text-red-600 hover:bg-red-500/30"
-            }`}
+            } ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
           >
             {client.blocked ? "🔓 Unblock" : "🚫 Block"}
           </button>

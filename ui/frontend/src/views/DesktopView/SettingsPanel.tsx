@@ -9,6 +9,7 @@ import {
   Type,
   UserStar,
   Coffee,
+  Pencil,
 } from "lucide-react";
 import {
   THEME_PRESETS,
@@ -21,6 +22,7 @@ import { CopyButton } from "../../components/CopyButton";
 import { Switch } from "../../components/Switch";
 import { EditableDeviceName } from "./EditableDeviceName";
 import { FeatureRequestForm } from "./FeatureRequestForm";
+import { ConfirmDialog } from "../../components/ConfirmDialog";
 import type { Client } from "../../hooks/useDevices";
 import type { ActivityType } from "../../hooks/useActivity";
 import { APP_VERSION } from "../../version";
@@ -40,6 +42,10 @@ interface SettingsPanelProps {
   setSecurityEnabled: (val: boolean) => void;
   multiClientEnabled: boolean;
   setMultiClientEnabled: (val: boolean) => void;
+  staticPortEnabled: boolean;
+  setStaticPortEnabled: (val: boolean) => void;
+  staticPort: number;
+  setStaticPort: (val: number) => void;
   logActivity: (type: ActivityType, message: string) => void;
   serverInfo: any;
   securityToken: string;
@@ -47,6 +53,7 @@ interface SettingsPanelProps {
   handleRestartServer: () => void;
   isCheckingNetwork: boolean;
   clients: Client[];
+  transactionsCount: number;
   adminToken: string;
   handleBlockClient: (client: Client) => void;
   handleBlockSending: (client: Client) => void;
@@ -68,6 +75,10 @@ export const SettingsPanel = ({
   setSecurityEnabled,
   multiClientEnabled,
   setMultiClientEnabled,
+  staticPortEnabled,
+  setStaticPortEnabled,
+  staticPort,
+  setStaticPort,
   logActivity,
   serverInfo,
   securityToken,
@@ -75,6 +86,7 @@ export const SettingsPanel = ({
   handleRestartServer,
   isCheckingNetwork,
   clients,
+  transactionsCount,
   adminToken,
   handleBlockClient,
   handleBlockSending,
@@ -84,6 +96,55 @@ export const SettingsPanel = ({
 }: SettingsPanelProps) => {
   const { t } = useTranslation();
   const [isFeatureDrawerOpen, setFeatureDrawerOpen] = React.useState(false);
+  const [isEditingPort, setIsEditingPort] = React.useState(false);
+  const [portInputValue, setPortInputValue] = React.useState<string>(String(staticPort));
+  const [pendingAction, setPendingAction] = React.useState<{
+    type: "toggle" | "change";
+    value: boolean | number;
+  } | null>(null);
+
+  const hasActiveConnections =
+    clients.length > 0 || transactionsCount > 0;
+
+  const handlePortChangeAction = (action: {
+    type: "toggle" | "change";
+    value: boolean | number;
+  }) => {
+    if (hasActiveConnections) {
+      setPendingAction(action);
+    } else {
+      executePortChange(action);
+    }
+  };
+
+  const executePortChange = (action: {
+    type: "toggle" | "change";
+    value: boolean | number;
+  }) => {
+    if (action.type === "toggle") {
+      setStaticPortEnabled(action.value as boolean);
+    } else {
+      const parsed = action.value as number;
+      setStaticPort(parsed);
+      setPortInputValue(String(parsed));
+    }
+    // Automatically restart server after change
+    setTimeout(() => {
+      handleRestartServer();
+    }, 300);
+  };
+
+  const handlePortConfirm = () => {
+    const parsed = parseInt(portInputValue, 10);
+    if (!Number.isNaN(parsed) && parsed > 0 && parsed <= 65535) {
+      if (parsed !== staticPort) {
+        handlePortChangeAction({ type: "change", value: parsed });
+      }
+    } else {
+      setPortInputValue(String(staticPort)); // reset to last valid
+    }
+    setIsEditingPort(false);
+  };
 
   const ADDITIONAL_ACTIONS = [
     {
@@ -182,6 +243,7 @@ export const SettingsPanel = ({
                     `Text Transfer: ${next ? "enabled" : "disabled"}`,
                   );
                 }}
+                disabled={isCheckingNetwork}
                 theme={theme}
                 ariaLabel={t("text_transfer")}
                 accentColor={activeAccent}
@@ -207,6 +269,7 @@ export const SettingsPanel = ({
                     `Security: ${next ? "enabled" : "disabled"}`,
                   );
                 }}
+                disabled={isCheckingNetwork}
                 theme={theme}
                 ariaLabel={t("enable_security")}
                 accentColor={activeAccent}
@@ -219,9 +282,6 @@ export const SettingsPanel = ({
                 <p className={`text-sm font-medium ${theme.text}`}>
                   {t("multi_client")}
                 </p>
-                {/* <p className={`text-xs mt-0.5 ${theme.subText}`}>
-                  {t("allow_multiple_devices")}
-                </p> */}
               </div>
               <Switch
                 checked={multiClientEnabled}
@@ -232,10 +292,102 @@ export const SettingsPanel = ({
                     `Multi-Client: ${next ? "enabled" : "disabled"}`,
                   );
                 }}
+                disabled={isCheckingNetwork}
                 theme={theme}
                 ariaLabel={t("multi_client")}
                 accentColor={activeAccent}
               />
+            </div>
+
+            {/* Static Port Toggle */}
+            <div className="flex items-center justify-between gap-4 group">
+              <div className="flex-1">
+                <p className={`text-sm font-medium ${theme.text}`}>
+                  Static Port
+                </p>
+              </div>
+
+              <div className="flex items-center gap-3">
+                {staticPortEnabled && (
+                  <div className="flex items-center gap-1.5 transition-all animate-in fade-in slide-in-from-right-2 duration-300">
+                    {isEditingPort ? (
+                      <div className="flex items-center gap-1">
+                        <input
+                          type="number"
+                          min={1}
+                          max={65535}
+                          value={portInputValue}
+                          disabled={isCheckingNetwork}
+                          onChange={(e) => setPortInputValue(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") handlePortConfirm();
+                            if (e.key === "Escape") {
+                              setPortInputValue(String(staticPort));
+                              setIsEditingPort(false);
+                            }
+                          }}
+                          autoFocus
+                          className={`w-16 text-right text-xs font-mono px-1.5 py-0.5 rounded border outline-none ${
+                            isDarkMode
+                              ? "bg-slate-800 border-slate-700 text-slate-100"
+                              : "bg-white border-gray-300 text-gray-800"
+                          } ${isCheckingNetwork ? "opacity-50 cursor-not-allowed" : ""}`}
+                        />
+                        <button
+                          onClick={handlePortConfirm}
+                          disabled={isCheckingNetwork}
+                          className={`p-1 rounded-md transition-colors ${
+                            isDarkMode
+                              ? "hover:bg-slate-700 text-green-400"
+                              : "hover:bg-gray-100 text-green-600"
+                          } ${isCheckingNetwork ? "opacity-50 cursor-not-allowed" : ""}`}
+                          title="Confirm"
+                        >
+                          <Check size={13} />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-1">
+                        <span
+                          className={`text-xs font-mono font-semibold opacity-70 ${
+                            isDarkMode ? "text-slate-300" : "text-gray-600"
+                          }`}
+                        >
+                          {staticPort}
+                        </span>
+                        <button
+                          onClick={() => {
+                            if (!isCheckingNetwork) {
+                              setPortInputValue(String(staticPort));
+                              setIsEditingPort(true);
+                            }
+                          }}
+                          disabled={isCheckingNetwork}
+                          className={`p-1 rounded-md opacity-40 hover:opacity-100 transition-all ${
+                            isDarkMode
+                              ? "hover:bg-slate-700 text-slate-300"
+                              : "hover:bg-gray-100 text-gray-500"
+                          } ${isCheckingNetwork ? "cursor-not-allowed hidden" : ""}`}
+                        >
+                          <Pencil size={12} />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <Switch
+                  checked={staticPortEnabled}
+                  onChange={(next) => {
+                    handlePortChangeAction({ type: "toggle", value: next });
+                    if (!next) setIsEditingPort(false);
+                  }}
+                  disabled={isCheckingNetwork}
+                  theme={theme}
+                  ariaLabel="Static Port"
+                  accentColor={activeAccent}
+                />
+              </div>
             </div>
           </div>
         </div>
@@ -271,6 +423,13 @@ export const SettingsPanel = ({
                           : serverInfo.url
                         : ""
                     }
+                    title={
+                      serverInfo.url
+                        ? securityEnabled && securityToken
+                          ? `${serverInfo.url}?security=${securityToken}`
+                          : serverInfo.url
+                        : "Copy URL"
+                    }
                     className={`p-1.5 rounded-md ${
                       isDarkMode
                         ? "hover:bg-slate-700 text-slate-400 hover:text-slate-300"
@@ -280,18 +439,16 @@ export const SettingsPanel = ({
                   />
                 </div>
               </div>
-              {serverInfo.ssid && (
-                <div>
-                  <p
-                    className={`text-[10px] uppercase tracking-wider mb-1.5 ${theme.subText}`}
-                  >
-                    {t("wifi_network")}
-                  </p>
-                  <code className={`text-xs font-mono ${theme.text}`}>
-                    {serverInfo.ssid}
-                  </code>
-                </div>
-              )}
+              <div>
+                <p
+                  className={`text-[10px] uppercase tracking-wider mb-1.5 ${theme.subText}`}
+                >
+                  {t("wifi_network")}
+                </p>
+                <code className={`text-xs font-mono ${theme.text}`}>
+                  {serverInfo.ssid || "Unable to detect"}
+                </code>
+              </div>
               <div className="pt-2">
                 <button
                   onClick={handleRestartServer}
@@ -421,6 +578,24 @@ export const SettingsPanel = ({
           </p>
         </div>
       </div>
+
+      {/* Static Port Change Confirmation */}
+      <ConfirmDialog
+        isOpen={!!pendingAction}
+        title="Server Restart Required"
+        message="Changing the static port settings will clear all current transactions and disconnect all devices. Are you sure you want to proceed?"
+        confirmText="Proceed & Restart"
+        cancelText="Cancel"
+        onConfirm={() => {
+          if (pendingAction) {
+            executePortChange(pendingAction);
+            setPendingAction(null);
+          }
+        }}
+        onCancel={() => setPendingAction(null)}
+        destructive={true}
+        isDarkMode={isDarkMode}
+      />
     </div>
   );
 };

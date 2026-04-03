@@ -505,6 +505,8 @@ func (h *UnifiedHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				TextTransferEnabled bool `json:"textTransferEnabled"`
 				SecurityEnabled     bool `json:"securityEnabled"`
 				MultiClientEnabled  bool `json:"multiClientEnabled"`
+				StaticPortEnabled   bool   `json:"staticPortEnabled"`
+				StaticPort          int    `json:"staticPort"`
 			}
 			if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 				http.Error(w, "Invalid body", http.StatusBadRequest)
@@ -540,6 +542,8 @@ func (h *UnifiedHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				settings.TextTransferEnabled = req.TextTransferEnabled
 				settings.SecurityEnabled = req.SecurityEnabled
 				settings.MultiClientEnabled = req.MultiClientEnabled
+				settings.StaticPortEnabled = req.StaticPortEnabled
+				settings.StaticPort = req.StaticPort
 				h.SettingsManager.SaveSettings(settings)
 			}
 
@@ -568,12 +572,19 @@ func (h *UnifiedHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			strings.Contains(userAgent, "Wails") ||
 			strings.Contains(r.Host, "wails.localhost")
 
-		// Return settings status only (all tokens removed for security)
 		response := map[string]interface{}{
 			"textTransferEnabled": enabled,
 			"securityEnabled":     securityEnabled,
 			"multiClientEnabled":  multiClientEnabled,
-			"isDesktop":           isWailsDesktop, // Helper flag
+			"staticPortEnabled":   false, // Initial fallback
+			"staticPort":          9090,  // Initial fallback
+			"isDesktop":           isWailsDesktop, 
+		}
+
+		if h.SettingsManager != nil {
+			settings := h.SettingsManager.LoadSettings()
+			response["staticPortEnabled"] = settings.StaticPortEnabled
+			response["staticPort"] = settings.StaticPort
 		}
 		// Security Token is NO LONGER returned here
 		// Mobile clients MUST obtain token via QR Code URL

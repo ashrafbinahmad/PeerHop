@@ -270,6 +270,11 @@ export const QRPanel = ({
                           ? `${serverInfo.url}?security=${securityToken}`
                           : serverInfo.url
                       }
+                      title={
+                        securityEnabled && securityToken
+                          ? `${serverInfo.url}?security=${securityToken}`
+                          : serverInfo.url
+                      }
                       className={`p-1.5 rounded-xl transition-all ${
                         isDarkMode
                           ? "bg-slate-800 hover:bg-slate-700 text-slate-300"

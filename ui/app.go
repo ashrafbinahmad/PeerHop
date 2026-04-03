@@ -92,10 +92,21 @@ func (a *App) startPersistentServer() error {
 		ip = "127.0.0.1"
 	}
 
-	// Get a free port for the server
-	port, err := network.GetFreePort()
-	if err != nil {
-		return err
+	// Get settings manager to check for static port
+	sm := server.NewSettingsManager()
+	settings := sm.LoadSettings()
+
+	port := 0
+	if settings.StaticPortEnabled && settings.StaticPort > 0 {
+		port = settings.StaticPort
+		logger.Info("Using static port: %d", port)
+	} else {
+		// Get a free port for the server
+		freePort, err := network.GetFreePort()
+		if err != nil {
+			return err
+		}
+		port = freePort
 	}
 
 	a.currentPort = port

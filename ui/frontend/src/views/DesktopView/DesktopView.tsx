@@ -272,6 +272,17 @@ export const DesktopView = () => {
     return saved !== null ? saved === "true" : false;
   });
 
+  const [staticPortEnabled, setStaticPortEnabled] = useState(() => {
+    const saved = localStorage.getItem("staticPortEnabled");
+    return saved !== null ? saved === "true" : false;
+  });
+
+  const [staticPort, setStaticPort] = useState<number>(() => {
+    const saved = localStorage.getItem("staticPort");
+    const parsed = Number(saved);
+    return saved && !Number.isNaN(parsed) && parsed > 0 ? parsed : 9090;
+  });
+
   const [securityToken, setSecurityToken] = useState<string>("");
   const [adminToken, setAdminToken] = useState<string>("");
 
@@ -507,6 +518,18 @@ export const DesktopView = () => {
     try {
       const info = await RestartServer();
       setServerInfo(info);
+      
+      // Fetch new secure settings immediately after restart
+      // (Tokens are regenerated even if the URL/port is static)
+      GetSecureSettings()
+        .then((secure) => {
+          if (secure) {
+            if (secure.adminToken) setAdminToken(secure.adminToken);
+            if (secure.securityToken) setSecurityToken(secure.securityToken);
+          }
+        })
+        .catch((e) => console.error("Failed to refetch tokens after restart:", e));
+
       logActivity(
         "restarted",
         `${t("restarted")} — new URL: ${info.url || "unknown"}`,
@@ -631,12 +654,16 @@ export const DesktopView = () => {
         textTransferEnabled,
         securityEnabled,
         multiClientEnabled,
+        staticPortEnabled,
+        staticPort,
       })
       .catch((e) => console.error("Failed to sync settings:", e));
   }, [
     textTransferEnabled,
     securityEnabled,
     multiClientEnabled,
+    staticPortEnabled,
+    staticPort,
     serverInfo?.url,
     adminToken,
   ]);
@@ -1063,6 +1090,18 @@ export const DesktopView = () => {
                 setSecurityEnabled={setSecurityEnabled}
                 multiClientEnabled={multiClientEnabled}
                 setMultiClientEnabled={setMultiClientEnabled}
+                staticPortEnabled={staticPortEnabled}
+                setStaticPortEnabled={(val) => {
+                  setStaticPortEnabled(val);
+                  localStorage.setItem("staticPortEnabled", String(val));
+                  logActivity("settings_changed", `Static Port: ${val ? "enabled" : "disabled"}`);
+                }}
+                staticPort={staticPort}
+                setStaticPort={(val) => {
+                  setStaticPort(val);
+                  localStorage.setItem("staticPort", String(val));
+                  logActivity("settings_changed", `Static Port changed to: ${val}`);
+                }}
                 logActivity={logActivity}
                 serverInfo={serverInfo}
                 securityToken={securityToken}
@@ -1070,6 +1109,7 @@ export const DesktopView = () => {
                 handleRestartServer={handleRestartServer}
                 isCheckingNetwork={isCheckingNetwork}
                 clients={clients}
+                transactionsCount={transactions.length}
                 adminToken={adminToken}
                 handleBlockClient={handleBlockClient}
                 handleBlockSending={handleBlockSending}

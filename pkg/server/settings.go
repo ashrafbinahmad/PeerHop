@@ -16,6 +16,8 @@ type PersistentSettings struct {
 	ThemeID             string `json:"themeId"`
 	AccentID            string `json:"accentId"`
 	DesktopDeviceName   string `json:"desktopDeviceName"`
+	StaticPortEnabled   bool   `json:"staticPortEnabled"`
+	StaticPort          int    `json:"staticPort"`
 }
 
 // SettingsManager handles saving and loading settings
@@ -60,6 +62,8 @@ func (sm *SettingsManager) LoadSettings() PersistentSettings {
 		ThemeID:             "night",
 		AccentID:            "blue",
 		DesktopDeviceName:   "",
+		StaticPortEnabled:   false,
+		StaticPort:          9090,
 	}
 
 	// Try to read from file
