@@ -899,6 +899,7 @@ export const DesktopView = () => {
       <div
         className={`absolute top-0 left-0 right-0 z-40 h-[48px] flex items-center px-4 gap-2 ${theme.panelBg}`}
         style={{ "--wails-draggable": "drag" } as React.CSSProperties}
+        onDoubleClick={handleMaximizeToggle}
       >
         <img
           src={logo}
