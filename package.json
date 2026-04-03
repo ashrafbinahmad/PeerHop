@@ -19,7 +19,8 @@
     "publish": "node ./scripts/publish.js",
     "build-and-publish": "node ./scripts/build-and-publish.js",
     "dev:cli": "go run ./cmd/peerhop",
-    "dev": "cd ui && wails dev"
+    "dev": "cd ui && wails dev",
+    "mfile": "node ./scripts/create-big-size-file.js 4gb C:/Users/ashra/Downloads"
   },
   "keywords": [],
   "author": "Peerhop",
