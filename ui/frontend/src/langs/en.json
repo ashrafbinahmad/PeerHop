@@ -77,6 +77,8 @@
   "you_are_blocked": "You are blocked",
   "blocked_description": "The host has restricted your access.",
   "refresh_connection": "Refresh Connection",
+  "auth_failed": "Authentication Failed",
+  "auth_description": "The security token for this device is invalid or has expired. Please re-scan the QR code from the desktop app to continue.",
   "sending_is_blocked": "Sending is blocked",
   "host_restricted_sending": "The host has restricted sending from this device",
   "rate_app": "Rate PeerHop",

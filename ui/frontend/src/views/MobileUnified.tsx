@@ -24,6 +24,7 @@ import {
   Smartphone,
   RefreshCw,
   ShieldAlert,
+  Lock,
   Coffee,
   Globe,
 } from "lucide-react";
@@ -199,6 +200,19 @@ export const MobileUnified: React.FC<Props> = ({
       }
     };
     checkSecurity();
+
+    // Axios interceptor for global 401 handling
+    const interceptor = axios.interceptors.response.use(
+      (response) => response,
+      (error) => {
+        if (error.response?.status === 401) {
+          setIsUnauthorized(true);
+        }
+        return Promise.reject(error);
+      },
+    );
+
+    return () => axios.interceptors.response.eject(interceptor);
   }, [securityToken]);
 
   const myClient = clients.find((c) => c.ip === myIp);
@@ -662,39 +676,9 @@ export const MobileUnified: React.FC<Props> = ({
   // Show all transactions (including uploads)
   const visibleTransactions = transactions;
 
-  // Unauthorized screen (rendered AFTER all hooks have been called)
-  if (isUnauthorized) {
-    return (
-      <div className="fixed inset-0 bg-gray-50 dark:bg-slate-900 flex flex-col items-center justify-center p-6 text-center z-50">
-        <div className="w-20 h-20 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mb-6">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="40"
-            height="40"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className="text-red-500 dark:text-red-400"
-          >
-            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
-            <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
-          </svg>
-        </div>
-        <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-          {t("access_denied")}
-        </h2>
-        <p className="text-gray-600 dark:text-gray-400 max-w-sm">
-          {t("protected_server")}
-        </p>
-      </div>
-    );
-  }
-
-  // Blocked overlay
-  if (isBlocked) {
+  // Blocked or Unauthorized overlay
+  if (isBlocked || isUnauthorized) {
+    const isAuth = isUnauthorized && !isBlocked;
     return (
       <div
         className={`min-h-screen flex flex-col justify-between px-10 py-12 ${theme.bg}`}
@@ -706,11 +690,15 @@ export const MobileUnified: React.FC<Props> = ({
             <div
               className={`w-20 h-20 rounded-3xl flex items-center justify-center border ${theme.panelCard} ${theme.border}`}
             >
-              <ShieldAlert
-                size={40}
-                className="text-red-500/80"
-                strokeWidth={2}
-              />
+              {isAuth ? (
+                <Lock size={40} className="text-red-500/80" strokeWidth={2} />
+              ) : (
+                <ShieldAlert
+                  size={40}
+                  className="text-red-500/80"
+                  strokeWidth={2}
+                />
+              )}
             </div>
           </div>
 
@@ -718,9 +706,11 @@ export const MobileUnified: React.FC<Props> = ({
           <div className="space-y-5 text-start">
             <div className="space-y-2">
               <h2
-                className={`text-4xl  font-black italic uppercase tracking-tight leading-tight ${theme.text}`}
+                className={`text-4xl font-black italic uppercase tracking-tight leading-tight ${theme.text}`}
               >
-                {(t as any)("you_are_blocked") || "You are Blocked"}
+                {isAuth
+                  ? (t as any)("auth_failed") || "Authentication Failed"
+                  : (t as any)("you_are_blocked") || "You are Blocked"}
               </h2>
 
               <div className="h-1 w-12 rounded-full bg-gray-200 dark:bg-gray-800">
@@ -732,8 +722,11 @@ export const MobileUnified: React.FC<Props> = ({
             </div>
 
             <p className="text-gray-500 dark:text-gray-400 text-lg font-medium max-w-sm">
-              {(t as any)("blocked_description") ||
-                "The host has restricted your access."}
+              {isAuth
+                ? (t as any)("auth_description") ||
+                  "The security token for this device is invalid or has expired. Please re-scan the QR code from the desktop app to continue."
+                : (t as any)("blocked_description") ||
+                  "The host has restricted your access."}
             </p>
           </div>
         </div>
