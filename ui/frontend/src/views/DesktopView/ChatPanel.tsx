@@ -48,6 +48,7 @@ interface ChatPanelProps {
   isUserAtBottomRef: React.MutableRefObject<boolean>;
   iframeHeight: number | string | undefined;
   iframeIsLoaded: boolean;
+  deleteTransaction: (id: number, deleteFile: boolean) => Promise<void>;
 }
 
 export const ChatPanel = ({
@@ -75,12 +76,17 @@ export const ChatPanel = ({
   isUserAtBottomRef,
   iframeHeight,
   iframeIsLoaded,
+  deleteTransaction,
 }: ChatPanelProps) => {
   const { t } = useTranslation();
   const [clientToCancelLocal, setClientToCancelLocal] = useState<{
     txn: any;
     ip: string;
   } | null>(null);
+  const [transactionToDelete, setTransactionToDelete] = useState<any | null>(
+    null,
+  );
+  const [removeFromHistoryOnly, setRemoveFromHistoryOnly] = useState(true);
   const handleScroll = () => {
     if (!scrollContainerRef.current) return;
     const { scrollTop, scrollHeight, clientHeight } =
@@ -532,6 +538,7 @@ export const ChatPanel = ({
                                     isDarkMode={isDarkMode}
                                     compact={true}
                                     onOpen={handleFileOpened}
+                                    onDelete={() => setTransactionToDelete(transaction)}
                                   />
                                 </div>
                               </div>
@@ -560,6 +567,7 @@ export const ChatPanel = ({
                                     filePath={transaction.serverFilePath}
                                     isOnBlueBubble={true}
                                     onOpen={handleFileOpened}
+                                    onDelete={() => setTransactionToDelete(transaction)}
                                   />
                                 </div>
                               </div>
@@ -682,6 +690,54 @@ export const ChatPanel = ({
           }
         }}
         onCancel={() => setClientToCancelLocal(null)}
+        destructive={true}
+        isDarkMode={isDarkMode}
+      />
+
+      <ConfirmDialog
+        isOpen={!!transactionToDelete}
+        title={t("delete_transaction")}
+        message={
+          <div className="flex flex-col gap-4 text-left">
+            <p>
+              {t("delete_history_confirm")}
+            </p>
+            {transactionToDelete?.type === "file" && (
+              <label className="flex items-center gap-3 cursor-pointer group p-1 ring-1 ring-transparent hover:ring-slate-400/20 rounded-lg transition-all">
+                <div className="relative flex items-center">
+                  <input
+                    type="checkbox"
+                    checked={removeFromHistoryOnly}
+                    onChange={(e) => setRemoveFromHistoryOnly(e.target.checked)}
+                    className="w-4 h-4 rounded-md border-gray-300 dark:border-slate-600 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                  />
+                </div>
+                <span className={`text-[13px] ${isDarkMode ? "text-slate-300" : "text-gray-600"} font-medium`}>
+                  {t("remove_from_history_only")}
+                </span>
+              </label>
+            )}
+          </div>
+        }
+        confirmText={t("delete")}
+        onConfirm={async () => {
+          if (transactionToDelete) {
+            try {
+              await deleteTransaction(
+                transactionToDelete.id,
+                !removeFromHistoryOnly,
+              );
+            } catch (err) {
+              console.error("Failed to delete transaction:", err);
+            }
+            setTransactionToDelete(null);
+            setRemoveFromHistoryOnly(true);
+          }
+        }}
+        onCancel={() => {
+          setTransactionToDelete(null);
+          setRemoveFromHistoryOnly(true);
+        }}
         destructive={true}
         isDarkMode={isDarkMode}
       />

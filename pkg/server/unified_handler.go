@@ -780,6 +780,69 @@ func (h *UnifiedHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// API: Delete transaction
+	if strings.HasPrefix(r.URL.Path, "/api/delete-transaction/") && r.Method == http.MethodPost {
+		idStr := strings.TrimPrefix(r.URL.Path, "/api/delete-transaction/")
+		id, err := strconv.Atoi(idStr)
+		if err != nil {
+			http.Error(w, "Invalid transaction ID", http.StatusBadRequest)
+			return
+		}
+
+		if h.TxStore == nil {
+			http.Error(w, "Transaction store not initialized", http.StatusInternalServerError)
+			return
+		}
+
+		var req struct {
+			DeleteFile bool `json:"deleteFile"`
+		}
+		if r.Body != nil {
+			json.NewDecoder(r.Body).Decode(&req)
+		}
+
+		txn, exists := h.TxStore.GetTransaction(id)
+		if !exists {
+			http.Error(w, "Transaction not found", http.StatusNotFound)
+			return
+		}
+
+		// Delete file if requested and it's a file transaction
+		if req.DeleteFile && txn.Type == TransactionTypeFile {
+			filePath := ""
+			if txn.SenderID == SenderServer {
+				filePath = txn.ServerFilePath
+			} else {
+				// For files from client, use SavedInLocation
+				filePath = txn.SavedInLocation
+			}
+
+			if filePath != "" {
+				err := os.Remove(filePath)
+				if err != nil {
+					fmt.Printf("Failed to delete file from disk: %v\n", err)
+				} else {
+					fmt.Printf("Deleted file from disk: %s\n", filePath)
+				}
+			}
+		}
+
+		h.TxStore.DeleteTransaction(id)
+
+		// Broadcast removal via WebSocket
+		if h.WSHub != nil {
+			h.WSHub.Broadcast("transaction_deleted", map[string]interface{}{
+				"id": id,
+			})
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": true,
+		})
+		return
+	}
+
 	// API: Update client name
 	if r.URL.Path == "/api/update-client-name" && r.Method == http.MethodPost {
 		var req struct {

@@ -4,7 +4,7 @@ import {
   ShowOpenWithDialog,
   OpenSourceFile,
 } from "../../../wailsjs/go/main/App";
-import { Check, FolderOpen, ExternalLink } from "lucide-react";
+import { Check, FolderOpen, ExternalLink, Trash2 } from "lucide-react";
 
 export const TransactionActions = ({
   transaction,
@@ -13,6 +13,7 @@ export const TransactionActions = ({
   filePath,
   isOnBlueBubble = false,
   onOpen,
+  onDelete,
 }: {
   transaction: any;
   isDarkMode: boolean;
@@ -20,6 +21,7 @@ export const TransactionActions = ({
   filePath?: string;
   isOnBlueBubble?: boolean;
   onOpen?: (filename: string) => void;
+  onDelete?: () => void;
 }) => {
   // Use provided filePath or fall back to transaction absolute paths
   const resolvedPath =
@@ -100,6 +102,19 @@ export const TransactionActions = ({
       >
         <ExternalLink size={12} />
       </button>
+
+      {onDelete && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete();
+          }}
+          className={`p-1.5 rounded-md transition-all active:scale-95 hover:text-red-500 ${buttonClass}`}
+          title="Delete Transaction"
+        >
+          <Trash2 size={12} />
+        </button>
+      )}
     </div>
   );
 };

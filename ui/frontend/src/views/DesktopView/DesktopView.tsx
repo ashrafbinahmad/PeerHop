@@ -281,7 +281,7 @@ export const DesktopView = () => {
   const isUserAtBottomRef = useRef(true);
 
   // Hook: WebSocket for transactions
-  const { transactions, sendText } = useTransactions(
+  const { transactions, sendText, deleteTransaction } = useTransactions(
     2000,
     serverInfo?.url,
     false,
@@ -1025,6 +1025,7 @@ export const DesktopView = () => {
         isUserAtBottomRef={isUserAtBottomRef}
         iframeHeight={iframeHeight}
         iframeIsLoaded={iframIsLoaded}
+        deleteTransaction={deleteTransaction}
       />
       {/* --- RIGHT SIDE: SERVER INFO & QR --- */}
       {/* On Mobile: Absolute positioning covers the entire chat area (respects header).

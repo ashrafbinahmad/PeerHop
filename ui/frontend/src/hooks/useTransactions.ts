@@ -61,6 +61,7 @@ interface UseTransactionsResult {
   multiClientEnabled: boolean;
   clients: Client[];
   sendText: (text: string, senderId: string) => Promise<void>;
+  deleteTransaction: (id: number, deleteFile: boolean) => Promise<void>;
   refreshTransactions: () => Promise<void>;
 }
 
@@ -134,6 +135,9 @@ export const useTransactions = (
       textTransferEnabled: false,
       multiClientEnabled: false,
       sendText: async () => {
+        /* no-op */
+      },
+      deleteTransaction: async () => {
         /* no-op */
       },
       refreshTransactions: async () => {
@@ -254,6 +258,22 @@ export const useTransactions = (
         // No need to manually refresh - WebSocket will push update
       } catch (err) {
         console.error("Failed to send text:", err);
+        throw err;
+      }
+    },
+    [baseURL, addSecurityToken],
+  );
+
+  const deleteTransaction = useCallback(
+    async (id: number, deleteFile: boolean) => {
+      try {
+        const url = baseURL
+          ? `${baseURL}/api/delete-transaction/${id}`
+          : `/api/delete-transaction/${id}`;
+        await axios.post(addSecurityToken(url), { deleteFile });
+        // No need to manually refresh - WebSocket will push update
+      } catch (err) {
+        console.error("Failed to delete transaction:", err);
         throw err;
       }
     },
@@ -444,6 +464,10 @@ export const useTransactions = (
             }
           });
           break;
+
+        case "transaction_deleted":
+          setTransactions((prev) => prev.filter((t) => t.id !== message.data.id));
+          break;
       }
     };
 
@@ -511,6 +535,7 @@ export const useTransactions = (
     multiClientEnabled,
     clients,
     sendText,
+    deleteTransaction,
     refreshTransactions: fetchTransactions,
   };
 };
