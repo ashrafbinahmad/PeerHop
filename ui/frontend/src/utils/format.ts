@@ -33,6 +33,12 @@ export const calculateSpeedForClient = (bytes: number, timestamp: string) => {
   return `${speed.toFixed(2)} MB/s`;
 };
 
+export const formatLiveSpeed = (speedBps: number): string => {
+  if (!isFinite(speedBps) || speedBps <= 0) return "0.0 MB/s";
+  const mbps = speedBps / (1024 * 1024);
+  return `${mbps.toFixed(2)} MB/s`;
+};
+
 const previousStats: Record<
   number,
   { bytes: number; time: number; speed: number }

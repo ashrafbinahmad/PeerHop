@@ -12,7 +12,7 @@ import {
 import { PlatformIcon } from "../../components/PlatformIcon";
 import { CopyButton } from "../../components/CopyButton";
 import { TransactionActions } from "./TransactionActions";
-import { formatBytes, calculateSpeed } from "../../utils/format";
+import { formatBytes, calculateSpeed, formatLiveSpeed } from "../../utils/format";
 import type { Client } from "../../hooks/useDevices";
 import { OpenSourceFile } from "../../../wailsjs/go/main/App";
 import { useTranslation } from "../../hooks/useTranslation";
@@ -442,6 +442,11 @@ export const ChatPanel = ({
                                               }}
                                             />
                                           </div>
+                                          <span
+                                            className={`text-[10px] font-mono text-slate-400 w-16 text-right`}
+                                          >
+                                            {formatLiveSpeed(transaction.clientSpeed?.[clientIp] || 0)}
+                                          </span>
                                           <span
                                             className={`text-xs font-bold w-10 text-right text-slate-200`}
                                           >

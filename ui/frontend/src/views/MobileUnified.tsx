@@ -5,6 +5,7 @@ import {
   formatBytes,
   calculateSpeed,
   calculateSpeedForClient,
+  formatLiveSpeed,
 } from "../utils/format";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { CopyButton } from "../components/CopyButton";
@@ -1140,25 +1141,23 @@ export const MobileUnified: React.FC<Props> = ({
                                 <div className="flex flex-col gap-0.5 mt-1 font-mono">
                                   <span className="flex items-center">
                                     {(() => {
-                                      const bytes =
-                                        myIp &&
-                                        transaction.clientBytes &&
-                                        transaction.clientBytes[myIp] !==
-                                          undefined
-                                          ? transaction.clientBytes[myIp]
-                                          : transaction.bytesTransferred || 0;
-                                      const mbps = getNumericSpeed(
-                                        bytes,
-                                        transaction.timestamp,
-                                      );
-                                      const layers =
-                                        signalLogic.getLayers(mbps);
+                                      // Try to use live delta-based speed
+                                      // Try to use live delta-based speed
+                                      let speedBps = 0;
+                                      if (isMe) {
+                                          speedBps = transaction.overallSpeed || 0;
+                                      } else if (myIp && transaction.clientSpeed && transaction.clientSpeed[myIp] !== undefined) {
+                                          speedBps = transaction.clientSpeed[myIp];
+                                      } else if (transaction.clientSpeed && Object.keys(transaction.clientSpeed).length > 0) {
+                                          speedBps = Object.values(transaction.clientSpeed)[0];
+                                      }
+                                      
+                                      const mbpsStr = formatLiveSpeed(speedBps);
+                                      const mbps = speedBps / (1024 * 1024);
+                                      const layers = signalLogic.getLayers(mbps);
                                       return (
                                         <>
-                                          {calculateSpeedForClient(
-                                            bytes,
-                                            transaction.timestamp,
-                                          )}
+                                          {mbpsStr}
                                           <WifiSignalIcon
                                             layers={layers}
                                             color={
