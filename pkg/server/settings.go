@@ -53,13 +53,25 @@ func (sm *SettingsManager) LoadSettings() PersistentSettings {
 	defer sm.mu.RUnlock()
 
 	// Default settings
+	hostname, err := os.Hostname()
+	if err != nil || hostname == "" {
+		// Fallback to username
+		home, err := os.UserHomeDir()
+		if err == nil {
+			hostname = filepath.Base(home)
+		}
+	}
+	if hostname == "" {
+		hostname = "PeerHop"
+	}
+
 	defaults := PersistentSettings{
 		TextTransferEnabled: false,
 		SecurityEnabled:     true,
 		IsDarkMode:          true,
 		ThemeID:             "night",
 		AccentID:            "blue",
-		DesktopDeviceName:   "",
+		DesktopDeviceName:   hostname,
 		StaticPortEnabled:   false,
 		StaticPort:          9090,
 	}
@@ -75,6 +87,11 @@ func (sm *SettingsManager) LoadSettings() PersistentSettings {
 	if err := json.Unmarshal(data, &settings); err != nil {
 		// Invalid JSON, return defaults
 		return defaults
+	}
+
+	// If name is empty, use defaults
+	if settings.DesktopDeviceName == "" {
+		settings.DesktopDeviceName = defaults.DesktopDeviceName
 	}
 
 	return settings

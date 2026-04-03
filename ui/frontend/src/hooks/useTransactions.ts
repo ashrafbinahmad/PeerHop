@@ -81,7 +81,7 @@ export const useTransactions = (
   const [activeThemeId, setActiveThemeId] = useState("night");
   const [activeAccentId, setActiveAccentId] = useState("blue");
   const [isConnected, setIsConnected] = useState(true); // Optimistic - assume connected until proven otherwise
-  const [deviceName, setDeviceName] = useState("PeerHop"); // Default to "PeerHop"
+  const [deviceName, setDeviceName] = useState(""); // Default to empty
   const [textTransferEnabled, setTextTransferEnabled] = useState(false); // Default to false
 
   // Helper function to add security token to URL

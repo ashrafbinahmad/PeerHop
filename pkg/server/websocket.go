@@ -83,7 +83,7 @@ func NewWebSocketHub(txStore *TransactionStore, clientStore *ClientStore) *WebSo
 		connections:   make(map[*SafeConn]bool),
 		txStore:       txStore,
 		clientStore:   clientStore,
-		desktopName:   "PeerHop", // Default name
+		desktopName:   "",        // Default name (will be loaded from settings)
 		themeID:       "night",   // Default theme
 		accentID:      "blue",    // Default accent
 		lastSentBytes: make(map[int]int64),

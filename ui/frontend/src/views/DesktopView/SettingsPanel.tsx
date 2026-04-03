@@ -58,6 +58,8 @@ interface SettingsPanelProps {
   canPromptReview: boolean;
   onRequestReview: () => void;
   setNotification: (notification: { show: boolean; message: string }) => void;
+  deviceName: string;
+  onUpdateDeviceName: (name: string) => void;
 }
 
 export const SettingsPanel = ({
@@ -89,6 +91,8 @@ export const SettingsPanel = ({
   canPromptReview,
   onRequestReview,
   setNotification,
+  deviceName,
+  onUpdateDeviceName,
 }: SettingsPanelProps) => {
   const { t } = useTranslation();
   const [isFeatureDrawerOpen, setFeatureDrawerOpen] = React.useState(false);
@@ -140,6 +144,24 @@ export const SettingsPanel = ({
       setPortInputValue(String(staticPort)); // reset to last valid
     }
     setIsEditingPort(false);
+  };
+
+  const [isEditingName, setIsEditingName] = React.useState(false);
+  const [nameInputValue, setNameInputValue] = React.useState(deviceName);
+
+  React.useEffect(() => {
+    if (!isEditingName) {
+      setNameInputValue(deviceName);
+    }
+  }, [deviceName, isEditingName]);
+
+  const handleNameConfirm = () => {
+    if (nameInputValue.trim() && nameInputValue !== deviceName) {
+      onUpdateDeviceName(nameInputValue.trim());
+    } else {
+      setNameInputValue(deviceName);
+    }
+    setIsEditingName(false);
   };
 
   const ADDITIONAL_ACTIONS = [
@@ -213,6 +235,85 @@ export const SettingsPanel = ({
           setNotification={setNotification}
           theme={theme}
         />
+
+        {/* General / Profile */}
+        <div>
+          <h3 className={`text-sm font-semibold mb-4 ${theme.text}`}>
+            {t("general") || "General"}
+          </h3>
+          <div className="space-y-5">
+            {/* Host Name Setting */}
+            <div className="flex items-center justify-between gap-4 group">
+              <div className="flex-1">
+                <p className={`text-sm font-medium ${theme.text}`}>
+                  {t("host_name") || "Host Name"}
+                </p>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-1.5 transition-all animate-in fade-in slide-in-from-right-2 duration-300">
+                  {isEditingName ? (
+                    <div className="flex items-center gap-1">
+                      <input
+                        type="text"
+                        value={nameInputValue}
+                        onChange={(e) => setNameInputValue(e.target.value)}
+                        onBlur={handleNameConfirm}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") handleNameConfirm();
+                          if (e.key === "Escape") {
+                            setNameInputValue(deviceName);
+                            setIsEditingName(false);
+                          }
+                        }}
+                        autoFocus
+                        className={`w-32 text-right text-xs px-1.5 py-0.5 rounded border outline-none ${
+                          isDarkMode
+                            ? "bg-slate-800 border-slate-700 text-slate-100"
+                            : "bg-white border-gray-300 text-gray-800"
+                        }`}
+                      />
+                      <button
+                        onClick={handleNameConfirm}
+                        className={`p-1 rounded-md transition-colors ${
+                          isDarkMode
+                            ? "hover:bg-slate-700 text-green-400"
+                            : "hover:bg-gray-100 text-green-600"
+                        }`}
+                        title="Confirm"
+                      >
+                        <Check size={13} />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-1">
+                      <span
+                        className={`text-xs font-semibold opacity-70 truncate max-w-[120px] ${
+                          isDarkMode ? "text-slate-300" : "text-gray-600"
+                        }`}
+                      >
+                        {deviceName}
+                      </span>
+                      <button
+                        onClick={() => {
+                          setNameInputValue(deviceName);
+                          setIsEditingName(true);
+                        }}
+                        className={`p-1 rounded-md opacity-40 hover:opacity-100 transition-all ${
+                          isDarkMode
+                            ? "hover:bg-slate-700 text-slate-300"
+                            : "hover:bg-gray-100 text-gray-500"
+                        }`}
+                      >
+                        <Pencil size={12} />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
 
         {/* Features */}
         <div>

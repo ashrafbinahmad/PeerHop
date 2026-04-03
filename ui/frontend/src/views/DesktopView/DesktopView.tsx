@@ -286,15 +286,16 @@ export const DesktopView = () => {
   const isUserAtBottomRef = useRef(true);
 
   // Hook: WebSocket for transactions
-  const { transactions, sendText, deleteTransaction } = useTransactions(
-    2000,
-    serverInfo?.url,
-    false,
-    true,
-    adminToken, // Desktop uses admin token
-    securityEnabled,
-    logActivity,
-  );
+  const { transactions, sendText, deleteTransaction, deviceName } =
+    useTransactions(
+      2000,
+      serverInfo?.url,
+      false,
+      true,
+      adminToken, // Desktop uses admin token
+      securityEnabled,
+      logActivity,
+    );
 
   // Hook: WebSocket for devices/clients
   // Get clients list - Pass admin token for desktop client tracking/UI
@@ -375,7 +376,10 @@ export const DesktopView = () => {
 
   // Log app session start / end
   useEffect(() => {
-    logActivity("started", `PeerHop v${APP_VERSION}`);
+    logActivity(
+      "started",
+      `PeerHop v${APP_VERSION}, device name: ${deviceName}`,
+    );
     return () => {
       logActivity("closed", "App session ended");
     };
@@ -425,6 +429,18 @@ export const DesktopView = () => {
       );
     } catch (err) {
       console.error("Failed to block/unblock sending for client:", err);
+    }
+  };
+  const handleUpdateDesktopName = async (name: string) => {
+    if (!serverInfo?.url) return;
+    try {
+      const url = adminToken
+        ? `${serverInfo.url}/api/desktop-name?admin=${adminToken}`
+        : `${serverInfo.url}/api/desktop-name`;
+      await axios.post(url, { name: name.trim() });
+      logActivity("settings_changed", `Desktop name changed to: ${name}`);
+    } catch (err) {
+      console.error("Failed to update desktop name:", err);
     }
   };
 
@@ -512,7 +528,7 @@ export const DesktopView = () => {
     try {
       const info = await RestartServer();
       setServerInfo(info);
-      
+
       // Fetch new secure settings immediately after restart
       // (Tokens are regenerated even if the URL/port is static)
       GetSecureSettings()
@@ -522,7 +538,9 @@ export const DesktopView = () => {
             if (secure.securityToken) setSecurityToken(secure.securityToken);
           }
         })
-        .catch((e) => console.error("Failed to refetch tokens after restart:", e));
+        .catch((e) =>
+          console.error("Failed to refetch tokens after restart:", e),
+        );
 
       logActivity(
         "restarted",
@@ -600,6 +618,13 @@ export const DesktopView = () => {
       })
       .catch((e) => console.error("Failed to sync theme:", e));
   }, [activeThemeId, activeAccentId, serverInfo?.url, adminToken]);
+
+  // Sync device name to localStorage for useActivity to access synchronously
+  useEffect(() => {
+    if (deviceName) {
+      localStorage.setItem("deviceName", deviceName);
+    }
+  }, [deviceName]);
 
   // Fetch security settings from server on mount
   // Fetch security settings from server on mount
@@ -830,9 +855,9 @@ export const DesktopView = () => {
     const bgParam = activeTheme.bg.replace("bg-[", "").replace("]", "");
     return `${baseUrl}/desktop-ad?bg=${encodeURIComponent(
       bgParam,
-    )}&theme=${encodeURIComponent(activeThemeId)}&isDark=${String(isDarkMode)}&version=${APP_VERSION}&lang=${lang}`;
+    )}&theme=${encodeURIComponent(activeThemeId)}&isDark=${String(isDarkMode)}&version=${APP_VERSION}&lang=${lang}&deviceName=${encodeURIComponent(deviceName)}`;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [deviceName]);
 
   // Communicate theme changes to the ad iframe without reloading it
   useEffect(() => {
@@ -845,12 +870,12 @@ export const DesktopView = () => {
           isDark: isDarkMode,
           version: APP_VERSION,
           lang: lang,
+          deviceName: deviceName,
         },
         "*",
       );
     }
-  }, [activeThemeId, isDarkMode, activeTheme.bg, lang]);
-
+  }, [activeThemeId, isDarkMode, activeTheme.bg, lang, deviceName]);
   useEffect(() => {
     if (isDarkMode && window.document.body.classList.contains("dark")) return;
     window.document.body.classList.toggle("dark");
@@ -1083,13 +1108,19 @@ export const DesktopView = () => {
                 setStaticPortEnabled={(val) => {
                   setStaticPortEnabled(val);
                   localStorage.setItem("staticPortEnabled", String(val));
-                  logActivity("settings_changed", `Static Port: ${val ? "enabled" : "disabled"}`);
+                  logActivity(
+                    "settings_changed",
+                    `Static Port: ${val ? "enabled" : "disabled"}`,
+                  );
                 }}
                 staticPort={staticPort}
                 setStaticPort={(val) => {
                   setStaticPort(val);
                   localStorage.setItem("staticPort", String(val));
-                  logActivity("settings_changed", `Static Port changed to: ${val}`);
+                  logActivity(
+                    "settings_changed",
+                    `Static Port changed to: ${val}`,
+                  );
                 }}
                 logActivity={logActivity}
                 serverInfo={serverInfo}
@@ -1105,6 +1136,8 @@ export const DesktopView = () => {
                 canPromptReview={canPromptReview}
                 onRequestReview={triggerReviewFlow}
                 setNotification={setNotification}
+                deviceName={deviceName}
+                onUpdateDeviceName={handleUpdateDesktopName}
               />
             ) : (
               <QRPanel

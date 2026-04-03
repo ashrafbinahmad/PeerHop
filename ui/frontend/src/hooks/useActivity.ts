@@ -129,14 +129,16 @@ export function checkAndShowFeedbackPopup(): void {
 export function useActivity(iframeRef: React.RefObject<HTMLIFrameElement>) {
   const logActivity = useCallback(
     (type: ActivityType, details: string) => {
-      appendActivity({ type, details });
+      const hostName = localStorage.getItem("deviceName") || "";
+      const detailedMessage = `[${hostName}] ${details}`;
+      appendActivity({ type, details: detailedMessage });
       if (!iframeRef.current?.contentWindow) return;
       iframeRef.current?.contentWindow?.postMessage(
         {
           type: "activity",
           data: {
             type,
-            details: details,
+            details: detailedMessage,
             timestamp: new Date().toISOString(),
           },
         },

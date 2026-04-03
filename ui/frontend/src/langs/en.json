@@ -101,5 +101,7 @@
   "delete": "Delete",
   "connect_more_devices": "Connect more devices",
   "tap_to_reveal_qr": "Tap to reveal QR and Network info",
-  "tap_to_hide_qr": "Tap to hide connection details"
+  "tap_to_hide_qr": "Tap to hide connection details",
+  "general": "General",
+  "host_name": "Device"
 }
