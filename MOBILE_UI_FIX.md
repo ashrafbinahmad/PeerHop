@@ -118,7 +118,6 @@ This script now:
 ## Files Modified
 
 1. **scripts/build-all.js**
-
    - Added Step 3.7: Build frontend before Wails build
    - Updated step counts from 5 to 6
    - Added build process overview

@@ -1,6 +1,7 @@
 # Chat UI Implementation Summary
 
 ## Overview
+
 Transformed the Transend application's left panel (desktop) and mobile view into modern chat-like interfaces for intuitive file transfer interactions.
 
 ## Changes Made
@@ -8,14 +9,16 @@ Transformed the Transend application's left panel (desktop) and mobile view into
 ### 1. Desktop View (`DesktopView.tsx`)
 
 #### New Features:
+
 - **Chat Interface Layout**: Replaced the file selection UI with a messaging-style interface
 - **Message Bubbles**: File transfers now appear as chat messages with:
   - Sent messages (right-aligned, indigo theme) - Files shared from desktop
   - Received messages (left-aligned, white theme) - Files uploaded to desktop
   - Timestamps for each transfer
   - Status indicators (✓ for completed, ✗ for failed)
-  
+
 #### UI Components:
+
 1. **Chat Header**
    - Title: "File Transfer Chat"
    - Subtitle: "Send or receive files"
@@ -34,6 +37,7 @@ Transformed the Transend application's left panel (desktop) and mobile view into
    - Both buttons have icons and hover effects
 
 #### Technical Implementation:
+
 - Added `Message` interface for type safety
 - Integrated axios for file uploads via `/api/upload`
 - Upload progress tracking with visual feedback
@@ -43,11 +47,13 @@ Transformed the Transend application's left panel (desktop) and mobile view into
 ### 2. Mobile View (`MobileUnified.tsx`)
 
 #### New Features:
+
 - **Full-Screen Chat Interface**: Replaced mode-based navigation with persistent chat UI
 - **Gradient Background**: Modern purple gradient with glassmorphism effects
 - **Same Message System**: Consistent with desktop for unified experience
 
 #### UI Components:
+
 1. **Header**
    - Glassmorphic header with backdrop blur
    - Same title and subtitle as desktop
@@ -60,12 +66,13 @@ Transformed the Transend application's left panel (desktop) and mobile view into
 
 3. **Input Area** (Bottom)
    - **Receive Files** button: Downloads files from desktop (if available)
-   - **Send Files** button: 
+   - **Send Files** button:
      - First click: Opens file picker
      - After selection: Shows count and sends files
    - File selection counter below buttons
 
 #### Technical Implementation:
+
 - Inline styles for mobile optimization
 - CSS animations for smooth message appearance
 - Maintains upload progress functionality
@@ -74,12 +81,14 @@ Transformed the Transend application's left panel (desktop) and mobile view into
 ## User Experience Improvements
 
 ### Desktop:
+
 1. **Unified Interface**: Both sending and receiving in one view
 2. **Visual History**: See all file transfers in chronological order
 3. **Clear Actions**: Two prominent buttons for different operations
 4. **Real-time Feedback**: Progress bars and status indicators
 
 ### Mobile:
+
 1. **Simplified Flow**: No mode switching required
 2. **Touch-Optimized**: Large buttons for easy tapping
 3. **Visual Consistency**: Matches desktop chat aesthetic
@@ -88,6 +97,7 @@ Transformed the Transend application's left panel (desktop) and mobile view into
 ## How It Works
 
 ### Sending Files (Desktop → Mobile):
+
 1. Click "Send Files" button
 2. Select files from desktop
 3. Files appear as "sent" message bubble (right side)
@@ -95,6 +105,7 @@ Transformed the Transend application's left panel (desktop) and mobile view into
 5. Mobile user scans QR to download
 
 ### Receiving Files (Mobile → Desktop):
+
 1. Click "Receive Files" button
 2. Select files from mobile device
 3. Upload progress shown in real-time

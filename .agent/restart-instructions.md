@@ -3,6 +3,7 @@
 ## ✅ What I Just Did
 
 1. **Built the frontend** with the new chat UI:
+
    ```bash
    cd ui/frontend && npm run build
    ```
@@ -17,10 +18,12 @@
 The Go server embeds the frontend files at compile time, so you need to restart it to pick up the changes.
 
 ### Option 1: Restart the current dev server
+
 1. Stop the current `npm run dev:ui` (Ctrl+C)
 2. Run it again: `npm run dev:ui`
 
 ### Option 2: Quick restart
+
 ```bash
 # Stop current server (Ctrl+C in terminal)
 # Then run:
@@ -39,6 +42,7 @@ npm run dev:ui
 ## 🎯 What You'll See on Mobile
 
 ### Before (Old UI):
+
 ```
 ┌─────────────────────────┐
 │      💫 Transend        │
@@ -50,6 +54,7 @@ npm run dev:ui
 ```
 
 ### After (New Chat UI):
+
 ```
 ┌─────────────────────────┐
 │ 💬 File Transfer Chat   │ ← Purple gradient!
@@ -66,6 +71,7 @@ npm run dev:ui
 ## 🔍 Verification
 
 After restarting, check:
+
 - [ ] Desktop shows dark chat UI
 - [ ] Mobile shows purple gradient background
 - [ ] No more mode selection cards
@@ -74,6 +80,7 @@ After restarting, check:
 ## ⚡ Pro Tip
 
 For future changes, remember this workflow:
+
 1. Edit React components
 2. Build: `cd ui/frontend && npm run build`
 3. Copy: `cp -r ui/frontend/dist pkg/server/`

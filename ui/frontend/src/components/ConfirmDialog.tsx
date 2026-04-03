@@ -119,8 +119,8 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
                   ? "text-red-500"
                   : "text-red-600"
                 : isDarkMode
-                ? "text-[#0A84FF]"
-                : "text-[#007AFF]"
+                  ? "text-[#0A84FF]"
+                  : "text-[#007AFF]"
             } ${
               isDarkMode
                 ? "hover:bg-slate-700/50 active:bg-slate-700"

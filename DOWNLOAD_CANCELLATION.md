@@ -1,6 +1,7 @@
 # Download Cancellation Feature
 
 ## Overview
+
 Added ability to cancel file downloads in progress from mobile clients with user confirmation.
 
 ## UI Changes
@@ -8,24 +9,28 @@ Added ability to cancel file downloads in progress from mobile clients with user
 ### Mobile View (MobileUnified.tsx)
 
 **Download Button Behavior:**
-- **Pending/Completed**: Shows blue download icon 
+
+- **Pending/Completed**: Shows blue download icon
 - **In Progress**: Shows red cancel (X) icon
 
 **Visual Changes:**
+
 ```tsx
 // Before: Always showed download button
-<Download size={18} />
+<Download size={18} />;
 
 // After: Dynamic based on status
-{transaction.status === "in_progress" ? (
-  <button className="p-2 bg-red-100 text-red-600 ...">
-    <X size={18} />  // Cancel icon
-  </button>
-) : (
-  <button className="p-2 bg-gray-100 text-[#007AFF] ...">
-    <Download size={18} />  // Download icon
-  </button>
-)}
+{
+  transaction.status === "in_progress" ? (
+    <button className="p-2 bg-red-100 text-red-600 ...">
+      <X size={18} /> // Cancel icon
+    </button>
+  ) : (
+    <button className="p-2 bg-gray-100 text-[#007AFF] ...">
+      <Download size={18} /> // Download icon
+    </button>
+  );
+}
 ```
 
 ## User Flow
@@ -39,11 +44,13 @@ Added ability to cancel file downloads in progress from mobile clients with user
 2. **Cancel Download**
    - User taps cancel (X) button
    - Confirmation popup appears:
+
      ```
      Cancel download of "filename.pdf"?
-     
+
      This will stop the file transfer.
      ```
+
    - User confirms or cancels
 
 3. **If Confirmed**
@@ -60,6 +67,7 @@ Added ability to cancel file downloads in progress from mobile clients with user
 ### Transaction Store Changes (`transaction.go`)
 
 **Added Fields:**
+
 ```go
 type TransactionStore struct {
     // ... existing fields
@@ -68,6 +76,7 @@ type TransactionStore struct {
 ```
 
 **New Methods:**
+
 ```go
 // CancelTransaction marks a transaction as cancelled
 func (ts *TransactionStore) CancelTransaction(id int) bool
@@ -79,6 +88,7 @@ func (ts *TransactionStore) IsCancelled(id int) bool
 ### Progress Writer Changes (`unified_handler.go`)
 
 **Cancellation Check:**
+
 ```go
 func (w *transactionProgressWriter) Write(p []byte) (int, error) {
     // Check if cancelled before every write
@@ -98,6 +108,7 @@ This ensures the transfer stops immediately when cancelled, not just after the c
 **Request:** No body required
 
 **Response:**
+
 ```json
 {
   "success": true
@@ -105,6 +116,7 @@ This ensures the transfer stops immediately when cancelled, not just after the c
 ```
 
 **Error Responses:**
+
 - `400 Bad Request`: Invalid transaction ID
 - `404 Not Found`: Transaction not found
 - `500 Internal Server Error`: Transaction store not initialized
@@ -165,6 +177,7 @@ Client                  Backend                 TransactionStore
 ### Backend Logs
 
 **Expected Output:**
+
 ```
 [API] Cancelled download for transaction 5
 [WebSocket] Broadcasting txn 5: large-file.zip 45% (status: failed)
@@ -173,11 +186,13 @@ Client                  Backend                 TransactionStore
 ## Error Handling
 
 ### Frontend
+
 - Network error during cancel: Shows alert "Failed to cancel download"
 - Transaction not found: Shows alert
 - Console logs all errors for debugging
 
 ### Backend
+
 - Invalid transaction ID: Returns 400 Bad Request
 - Transaction doesn't exist: Returns 404 Not Found
 - Write after cancellation: Returns error, closes connection
@@ -190,22 +205,23 @@ No configuration required. Feature is automatically enabled.
 
 **Change Confirmation Message:**
 Edit `MobileUnified.tsx` line 169:
+
 ```tsx
-const confirmed = window.confirm(
-  `Your custom message here`
-);
+const confirmed = window.confirm(`Your custom message here`);
 ```
 
 **Change Cancel Icon:**
 Edit `MobileUnified.tsx` line 321:
+
 ```tsx
-<X size={18} />  // Replace with desired icon
+<X size={18} /> // Replace with desired icon
 ```
 
 **Change Cancel Button Color:**
 Edit `MobileUnified.tsx` line 318:
+
 ```tsx
-className="p-2 bg-red-100 text-red-600 ..."  // Modify colors
+className = "p-2 bg-red-100 text-red-600 ..."; // Modify colors
 ```
 
 ## Security Considerations
@@ -235,6 +251,7 @@ className="p-2 bg-red-100 text-red-600 ..."  // Modify colors
 ## Future Enhancements
 
 Potential improvements:
+
 1. Replace native `confirm()` with custom modal for better UX
 2. Add "Resume" functionality for cancelled downloads
 3. Track cancellation reason (user vs network error)
@@ -244,12 +261,14 @@ Potential improvements:
 ## Files Modified
 
 ### Frontend
+
 - `ui/frontend/src/views/MobileUnified.tsx`:
   - Added `handleCancelDownload()` function
   - Updated download button to show cancel icon during download
   - Added confirmation dialog
 
 ### Backend
+
 - `pkg/server/transaction.go`:
   - Added `cancelled` map to TransactionStore
   - Added `CancelTransaction()` method
@@ -260,5 +279,6 @@ Potential improvements:
   - Added `/api/cancel-download/{id}` endpoint
 
 ## Related Documentation
+
 - WebSocket implementation: `WEBSOCKET_IMPLEMENTATION.md`
 - Download progress fix: `WEBSOCKET_PROGRESS_FIX.md`

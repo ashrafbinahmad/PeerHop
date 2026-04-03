@@ -183,7 +183,6 @@ type Transaction struct {
 If the issue is confirmed to be parallel range requests, we can:
 
 1. **Disable parallel downloads** by not supporting range requests:
-
    - Remove Range header support
    - Force full file downloads
    - Less efficient but guaranteed to work
@@ -209,17 +208,14 @@ Then remove or change `fmt.Printf` to `// fmt.Printf` for each debug log.
 Please provide feedback after testing:
 
 1. **Do you see parallel range requests?**
-
    - Multiple [RANGE-DEBUG] logs at the same time?
    - Different offset values?
 
 2. **Is the backend rejecting backward updates correctly?**
-
    - Do you see ⏸️ SKIPPED logs?
    - Or do you see ✅ UPDATED with decreasing values?
 
 3. **What does the UI show vs. what the logs show?**
-
    - Does UI progress match the [UPDATE-DEBUG] logs?
    - Or is there a discrepancy?
 

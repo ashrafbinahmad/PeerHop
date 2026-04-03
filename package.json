@@ -20,9 +20,13 @@
     "build-and-publish": "node ./scripts/build-and-publish.js",
     "dev:cli": "go run ./cmd/peerhop",
     "dev": "cd ui && wails dev",
-    "mfile": "node ./scripts/create-big-size-file.js 4gb C:/Users/ashra/Downloads"
+    "mfile": "node ./scripts/create-big-size-file.js 4gb C:/Users/ashra/Downloads",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,css,json,md}\" --ignore-path .gitignore"
   },
   "keywords": [],
   "author": "Peerhop",
-  "license": "ISC"
+  "license": "ISC",
+  "devDependencies": {
+    "prettier": "^3.8.1"
+  }
 }

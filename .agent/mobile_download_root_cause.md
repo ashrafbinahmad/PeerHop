@@ -16,7 +16,6 @@ Download progress on mobile browsers (especially Android) was:
 The main issue was in **how the backend tracks download progress with browser range requests**:
 
 1. **Browser Behavior**: When downloading files, mobile browsers (especially Chrome on Android) make **multiple HTTP range requests** to download the file in chunks
-
    - First request: `Range: bytes=0-1023`
    - Second request: `Range: bytes=1024-2047`
    - And so on...
@@ -152,7 +151,6 @@ if (transaction.clientBytes && transaction.clientBytes[myIp]) {
 ### Backend:
 
 1. **`pkg/server/transaction.go`**
-
    - Made `UpdateClientProgress` monotonic
    - Added previousBytes/previousProgress tracking
 
@@ -164,7 +162,6 @@ if (transaction.clientBytes && transaction.clientBytes[myIp]) {
 ### Frontend:
 
 1. **`ui/frontend/src/hooks/useTransferSpeed.ts`**
-
    - Preserve speeds between rapid updates
    - Add validation and clamping
    - Skip non-in-progress transactions
@@ -182,17 +179,14 @@ Run these tests on an **Android phone** (Chrome/Firefox):
    - Progress should only increase, never decrease
    - Completion should reach exactly 100%
 2. ✅ **Multiple Downloads** (3-5 simultaneous)
-
    - Each should track independently
    - No progress mixing between files
 
 3. ✅ **Network Interruption**
-
    - Pause/resume download
    - Progress should continue from last point
 
 4. ✅ **Speed Display**
-
    - Speed should stay visible throughout
    - Should show reasonable values (not 0.0 or 10000+)
 

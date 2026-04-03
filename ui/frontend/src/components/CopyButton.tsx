@@ -39,7 +39,8 @@ export const CopyButton: React.FC<CopyButtonProps> = ({
     };
 
     if (navigator.clipboard && window.isSecureContext) {
-      navigator.clipboard.writeText(text)
+      navigator.clipboard
+        .writeText(text)
         .then(() => {
           setCopied(true);
           setTimeout(() => setCopied(false), 1000);
@@ -64,18 +65,20 @@ export const CopyButton: React.FC<CopyButtonProps> = ({
     >
       <div className="relative" style={{ width: iconSize, height: iconSize }}>
         <div
-          className={`absolute inset-0 transition-all duration-200 flex items-center justify-center ${copied
-            ? "opacity-0 scale-50 rotate-90"
-            : "opacity-100 scale-100 rotate-0"
-            }`}
+          className={`absolute inset-0 transition-all duration-200 flex items-center justify-center ${
+            copied
+              ? "opacity-0 scale-50 rotate-90"
+              : "opacity-100 scale-100 rotate-0"
+          }`}
         >
           <Copy size={iconSize} />
         </div>
         <div
-          className={`absolute inset-0 transition-all duration-200 flex items-center justify-center ${copied
-            ? "opacity-100 scale-100 rotate-0"
-            : "opacity-0 scale-50 -rotate-90"
-            }`}
+          className={`absolute inset-0 transition-all duration-200 flex items-center justify-center ${
+            copied
+              ? "opacity-100 scale-100 rotate-0"
+              : "opacity-0 scale-50 -rotate-90"
+          }`}
         >
           <Check size={iconSize} />
         </div>

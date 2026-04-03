@@ -5,11 +5,13 @@
 The mobile view (`MobileUnified.tsx`) is automatically shown when you access the application through the QR code on your mobile device. Here's how it works:
 
 ### Desktop View
+
 - Accessed directly at `http://localhost:5173` (or when running the Wails app)
 - Shows the split-panel interface with chat on left, QR code on right
 - `/api/meta` endpoint returns `null` (no metadata)
 
-### Mobile View  
+### Mobile View
+
 - Accessed by scanning the QR code from your mobile device
 - The QR code contains a URL like `http://192.168.x.x:PORT`
 - When accessed, the server's `/api/meta` endpoint returns:
@@ -30,6 +32,7 @@ The mobile view (`MobileUnified.tsx`) is automatically shown when you access the
 ## What You Should See on Mobile
 
 ### Visual Appearance:
+
 1. **Purple Gradient Background** - Linear gradient from `#667eea` to `#764ba2`
 2. **Header** - "💬 File Transfer Chat" with glassmorphic effect
 3. **Chat Area** - Scrollable message list showing:
@@ -41,6 +44,7 @@ The mobile view (`MobileUnified.tsx`) is automatically shown when you access the
    - **Send Files** (always available)
 
 ### Features:
+
 - ✅ Message bubbles with timestamps
 - ✅ File icons and names
 - ✅ Status indicators (✓ for success, ✗ for failure)
@@ -77,6 +81,7 @@ The mobile view (`MobileUnified.tsx`) is automatically shown when you access the
 ## Testing Steps
 
 ### Test Upload (Mobile → Desktop):
+
 1. Scan QR code on mobile
 2. You should see the purple gradient chat UI
 3. Click "Send Files" button
@@ -87,6 +92,7 @@ The mobile view (`MobileUnified.tsx`) is automatically shown when you access the
 8. Check desktop - file should be saved
 
 ### Test Download (Desktop → Mobile):
+
 1. On desktop, click "Send Files" and select files
 2. QR code updates with the file info
 3. Scan QR code on mobile
@@ -115,25 +121,25 @@ MobileUnified.tsx
 
 ## Expected Behavior
 
-| Action | Desktop | Mobile |
-|--------|---------|--------|
-| Select files on desktop | Shows "Ready to Send" + QR | - |
-| Scan QR (download mode) | - | Shows chat UI with "Receive Files" button |
-| Click "Receive Files" | - | Downloads file, adds to chat |
-| Click "Send Files" on mobile | - | Opens file picker |
-| Upload files from mobile | Receives files, saves locally | Shows progress, then success message |
-| View chat history | Shows all transfers in left panel | Shows all transfers in main area |
+| Action                       | Desktop                           | Mobile                                    |
+| ---------------------------- | --------------------------------- | ----------------------------------------- |
+| Select files on desktop      | Shows "Ready to Send" + QR        | -                                         |
+| Scan QR (download mode)      | -                                 | Shows chat UI with "Receive Files" button |
+| Click "Receive Files"        | -                                 | Downloads file, adds to chat              |
+| Click "Send Files" on mobile | -                                 | Opens file picker                         |
+| Upload files from mobile     | Receives files, saves locally     | Shows progress, then success message      |
+| View chat history            | Shows all transfers in left panel | Shows all transfers in main area          |
 
 ## Key Differences: Desktop vs Mobile
 
-| Feature | Desktop | Mobile |
-|---------|---------|--------|
-| Background | Dark slate (#0f172a) | Purple gradient |
-| Layout | Split panel (chat + QR) | Full-screen chat |
-| Styling | Tailwind classes | Inline styles |
-| QR Code | Always visible (right side) | Not shown |
-| Buttons | Bottom of left panel | Bottom of screen |
-| Messages | Left panel only | Full screen |
+| Feature    | Desktop                     | Mobile           |
+| ---------- | --------------------------- | ---------------- |
+| Background | Dark slate (#0f172a)        | Purple gradient  |
+| Layout     | Split panel (chat + QR)     | Full-screen chat |
+| Styling    | Tailwind classes            | Inline styles    |
+| QR Code    | Always visible (right side) | Not shown        |
+| Buttons    | Bottom of left panel        | Bottom of screen |
+| Messages   | Left panel only             | Full screen      |
 
 ## If Still Not Working
 

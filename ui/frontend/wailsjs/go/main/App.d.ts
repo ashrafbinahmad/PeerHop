@@ -5,23 +5,13 @@ import {main} from '../models';
 
 export function CheckShareActivation():Promise<void>;
 
-export function ClearTransfer():Promise<void>;
-
-export function ExportLogs():Promise<string>;
-
 export function GetClipboardFiles():Promise<Array<string>>;
-
-export function GetLogPath():Promise<string>;
-
-export function GetRecentLogs(arg1:number):Promise<Array<string>>;
 
 export function GetSecureSettings():Promise<server.SecuritySettings>;
 
 export function GetServerInfo():Promise<main.ServerInfo>;
 
 export function GetSharedFiles():Promise<main.ShareData>;
-
-export function OpenLogFolder():Promise<void>;
 
 export function OpenSourceFile(arg1:string):Promise<void>;
 

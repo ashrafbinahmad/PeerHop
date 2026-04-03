@@ -191,7 +191,6 @@ Now when you download on Android:
 ## 🔧 Code Changes Summary
 
 - **Modified**: `pkg/server/transaction.go`
-
   - Added `ByteRange` struct
   - Added `ClientRanges` field to `Transaction`
   - Added `UpdateClientRangeProgress()` function

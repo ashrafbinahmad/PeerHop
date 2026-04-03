@@ -112,13 +112,11 @@ if (currentProgress < previousHighest && currentProgress > 0) {
 ## Testing Recommendations
 
 1. Test on Android Chrome with:
-
    - Large file downloads (100MB+)
    - Varying network speeds
    - Multiple simultaneous downloads
 
 2. Test on iOS Safari with:
-
    - Background tab switching
    - Screen lock/unlock during download
    - Low power mode

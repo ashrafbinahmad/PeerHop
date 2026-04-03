@@ -294,13 +294,9 @@ func (h *UnifiedHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			providedToken := r.URL.Query().Get("security")
 			providedAdminToken := r.URL.Query().Get("admin")
 
-			fmt.Printf("[Security] Validating request: %s %s, isAdmin: %v, providedToken: %s, providedAdminToken: %s\n",
-				r.Method, r.URL.Path, isAdminEndpoint, providedToken, providedAdminToken)
-
 			// Admin endpoints require admin token
 			if isAdminEndpoint {
 				if providedAdminToken != adminToken || adminToken == "" {
-					fmt.Printf("[Security] REJECTED - Invalid admin token\n")
 					http.Error(w, "Invalid or missing admin token", http.StatusForbidden)
 					return
 				}
@@ -311,18 +307,13 @@ func (h *UnifiedHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				validAdminToken := providedAdminToken == adminToken && adminToken != ""
 
 				if !validClientToken && !validAdminToken {
-					fmt.Printf("[Security] REJECTED - Invalid token for %s (client: %s, admin: %s)\n",
-						r.URL.Path, providedToken, providedAdminToken)
 					http.Error(w, "Invalid or missing security token", http.StatusUnauthorized)
 					return
 				}
 			}
-			fmt.Printf("[Security] ALLOWED - Valid token\n")
 		} else {
-			fmt.Printf("[Security] ALLOWED - Public endpoint: %s %s\n", r.Method, r.URL.Path)
 		}
 	} else {
-		fmt.Printf("[Security] DISABLED - Allowing all requests: %s %s\n", r.Method, r.URL.Path)
 	}
 
 	// API: Metadata - returns current state (upload mode or download mode with file info)
@@ -651,7 +642,6 @@ func (h *UnifiedHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// API: Get all transactions
 	if r.URL.Path == "/api/transactions" {
 		if h.TxStore == nil {
-			fmt.Println("[API] TxStore is nil, returning empty transactions")
 			json.NewEncoder(w).Encode(map[string]interface{}{
 				"transactions": []interface{}{},
 			})
@@ -659,7 +649,6 @@ func (h *UnifiedHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 
 		transactions := h.TxStore.GetAllTransactions()
-		// fmt.Printf("[API] Returning %d transactions\n", len(transactions), transactions.)
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"transactions": transactions,
@@ -720,7 +709,6 @@ func (h *UnifiedHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			Status:             "completed",
 			ClientIP:           clientIP,
 		}
-		fmt.Printf("[API] Created text txn from client IP: %s\n", clientIP)
 
 		id := h.TxStore.AddTransaction(txn)
 
@@ -777,8 +765,6 @@ func (h *UnifiedHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		fmt.Printf("[API] Cancelled download for client %s on transaction %d (progress reset to 0%%)\n", clientIP, id)
-
 		// Broadcast the reset transaction state via WebSocket
 		if h.WSHub != nil {
 			txn, exists := h.TxStore.GetTransactionCopy(id)
@@ -817,8 +803,6 @@ func (h *UnifiedHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		fmt.Printf("[API] Updated name for client %s to: %s\n", req.IP, req.Name)
-
 		// Broadcast update
 		if h.WSHub != nil {
 			h.WSHub.BroadcastDevicesUpdate()
@@ -852,10 +836,6 @@ func (h *UnifiedHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Client not found", http.StatusNotFound)
 			return
 		}
-
-		fmt.Printf("[API] Blocked client with IP: %s\n", req.IP)
-
-		fmt.Printf("[API] Blocked client with IP: %s\n", req.IP)
 
 		// Note: We do NOT disconnect WebSocket completely anymore,
 		// so the client can receive the update that it is blocked.
@@ -895,8 +875,6 @@ func (h *UnifiedHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		fmt.Printf("[API] Blocked sending for client with IP: %s\n", req.IP)
-
 		// Broadcast update
 		if h.WSHub != nil {
 			h.WSHub.BroadcastDevicesUpdate()
@@ -931,8 +909,6 @@ func (h *UnifiedHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		fmt.Printf("[API] Unblocked sending for client with IP: %s\n", req.IP)
-
 		// Broadcast update
 		if h.WSHub != nil {
 			h.WSHub.BroadcastDevicesUpdate()
@@ -966,8 +942,6 @@ func (h *UnifiedHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Client not found", http.StatusNotFound)
 			return
 		}
-
-		fmt.Printf("[API] Unblocked client with IP: %s\n", req.IP)
 
 		// Broadcast update
 		if h.WSHub != nil {
@@ -1005,8 +979,6 @@ func (h *UnifiedHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Transaction not found", http.StatusNotFound)
 			return
 		}
-
-		fmt.Printf("[API] Cancelled transaction %d\n", id)
 
 		// Broadcast update
 		if h.WSHub != nil {
@@ -1175,7 +1147,7 @@ func (h *UnifiedHandler) proxyWebSocket(w http.ResponseWriter, r *http.Request) 
 		Proxy:            http.ProxyFromEnvironment,
 		HandshakeTimeout: 5 * time.Second,
 	}
-	
+
 	confBody := r.Header.Clone()
 	confBody.Del("Upgrade")
 	confBody.Del("Connection")
@@ -1183,7 +1155,7 @@ func (h *UnifiedHandler) proxyWebSocket(w http.ResponseWriter, r *http.Request) 
 	confBody.Del("Sec-Websocket-Version")
 	confBody.Del("Sec-Websocket-Extensions")
 	confBody.Del("Sec-Websocket-Protocol")
-	
+
 	// Crucial for Vite HMR server to accept the connection without hanging or complaining
 	confBody.Set("Host", "localhost:5173")
 	confBody.Set("Origin", "http://localhost:5173")
@@ -1309,8 +1281,6 @@ func (h *UnifiedHandler) serveFile(w http.ResponseWriter, r *http.Request, fileP
 					if offset, err := strconv.ParseInt(parts[0], 10, 64); err == nil {
 						bytesOffset = offset
 						// DEBUG: Log range requests (simplified, in MB)
-						offsetMB := float64(bytesOffset) / (1024 * 1024)
-						fmt.Printf("[📥 RANGE] TxID=%d Offset=%.2fMB\n", txnID, offsetMB)
 					}
 				}
 			}
@@ -1357,7 +1327,6 @@ func (h *UnifiedHandler) handleUpload(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 		if err != nil {
-			fmt.Printf("Error reading part: %v\n", err)
 			break
 		}
 
@@ -1431,12 +1400,10 @@ func (h *UnifiedHandler) handleUpload(w http.ResponseWriter, r *http.Request) {
 			}
 
 			transactionIDs = append(transactionIDs, txnID)
-			fmt.Printf("[Upload] Created transaction ID=%d for file: %s (Streaming)\n", txnID, filename)
 		}
 
 		dst, err := os.Create(fullPath)
 		if err != nil {
-			fmt.Printf("Error creating file %s: %v\n", fullPath, err)
 			if h.TxStore != nil && txnID > 0 {
 				h.TxStore.UpdateStatus(txnID, "failed")
 			}
@@ -1461,7 +1428,6 @@ func (h *UnifiedHandler) handleUpload(w http.ResponseWriter, r *http.Request) {
 					if h.TxStore != nil && txnID > 0 {
 						// Check for cancellation immediately (every chunk)
 						if h.TxStore.IsCancelled(txnID) {
-							fmt.Printf("[Upload] Cancellation detected for txn %d\n", txnID)
 							if h.TxStore != nil && txnID > 0 {
 								h.TxStore.UpdateStatus(txnID, "cancelled")
 								// Force broadcast
@@ -1490,7 +1456,6 @@ func (h *UnifiedHandler) handleUpload(w http.ResponseWriter, r *http.Request) {
 								// Cleanup and return
 								dst.Close()
 								os.Remove(fullPath)
-								fmt.Printf("[Upload] Terminated upload from blocked client: %s\n", clientIP)
 								http.Error(w, "Client blocked", http.StatusForbidden)
 								return
 							}
@@ -1530,11 +1495,9 @@ func (h *UnifiedHandler) handleUpload(w http.ResponseWriter, r *http.Request) {
 				strings.Contains(err.Error(), "multipart: NextPart: EOF")
 
 			if isCancelled {
-				fmt.Printf("Upload cancelled for file %s: %v\n", fullPath, err)
 				// Delete the partial file
 				os.Remove(fullPath)
 			} else {
-				fmt.Printf("Error saving file %s: %v\n", fullPath, err)
 			}
 
 			if h.TxStore != nil && txnID > 0 {
@@ -1560,7 +1523,6 @@ func (h *UnifiedHandler) handleUpload(w http.ResponseWriter, r *http.Request) {
 		}
 
 		saved = append(saved, filename)
-		fmt.Printf("\nReceived file: %s (%d bytes) -> %s\n", filename, written, absPath)
 
 		// Mark transaction as completed
 		if h.TxStore != nil && txnID > 0 {
@@ -1595,12 +1557,6 @@ func (h *UnifiedHandler) SetFilePath(path string) {
 	h.FilePath = path
 }
 
-// ClearFilePath clears the file path (back to upload mode)
-func (h *UnifiedHandler) ClearFilePath() {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	h.FilePath = ""
-}
 
 // Shutdown cleans up resources
 func (h *UnifiedHandler) Shutdown() {

@@ -32,7 +32,7 @@ export interface Transaction {
   lastBytes?: Record<string, number>;
   lastTime?: Record<string, number>;
   clientSpeed?: Record<string, number>; // bytes per second
-  
+
   lastBytesTransferred?: number;
   lastTimeTransferred?: number;
   overallSpeed?: number; // overall bytes per second (for uploads)
@@ -338,8 +338,12 @@ export const useTransactions = (
               updatedTxn.lastBytes = { ...previousTxn.lastBytes };
               updatedTxn.lastTime = { ...previousTxn.lastTime };
               updatedTxn.clientSpeed = { ...previousTxn.clientSpeed };
-              updatedTxn.clientProgress = { ...previousTxn.clientProgress, ...updatedTxn.clientProgress };
-              updatedTxn.lastBytesTransferred = previousTxn.lastBytesTransferred;
+              updatedTxn.clientProgress = {
+                ...previousTxn.clientProgress,
+                ...updatedTxn.clientProgress,
+              };
+              updatedTxn.lastBytesTransferred =
+                previousTxn.lastBytesTransferred;
               updatedTxn.lastTimeTransferred = previousTxn.lastTimeTransferred;
               updatedTxn.overallSpeed = previousTxn.overallSpeed;
             } else {
@@ -349,7 +353,7 @@ export const useTransactions = (
             }
 
             const now = Date.now();
-            
+
             // Calculate overall speed (e.g. for uploads)
             if (updatedTxn.bytesTransferred !== undefined) {
               const currentB = updatedTxn.bytesTransferred;
@@ -362,7 +366,8 @@ export const useTransactions = (
                 if (deltaT > 0 && deltaB >= 0) {
                   const speed = deltaB / deltaT;
                   const prevSpeed = updatedTxn.overallSpeed || 0;
-                  updatedTxn.overallSpeed = prevSpeed > 0 ? (prevSpeed * 0.7 + speed * 0.3) : speed;
+                  updatedTxn.overallSpeed =
+                    prevSpeed > 0 ? prevSpeed * 0.7 + speed * 0.3 : speed;
                 }
               } else {
                 updatedTxn.overallSpeed = 0;
@@ -376,7 +381,8 @@ export const useTransactions = (
               Object.keys(updatedTxn.clientBytes).forEach((ip) => {
                 const currentBytes = updatedTxn.clientBytes![ip];
                 if (updatedTxn.fileSize) {
-                  updatedTxn.clientProgress![ip] = (currentBytes / updatedTxn.fileSize) * 100;
+                  updatedTxn.clientProgress![ip] =
+                    (currentBytes / updatedTxn.fileSize) * 100;
                 }
 
                 const lastB = updatedTxn.lastBytes![ip];
@@ -388,7 +394,8 @@ export const useTransactions = (
                   if (deltaTime > 0 && deltaBytes >= 0) {
                     const speed = deltaBytes / deltaTime;
                     const prevSpeed = updatedTxn.clientSpeed![ip] || 0;
-                    updatedTxn.clientSpeed![ip] = prevSpeed > 0 ? (prevSpeed * 0.7 + speed * 0.3) : speed;
+                    updatedTxn.clientSpeed![ip] =
+                      prevSpeed > 0 ? prevSpeed * 0.7 + speed * 0.3 : speed;
                   }
                 } else {
                   updatedTxn.clientSpeed![ip] = 0;

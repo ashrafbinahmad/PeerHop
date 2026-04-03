@@ -3,9 +3,11 @@
 ## Issues Fixed
 
 ### 1. ✅ Transactions Changing Order in Mobile
+
 **Problem:** Transactions were appearing in random order because Go's map iteration is non-deterministic.
 
 **Solution:** Added sorting by timestamp in `GetAllTransactions()`:
+
 ```go
 // Sort by timestamp (oldest first)
 sort.Slice(result, func(i, j int) bool {
@@ -16,40 +18,50 @@ sort.Slice(result, func(i, j int) bool {
 **File:** `pkg/server/transaction.go`
 
 ### 2. 🔍 Desktop Not Showing Files - Debugging Added
+
 **Problem:** Files selected on desktop weren't appearing in the chat.
 
 **Solution:** Added comprehensive logging to track transaction lifecycle:
 
 #### Backend Logging:
+
 - `[Desktop] Created download transaction ID=X for file: filename` - When desktop selects files
 - `[Upload] Created transaction ID=X for file: filename (size: X bytes)` - When mobile uploads
 - `[API] Returning X transactions` - When API endpoint is called
 - `[API] TxStore is nil` - If transaction store isn't initialized
 
 #### Frontend Logging:
+
 - `[useTransactions] Fetched transactions: X [...]` - Shows all fetched transactions
 
 **Files Modified:**
+
 - `ui/app.go` - Desktop file selection logging
-- `pkg/server/unified_handler.go` - Upload and API logging  
+- `pkg/server/unified_handler.go` - Upload and API logging
 - `ui/frontend/src/hooks/useTransactions.ts` - Frontend fetch logging
 
 ## How to Debug
 
 ### Check Desktop Console
+
 When you select files on desktop, you should see:
+
 ```
 [Desktop] Created download transaction ID=1 for file: example.pdf
 ```
 
 ### Check Browser Console (F12)
+
 You should see every 200ms:
+
 ```
 [useTransactions] Fetched transactions: 1 [...]
 ```
 
 ### Check Terminal (Backend)
+
 When mobile uploads, you should see:
+
 ```
 [Upload] Created transaction ID=2 for file: photo.jpg (size: 1024000 bytes)
 [API] Returning 2 transactions
@@ -58,6 +70,7 @@ When mobile uploads, you should see:
 ## Expected Behavior
 
 ### Desktop:
+
 1. Click "Send Files" button
 2. Select file(s)
 3. Console shows: `[Desktop] Created download transaction ID=X`
@@ -65,6 +78,7 @@ When mobile uploads, you should see:
 5. Shows as "📤 Ready to Send" with filename and size
 
 ### Mobile:
+
 1. Click "Send Files" button
 2. Select file(s)
 3. Upload starts
@@ -73,6 +87,7 @@ When mobile uploads, you should see:
 6. Shows as "📤 Sent" on mobile, "📥 Received" on desktop
 
 ### Text Messages:
+
 1. Click 💬 button
 2. Type message and send
 3. Transaction created instantly
@@ -81,16 +96,19 @@ When mobile uploads, you should see:
 ## Troubleshooting
 
 ### If Desktop Shows No Transactions:
+
 1. Check browser console (F12) - should see polling logs
 2. Check if `[API] Returning X transactions` shows count > 0
 3. Verify transaction was created: look for `[Desktop] Created download transaction`
 
 ### If Mobile Order Keeps Changing:
+
 - This should now be fixed with timestamp sorting
 - Verify you're running the updated code
 - Check that transactions have proper timestamps
 
 ### If Transactions Duplicate:
+
 - Should not happen - React uses `key={transaction.id}`
 - Check browser console for any errors
 - Verify IDs are unique in API response
@@ -120,12 +138,14 @@ When mobile uploads, you should see:
 ## Code Changes Summary
 
 ### Modified Files:
+
 1. `pkg/server/transaction.go` - Added sorting
 2. `ui/app.go` - Added desktop logging
 3. `pkg/server/unified_handler.go` - Added upload/API logging
 4. `ui/frontend/src/hooks/useTransactions.ts` - Added frontend logging
 
 ### No Breaking Changes:
+
 - All existing functionality preserved
 - Only added logging and sorting
 - API responses unchanged

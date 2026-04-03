@@ -72,7 +72,7 @@ class WebSocketClient {
         if (this.listeners.size === 0) {
           console.log(
             "[WebSocketClient] Buffering message (no listeners yet):",
-            message.type
+            message.type,
           );
           this.initialMessagesBuffer.push(message);
         } else {
@@ -138,7 +138,7 @@ class WebSocketClient {
     // If this is the first listener and we have buffered messages, replay them
     if (isFirstListener && this.initialMessagesBuffer.length > 0) {
       console.log(
-        `[WebSocketClient] Replaying ${this.initialMessagesBuffer.length} buffered messages to first listener`
+        `[WebSocketClient] Replaying ${this.initialMessagesBuffer.length} buffered messages to first listener`,
       );
       this.initialMessagesBuffer.forEach((msg) => {
         this.notifyListeners(msg);

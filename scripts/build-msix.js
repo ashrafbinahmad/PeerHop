@@ -1,28 +1,28 @@
-const fs = require('fs');
-const path = require('path');
-const { execSync } = require('child_process');
+const fs = require("fs");
+const path = require("path");
+const { execSync } = require("child_process");
 
 // ANSI color codes
 const colors = {
-  reset: '\x1b[0m',
-  cyan: '\x1b[36m',
-  green: '\x1b[32m',
-  red: '\x1b[31m',
-  yellow: '\x1b[33m',
-  white: '\x1b[37m'
+  reset: "\x1b[0m",
+  cyan: "\x1b[36m",
+  green: "\x1b[32m",
+  red: "\x1b[31m",
+  yellow: "\x1b[33m",
+  white: "\x1b[37m",
 };
 
-function log(message, color = 'white') {
+function log(message, color = "white") {
   console.log(`${colors[color]}${message}${colors.reset}`);
 }
 
 function exec(command) {
   try {
-    execSync(command, { stdio: 'inherit' });
+    execSync(command, { stdio: "inherit" });
     return true;
   } catch (err) {
-    log(`Command failed: ${command}`, 'red');
-    log(err.message, 'red');
+    log(`Command failed: ${command}`, "red");
+    log(err.message, "red");
     return false;
   }
 }
@@ -34,42 +34,67 @@ const PUBLISHER_DISPLAY_NAME = "Peerhop";
 const CERT_SUBJECT = "CN=CBE90A45-8594-4076-AEDB-BD3B88F1C249";
 const CERT_PASSWORD = "PeerHop123";
 const SCRIPT_DIR = __dirname;
-const ROOT_DIR = path.join(SCRIPT_DIR, '..');
-const BUILDS_DIR = path.join(ROOT_DIR, 'builds');
-const DIST_DIR = path.join(ROOT_DIR, 'ui', 'build', 'windows', 'msix_dist');
+const ROOT_DIR = path.join(SCRIPT_DIR, "..");
+const BUILDS_DIR = path.join(ROOT_DIR, "builds");
+const DIST_DIR = path.join(ROOT_DIR, "ui", "build", "windows", "msix_dist");
 
-const INPUT_EXE = path.join(BUILDS_DIR, 'peerhop_win.exe');
-const SHIM_EXE = path.join(ROOT_DIR, 'share_shim', 'build', 'Release', 'ShareShim.exe');
-const OUTPUT_MSIX = path.join(BUILDS_DIR, 'peerhop_store.msix');
-const CERT_PATH = path.join(SCRIPT_DIR, 'PeerHop_SelfSigned.pfx');
+const INPUT_EXE = path.join(BUILDS_DIR, "peerhop_win.exe");
+const SHIM_EXE = path.join(
+  ROOT_DIR,
+  "share_shim",
+  "build",
+  "Release",
+  "ShareShim.exe",
+);
+const OUTPUT_MSIX = path.join(BUILDS_DIR, "peerhop_store.msix");
+const CERT_PATH = path.join(SCRIPT_DIR, "PeerHop_SelfSigned.pfx");
 
-const SDK_PATH = "C:\\Program Files (x86)\\Windows Kits\\10\\bin\\10.0.26100.0\\x64";
+const SDK_PATH =
+  "C:\\Program Files (x86)\\Windows Kits\\10\\bin\\10.0.26100.0\\x64";
 let makeAppxPath = "MakeAppx.exe";
 let signToolPath = "SignTool.exe";
 
 // Supported file types for share target and file association
 // Add more extensions here as needed — no wildcards, must start with a dot
 const SUPPORTED_FILE_TYPES = [
-  '.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp',
-  '.mp4', '.mov', '.avi', '.mkv', '.wmv',
-  '.mp3', '.wav', '.aac', '.flac',
-  '.pdf', '.txt', '.docx', '.xlsx', '.pptx',
-  '.zip', '.rar', '.7z',
+  ".jpg",
+  ".jpeg",
+  ".png",
+  ".gif",
+  ".webp",
+  ".bmp",
+  ".mp4",
+  ".mov",
+  ".avi",
+  ".mkv",
+  ".wmv",
+  ".mp3",
+  ".wav",
+  ".aac",
+  ".flac",
+  ".pdf",
+  ".txt",
+  ".docx",
+  ".xlsx",
+  ".pptx",
+  ".zip",
+  ".rar",
+  ".7z",
   // '.apk', '.exe',
 ];
 
 function checkTools() {
   try {
     try {
-      execSync('MakeAppx.exe /?', { stdio: 'ignore' });
-      execSync('SignTool.exe /?', { stdio: 'ignore' });
+      execSync("MakeAppx.exe /?", { stdio: "ignore" });
+      execSync("SignTool.exe /?", { stdio: "ignore" });
       return true;
     } catch (e) {
-      const explicitMakeAppx = path.join(SDK_PATH, 'MakeAppx.exe');
-      const explicitSignTool = path.join(SDK_PATH, 'SignTool.exe');
+      const explicitMakeAppx = path.join(SDK_PATH, "MakeAppx.exe");
+      const explicitSignTool = path.join(SDK_PATH, "SignTool.exe");
 
       if (fs.existsSync(explicitMakeAppx) && fs.existsSync(explicitSignTool)) {
-        log(`Found tools at ${SDK_PATH}`, 'green');
+        log(`Found tools at ${SDK_PATH}`, "green");
         makeAppxPath = `"${explicitMakeAppx}"`;
         signToolPath = `"${explicitSignTool}"`;
         return true;
@@ -77,23 +102,29 @@ function checkTools() {
       throw e;
     }
   } catch (e) {
-    log('Error: MakeAppx.exe or SignTool.exe not found in PATH or standard location.', 'red');
-    log(`Checked PATH and ${SDK_PATH}`, 'yellow');
-    log('Please install Windows SDK or Visual Studio with UWP tools.', 'yellow');
+    log(
+      "Error: MakeAppx.exe or SignTool.exe not found in PATH or standard location.",
+      "red",
+    );
+    log(`Checked PATH and ${SDK_PATH}`, "yellow");
+    log(
+      "Please install Windows SDK or Visual Studio with UWP tools.",
+      "yellow",
+    );
     return false;
   }
 }
 
 function generateFileTypeElements(indent) {
-  return SUPPORTED_FILE_TYPES
-    .map(ext => `${indent}<uap:FileType>${ext}</uap:FileType>`)
-    .join('\n');
+  return SUPPORTED_FILE_TYPES.map(
+    (ext) => `${indent}<uap:FileType>${ext}</uap:FileType>`,
+  ).join("\n");
 }
 
 function generateManifest(version) {
   const storeVersion = `${version}.0`;
   // const fileTypeElements6 = generateFileTypeElements('            ');  // 12 spaces
-  const fileTypeElements8 = generateFileTypeElements('                ');  // 16 spaces
+  const fileTypeElements8 = generateFileTypeElements("                "); // 16 spaces
   const manifestContent = `<?xml version="1.0" encoding="utf-8"?>
 <Package
   xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
@@ -180,118 +211,272 @@ function generateManifest(version) {
 }
 
 function buildMSIX(version) {
-  log('\nBuilding MSIX Package...', 'cyan');
+  log("\nBuilding MSIX Package...", "cyan");
 
   // Build ShareShim
-  const SHIM_BUILD_BAT = path.join(ROOT_DIR, 'scripts', 'build-shim.bat');
+  const SHIM_BUILD_BAT = path.join(ROOT_DIR, "scripts", "build-shim.bat");
   if (fs.existsSync(SHIM_BUILD_BAT)) {
-    log('Building ShareShim utility...', 'cyan');
+    log("Building ShareShim utility...", "cyan");
     try {
-      execSync(`"${SHIM_BUILD_BAT}"`, { stdio: 'inherit', cwd: ROOT_DIR });
-      log('ShareShim build completed.', 'green');
+      execSync(`"${SHIM_BUILD_BAT}"`, { stdio: "inherit", cwd: ROOT_DIR });
+      log("ShareShim build completed.", "green");
     } catch (error) {
-      log('Error: Failed to build ShareShim. Please ensure CMake and Visual Studio are installed.', 'red');
+      log(
+        "Error: Failed to build ShareShim. Please ensure CMake and Visual Studio are installed.",
+        "red",
+      );
     }
   }
 
   if (!fs.existsSync(INPUT_EXE)) {
-    log(`Error: Input executable not found: ${INPUT_EXE}`, 'red');
+    log(`Error: Input executable not found: ${INPUT_EXE}`, "red");
     return false;
   }
 
   if (!checkTools()) return false;
 
   // 1. Prepare Layout Directory
-  log('Preparing layout directory...', 'white');
-  if (fs.existsSync(DIST_DIR)) fs.rmSync(DIST_DIR, { recursive: true, force: true });
+  log("Preparing layout directory...", "white");
+  if (fs.existsSync(DIST_DIR))
+    fs.rmSync(DIST_DIR, { recursive: true, force: true });
   fs.mkdirSync(DIST_DIR, { recursive: true });
-  fs.mkdirSync(path.join(DIST_DIR, 'Assets'), { recursive: true });
+  fs.mkdirSync(path.join(DIST_DIR, "Assets"), { recursive: true });
 
   // Copy main executable
-  fs.copyFileSync(INPUT_EXE, path.join(DIST_DIR, 'PeerHop.exe'));
+  fs.copyFileSync(INPUT_EXE, path.join(DIST_DIR, "PeerHop.exe"));
 
   // Copy ShareShim
   if (fs.existsSync(SHIM_EXE)) {
-    fs.copyFileSync(SHIM_EXE, path.join(DIST_DIR, 'ShareShim.exe'));
-    log('Copied ShareShim.exe to layout', 'green');
+    fs.copyFileSync(SHIM_EXE, path.join(DIST_DIR, "ShareShim.exe"));
+    log("Copied ShareShim.exe to layout", "green");
   } else {
-    log(`Error: ShareShim.exe not found at ${SHIM_EXE}.`, 'red');
-    log('Please build it first using: scripts\\build-shim.bat', 'red');
+    log(`Error: ShareShim.exe not found at ${SHIM_EXE}.`, "red");
+    log("Please build it first using: scripts\\build-shim.bat", "red");
     process.exit(1);
   }
 
   // Copy assets
-  const sourceIcon = path.join(ROOT_DIR, 'ui', 'build', 'appicon.png');
-  const source150Icon = path.join(ROOT_DIR, 'ui', 'frontend', 'src', 'assets', 'images', 'appicon150x150.png');
-  const source44Icon = path.join(ROOT_DIR, 'ui', 'frontend', 'src', 'assets', 'images', 'appicon44x44.png');
-  const source44IconAlt44 = path.join(ROOT_DIR, 'ui', 'frontend', 'src', 'assets', 'images', 'appicon44x44.targetsize-44_altform-unplated.png');
-  const source44IconAlt256 = path.join(ROOT_DIR, 'ui', 'frontend', 'src', 'assets', 'images', 'appicon44x44.targetsize-256_altform-unplated.png');
-  const source44IconAlt48 = path.join(ROOT_DIR, 'ui', 'frontend', 'src', 'assets', 'images', 'appicon44x44.targetsize-48_altform-unplated.png');
-  const source44IconIco = path.join(ROOT_DIR, 'ui', 'frontend', 'src', 'assets', 'images', 'appicon44x44.ico');
-  const sourceLogoUniversal = path.join(ROOT_DIR, 'ui', 'frontend', 'src', 'assets', 'images', 'logo-universal.png');
+  const sourceIcon = path.join(ROOT_DIR, "ui", "build", "appicon.png");
+  const source150Icon = path.join(
+    ROOT_DIR,
+    "ui",
+    "frontend",
+    "src",
+    "assets",
+    "images",
+    "appicon150x150.png",
+  );
+  const source44Icon = path.join(
+    ROOT_DIR,
+    "ui",
+    "frontend",
+    "src",
+    "assets",
+    "images",
+    "appicon44x44.png",
+  );
+  const source44IconAlt44 = path.join(
+    ROOT_DIR,
+    "ui",
+    "frontend",
+    "src",
+    "assets",
+    "images",
+    "appicon44x44.targetsize-44_altform-unplated.png",
+  );
+  const source44IconAlt256 = path.join(
+    ROOT_DIR,
+    "ui",
+    "frontend",
+    "src",
+    "assets",
+    "images",
+    "appicon44x44.targetsize-256_altform-unplated.png",
+  );
+  const source44IconAlt48 = path.join(
+    ROOT_DIR,
+    "ui",
+    "frontend",
+    "src",
+    "assets",
+    "images",
+    "appicon44x44.targetsize-48_altform-unplated.png",
+  );
+  const source44IconIco = path.join(
+    ROOT_DIR,
+    "ui",
+    "frontend",
+    "src",
+    "assets",
+    "images",
+    "appicon44x44.ico",
+  );
+  const sourceLogoUniversal = path.join(
+    ROOT_DIR,
+    "ui",
+    "frontend",
+    "src",
+    "assets",
+    "images",
+    "logo-universal.png",
+  );
 
   function copyIfExists(src, dest) {
     if (fs.existsSync(src)) {
       fs.copyFileSync(src, dest);
       return true;
     }
-    log(`Warning: ${path.relative(ROOT_DIR, src)} not found; skipping ${path.relative(ROOT_DIR, dest)}`, 'yellow');
+    log(
+      `Warning: ${path.relative(ROOT_DIR, src)} not found; skipping ${path.relative(ROOT_DIR, dest)}`,
+      "yellow",
+    );
     return false;
   }
 
   if (!fs.existsSync(sourceIcon)) {
-    log('Error: appicon.png not found. Please build the frontend before packaging MSIX.', 'red');
+    log(
+      "Error: appicon.png not found. Please build the frontend before packaging MSIX.",
+      "red",
+    );
     process.exit(1);
   }
 
-  copyIfExists(sourceIcon, path.join(DIST_DIR, 'Assets', 'StoreLogo.png'));
-  copyIfExists(source150Icon, path.join(DIST_DIR, 'Assets', 'Square150x150Logo.png'));
-  copyIfExists(source150Icon, path.join(DIST_DIR, 'Assets', 'Square150x150Logo.altform-unplated.png'));
-  copyIfExists(source150Icon, path.join(DIST_DIR, 'Assets', 'Square150x150Logo.scale-100.altform-unplated.png'));
-  copyIfExists(source150Icon, path.join(DIST_DIR, 'Assets', 'Square150x150Logo.scale-125.altform-unplated.png'));
-  copyIfExists(source150Icon, path.join(DIST_DIR, 'Assets', 'Square150x150Logo.scale-150.altform-unplated.png'));
-  copyIfExists(source150Icon, path.join(DIST_DIR, 'Assets', 'Square150x150Logo.scale-200.altform-unplated.png'));
-  copyIfExists(source44Icon, path.join(DIST_DIR, 'Assets', 'Square44x44Logo.png'));
-  copyIfExists(source44IconAlt44, path.join(DIST_DIR, 'Assets', 'Peerhop.altform-unplated.png'));
-  copyIfExists(source44IconAlt44, path.join(DIST_DIR, 'Assets', 'Square44x44Logo.scale-100.altform-unplated.png'));
-  copyIfExists(source44IconAlt44, path.join(DIST_DIR, 'Assets', 'Square44x44Logo.scale-125.altform-unplated.png'));
-  copyIfExists(source44IconAlt44, path.join(DIST_DIR, 'Assets', 'Square44x44Logo.scale-150.altform-unplated.png'));
-  copyIfExists(source44IconAlt44, path.join(DIST_DIR, 'Assets', 'Square44x44Logo.scale-200.altform-unplated.png'));
-  copyIfExists(source44IconAlt256, path.join(DIST_DIR, 'Assets', 'Square44x44Logo.targetsize-256_altform-unplated.png'));
-  copyIfExists(source44IconAlt48, path.join(DIST_DIR, 'Assets', 'Square44x44Logo.targetsize-48_altform-unplated.png'));
-  copyIfExists(source44IconIco, path.join(DIST_DIR, 'Assets', 'Square44x44Logo.ico'));
-  copyIfExists(sourceLogoUniversal, path.join(DIST_DIR, 'Assets', 'LogoUniversal.png'));
+  copyIfExists(sourceIcon, path.join(DIST_DIR, "Assets", "StoreLogo.png"));
+  copyIfExists(
+    source150Icon,
+    path.join(DIST_DIR, "Assets", "Square150x150Logo.png"),
+  );
+  copyIfExists(
+    source150Icon,
+    path.join(DIST_DIR, "Assets", "Square150x150Logo.altform-unplated.png"),
+  );
+  copyIfExists(
+    source150Icon,
+    path.join(
+      DIST_DIR,
+      "Assets",
+      "Square150x150Logo.scale-100.altform-unplated.png",
+    ),
+  );
+  copyIfExists(
+    source150Icon,
+    path.join(
+      DIST_DIR,
+      "Assets",
+      "Square150x150Logo.scale-125.altform-unplated.png",
+    ),
+  );
+  copyIfExists(
+    source150Icon,
+    path.join(
+      DIST_DIR,
+      "Assets",
+      "Square150x150Logo.scale-150.altform-unplated.png",
+    ),
+  );
+  copyIfExists(
+    source150Icon,
+    path.join(
+      DIST_DIR,
+      "Assets",
+      "Square150x150Logo.scale-200.altform-unplated.png",
+    ),
+  );
+  copyIfExists(
+    source44Icon,
+    path.join(DIST_DIR, "Assets", "Square44x44Logo.png"),
+  );
+  copyIfExists(
+    source44IconAlt44,
+    path.join(DIST_DIR, "Assets", "Peerhop.altform-unplated.png"),
+  );
+  copyIfExists(
+    source44IconAlt44,
+    path.join(
+      DIST_DIR,
+      "Assets",
+      "Square44x44Logo.scale-100.altform-unplated.png",
+    ),
+  );
+  copyIfExists(
+    source44IconAlt44,
+    path.join(
+      DIST_DIR,
+      "Assets",
+      "Square44x44Logo.scale-125.altform-unplated.png",
+    ),
+  );
+  copyIfExists(
+    source44IconAlt44,
+    path.join(
+      DIST_DIR,
+      "Assets",
+      "Square44x44Logo.scale-150.altform-unplated.png",
+    ),
+  );
+  copyIfExists(
+    source44IconAlt44,
+    path.join(
+      DIST_DIR,
+      "Assets",
+      "Square44x44Logo.scale-200.altform-unplated.png",
+    ),
+  );
+  copyIfExists(
+    source44IconAlt256,
+    path.join(
+      DIST_DIR,
+      "Assets",
+      "Square44x44Logo.targetsize-256_altform-unplated.png",
+    ),
+  );
+  copyIfExists(
+    source44IconAlt48,
+    path.join(
+      DIST_DIR,
+      "Assets",
+      "Square44x44Logo.targetsize-48_altform-unplated.png",
+    ),
+  );
+  copyIfExists(
+    source44IconIco,
+    path.join(DIST_DIR, "Assets", "Square44x44Logo.ico"),
+  );
+  copyIfExists(
+    sourceLogoUniversal,
+    path.join(DIST_DIR, "Assets", "LogoUniversal.png"),
+  );
 
   // 2. Generate Manifest
-  log('Generating AppxManifest.xml...', 'white');
+  log("Generating AppxManifest.xml...", "white");
   const manifest = generateManifest(version);
-  fs.writeFileSync(path.join(DIST_DIR, 'AppxManifest.xml'), manifest);
+  fs.writeFileSync(path.join(DIST_DIR, "AppxManifest.xml"), manifest);
 
   // 3. Pack MSIX
-  log('Packing MSIX...', 'white');
+  log("Packing MSIX...", "white");
   if (fs.existsSync(OUTPUT_MSIX)) fs.unlinkSync(OUTPUT_MSIX);
 
   const packCmd = `${makeAppxPath} pack /d "${DIST_DIR}" /p "${OUTPUT_MSIX}"`;
   if (!exec(packCmd)) return false;
 
   // 4. Sign
-  log('Signing MSIX...', 'white');
+  log("Signing MSIX...", "white");
 
   if (!fs.existsSync(CERT_PATH)) {
-    log('Certificate not found. Generating self-signed cert...', 'yellow');
-    const psCmd = `powershell -ExecutionPolicy Bypass -File "${path.join(SCRIPT_DIR, 'generate-test-cert.ps1')}"`;
-    execSync(psCmd, { stdio: 'inherit' });
+    log("Certificate not found. Generating self-signed cert...", "yellow");
+    const psCmd = `powershell -ExecutionPolicy Bypass -File "${path.join(SCRIPT_DIR, "generate-test-cert.ps1")}"`;
+    execSync(psCmd, { stdio: "inherit" });
   }
 
   if (!fs.existsSync(CERT_PATH)) {
-    log('Error: Certificate missing even after generation attempt.', 'red');
+    log("Error: Certificate missing even after generation attempt.", "red");
     return false;
   }
 
   const signCmd = `${signToolPath} sign /fd SHA256 /a /f "${CERT_PATH}" /p "${CERT_PASSWORD}" "${OUTPUT_MSIX}"`;
   if (!exec(signCmd)) return false;
 
-  log(`\nSuccessfully created signed MSIX: ${OUTPUT_MSIX}`, 'green');
+  log(`\nSuccessfully created signed MSIX: ${OUTPUT_MSIX}`, "green");
   return true;
 }
 
@@ -299,7 +484,7 @@ function buildMSIX(version) {
 if (require.main === module) {
   const version = process.argv[2];
   if (!version) {
-    log('Please provide version argument', 'red');
+    log("Please provide version argument", "red");
     process.exit(1);
   }
   buildMSIX(version);

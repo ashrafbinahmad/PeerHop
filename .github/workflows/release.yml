@@ -1,42 +1,42 @@
-name: Release
+# name: Release
 
-on:
-  push:
-    tags:
-      - "v*"
+# on:
+#   push:
+#     tags:
+#       - "v*"
 
-permissions:
-  contents: write
+# permissions:
+#   contents: write
 
-jobs:
-  release:
-    name: Create Release
-    runs-on: windows-latest
+# jobs:
+#   release:
+#     name: Create Release
+#     runs-on: windows-latest
 
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+#     steps:
+#       - name: Checkout code
+#         uses: actions/checkout@v4
 
-      - name: Create Release in peerhop repo
-        uses: softprops/action-gh-release@v2
-        with:
-          repository: ashrafbinahmad/PeerHop-releases
-          token: ${{ secrets.RELEASE_PAT }}
-          body: |
-            ## Download Binaries
+#       - name: Create Release in peerhop repo
+#         uses: softprops/action-gh-release@v2
+#         with:
+#           repository: ashrafbinahmad/PeerHop-releases
+#           token: ${{ secrets.RELEASE_PAT }}
+#           body: |
+#             ## Download Binaries
 
-            Please download the pre-built binaries below:
-            - **peerhop_win.exe** - Windows GUI application
-            - **peerhop_setup.exe** - Windows installer
-            - **peerhop_cli_win.exe** - Windows CLI tool
-            - **peerhop_cli_linux** - Linux CLI tool
-            - **peerhop_linux** - Linux GUI application
-            - **peerhop_store.msix** - Microsoft Store Package
+#             Please download the pre-built binaries below:
+#             - **peerhop_win.exe** - Windows GUI application
+#             - **peerhop_setup.exe** - Windows installer
+#             - **peerhop_cli_win.exe** - Windows CLI tool
+#             - **peerhop_cli_linux** - Linux CLI tool
+#             - **peerhop_linux** - Linux GUI application
+#             - **peerhop_store.msix** - Microsoft Store Package
 
-            > **Note:** Ignore the "Source code" archives - they are automatically added by GitHub and are not needed.
-          files: |
-            builds/*
-          fail_on_unmatched_files: false
-          draft: false
-          prerelease: false
-          generate_release_notes: false
+#             > **Note:** Ignore the "Source code" archives - they are automatically added by GitHub and are not needed.
+#           files: |
+#             builds/*
+#           fail_on_unmatched_files: false
+#           draft: false
+#           prerelease: false
+#           generate_release_notes: false

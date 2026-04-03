@@ -73,6 +73,7 @@
 ### Expected WebSocket Messages
 
 #### Initial Connection
+
 ```json
 {
   "type": "transactions_init",
@@ -92,6 +93,7 @@
 ```
 
 #### Updates
+
 ```json
 {
   "type": "transaction_update",
@@ -127,6 +129,7 @@
 **Symptom:** Console shows connection errors
 
 **Debug:**
+
 1. Check if server is running
 2. Verify WebSocket endpoint: `ws://localhost:PORT/api/ws`
 3. Check browser console for CORS errors
@@ -137,6 +140,7 @@
 **Symptom:** No progress shown during transfer
 
 **Debug:**
+
 1. Check backend logs for transaction updates
 2. Verify WebSocket hub is initialized
 3. Check frontend is receiving "transaction_update" messages
@@ -147,6 +151,7 @@
 **Symptom:** Connected devices not showing
 
 **Debug:**
+
 1. Check if client sends X-Client-ID header
 2. Verify devices_update messages in console
 3. Check backend ClientStore is tracking clients
@@ -159,7 +164,6 @@
 1. **Network Tab:**
    - WS connection should show as "101 Switching Protocols"
    - Messages should be minimal (only on changes)
-   
 2. **Console:**
    - Should not spam with messages
    - Only updates when data actually changes
@@ -171,6 +175,7 @@
 ### Backend Logs
 
 Look for:
+
 ```
 [WebSocket] New connection added. Total connections: X
 [WebSocket] Client connected from IP
@@ -184,4 +189,4 @@ Look for:
 ✅ Devices list updates immediately on connect/disconnect  
 ✅ WebSocket reconnects automatically after network issues  
 ✅ No polling-related HTTP requests in Network tab  
-✅ Smooth, real-time user experience  
+✅ Smooth, real-time user experience

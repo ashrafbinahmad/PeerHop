@@ -20,7 +20,7 @@ interface UseDevicesResult {
 export const useDevices = (
   baseURL?: string,
   isDesktop: boolean = false,
-  token?: string // Optional security/admin token
+  token?: string, // Optional security/admin token
 ): UseDevicesResult => {
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);

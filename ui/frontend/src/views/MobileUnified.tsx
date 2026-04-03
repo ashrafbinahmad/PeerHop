@@ -206,7 +206,6 @@ export const MobileUnified: React.FC<Props> = ({
     !isBlocked && (myClient?.sendingBlocked || false);
 
   const activeTheme =
-    // THEME_PRESETS.find((t) => t.id === activeThemeId) ||
     THEME_PRESETS.find((t) => t.id === "classic") || THEME_PRESETS[7];
   const activeAccent =
     ACCENT_COLORS.find((a) => a.id === "sky") || ACCENT_COLORS[1];
@@ -746,17 +745,6 @@ export const MobileUnified: React.FC<Props> = ({
         className="flex-1 overflow-y-auto px-2 py-2 pt-16 flex flex-col scroll-smooth relative custom-scrollbar min-h-0"
       >
         <div className="mt-auto flex flex-col gap-4 pb-2">
-          {(() => {
-            console.log(
-              "[MobileUnified] Rendering transactions:",
-              visibleTransactions.length,
-              "isUploading:",
-              isUploading,
-            );
-            console.log("[MobileUnified] My IP:", myIp);
-            console.log("[MobileUnified] Upload Progress:", uploadProgress);
-            return null;
-          })()}
           {visibleTransactions.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full gap-6 animate-in fade-in zoom-in-95 duration-500 pb-20 mt-auto mb-auto">
               {/* Big Share File Button */}
@@ -1145,16 +1133,30 @@ export const MobileUnified: React.FC<Props> = ({
                                       // Try to use live delta-based speed
                                       let speedBps = 0;
                                       if (isMe) {
-                                          speedBps = transaction.overallSpeed || 0;
-                                      } else if (myIp && transaction.clientSpeed && transaction.clientSpeed[myIp] !== undefined) {
-                                          speedBps = transaction.clientSpeed[myIp];
-                                      } else if (transaction.clientSpeed && Object.keys(transaction.clientSpeed).length > 0) {
-                                          speedBps = Object.values(transaction.clientSpeed)[0];
+                                        speedBps =
+                                          transaction.overallSpeed || 0;
+                                      } else if (
+                                        myIp &&
+                                        transaction.clientSpeed &&
+                                        transaction.clientSpeed[myIp] !==
+                                          undefined
+                                      ) {
+                                        speedBps =
+                                          transaction.clientSpeed[myIp];
+                                      } else if (
+                                        transaction.clientSpeed &&
+                                        Object.keys(transaction.clientSpeed)
+                                          .length > 0
+                                      ) {
+                                        speedBps = Object.values(
+                                          transaction.clientSpeed,
+                                        )[0];
                                       }
-                                      
+
                                       const mbpsStr = formatLiveSpeed(speedBps);
                                       const mbps = speedBps / (1024 * 1024);
-                                      const layers = signalLogic.getLayers(mbps);
+                                      const layers =
+                                        signalLogic.getLayers(mbps);
                                       return (
                                         <>
                                           {mbpsStr}
@@ -1216,11 +1218,6 @@ export const MobileUnified: React.FC<Props> = ({
                                       })}
                                     </span>
                                   </span>
-                                  {/* {!isMe && (
-                                    <span className="text-[#007AFF] font-medium">
-                                      Downloading...
-                                    </span>
-                                  )} */}
                                 </div>
                               ) : (
                                 <div className="flex flex-col gap-0.5 mt-0.5">

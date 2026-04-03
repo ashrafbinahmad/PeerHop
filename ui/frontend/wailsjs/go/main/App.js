@@ -6,24 +6,8 @@ export function CheckShareActivation() {
   return window['go']['main']['App']['CheckShareActivation']();
 }
 
-export function ClearTransfer() {
-  return window['go']['main']['App']['ClearTransfer']();
-}
-
-export function ExportLogs() {
-  return window['go']['main']['App']['ExportLogs']();
-}
-
 export function GetClipboardFiles() {
   return window['go']['main']['App']['GetClipboardFiles']();
-}
-
-export function GetLogPath() {
-  return window['go']['main']['App']['GetLogPath']();
-}
-
-export function GetRecentLogs(arg1) {
-  return window['go']['main']['App']['GetRecentLogs'](arg1);
 }
 
 export function GetSecureSettings() {
@@ -36,10 +20,6 @@ export function GetServerInfo() {
 
 export function GetSharedFiles() {
   return window['go']['main']['App']['GetSharedFiles']();
-}
-
-export function OpenLogFolder() {
-  return window['go']['main']['App']['OpenLogFolder']();
 }
 
 export function OpenSourceFile(arg1) {

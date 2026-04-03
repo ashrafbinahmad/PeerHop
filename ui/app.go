@@ -311,7 +311,6 @@ func (a *App) StartTransfer(paths []string) (*ServerInfo, error) {
 					a.unifiedHandler.WSHub.BroadcastTransactionUpdate(txnCopy)
 				}
 			}
-			fmt.Printf("[Desktop] Created and broadcasted download transaction ID=%d for zip: %s\n", txnID, filepath.Base(zipPath))
 		}
 
 		if a.serverInfo != nil {
@@ -333,7 +332,6 @@ func (a *App) StartTransfer(paths []string) (*ServerInfo, error) {
 	for i, filePath := range paths {
 		stat, err := os.Stat(filePath)
 		if err != nil {
-			fmt.Printf("[Desktop] Error stating file %s: %v\n", filePath, err)
 			continue
 		}
 
@@ -362,7 +360,6 @@ func (a *App) StartTransfer(paths []string) (*ServerInfo, error) {
 					a.unifiedHandler.WSHub.BroadcastTransactionUpdate(txnCopy)
 				}
 			}
-			fmt.Printf("[Desktop] Created and broadcasted download transaction ID=%d for file [%d/%d]: %s\n", txnID, i+1, len(paths), filepath.Base(filePath))
 		}
 
 		if i == 0 && a.unifiedHandler != nil {
@@ -378,19 +375,6 @@ func (a *App) StartTransfer(paths []string) (*ServerInfo, error) {
 	return a.serverInfo, nil
 }
 
-// ClearTransfer clears the current file transfer (back to upload mode)
-func (a *App) ClearTransfer() error {
-	if a.unifiedHandler != nil {
-		a.unifiedHandler.ClearFilePath()
-	}
-
-	if a.serverInfo != nil {
-		a.serverInfo.Filename = ""
-		a.serverInfo.Size = 0
-	}
-
-	return nil
-}
 
 func removeZoneIdentifier(filePath string) {
 	zonePath := filePath + ":Zone.Identifier"

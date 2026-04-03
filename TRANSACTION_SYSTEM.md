@@ -1,6 +1,7 @@
 # Transaction-Based Messaging System
 
 ## Overview
+
 This document describes the in-memory transaction tracking system implemented for real-time file and text transfer monitoring between server and client.
 
 ## Backend Implementation
@@ -26,6 +27,7 @@ type Transaction struct {
 ```
 
 ### 2. Transaction Store
+
 - **In-memory storage**: All transactions stored in `map[int]*Transaction`
 - **Thread-safe**: Uses `sync.RWMutex` for concurrent access
 - **Auto-incrementing IDs**: Unique ID for each transaction
@@ -34,9 +36,11 @@ type Transaction struct {
 ### 3. API Endpoints
 
 #### GET `/api/transactions`
+
 Returns all transactions for polling.
 
 **Response:**
+
 ```json
 {
   "transactions": [
@@ -55,17 +59,20 @@ Returns all transactions for polling.
 ```
 
 #### POST `/api/send-text`
+
 Send a text message.
 
 **Request:**
+
 ```json
 {
   "text": "Hello, this is a message",
-  "direction": "from client"  // or "from server"
+  "direction": "from client" // or "from server"
 }
 ```
 
 **Response:**
+
 ```json
 {
   "success": true,
@@ -74,9 +81,11 @@ Send a text message.
 ```
 
 #### GET `/api/transaction/{id}`
+
 Get specific transaction progress by ID.
 
 **Response:**
+
 ```json
 {
   "id": 1,
@@ -92,12 +101,14 @@ Get specific transaction progress by ID.
 ### 1. Transaction Polling Hook (`ui/frontend/src/hooks/useTransactions.ts`)
 
 **Features:**
+
 - Polls `/api/transactions` every 200ms
 - Automatic state management
 - Text message sending function
 - Type-safe transaction interface
 
 **Usage:**
+
 ```typescript
 const { transactions, sendText, refreshTransactions } = useTransactions(500);
 ```
@@ -105,6 +116,7 @@ const { transactions, sendText, refreshTransactions } = useTransactions(500);
 ### 2. Mobile UI (`ui/frontend/src/views/MobileUnified.tsx`)
 
 **Features:**
+
 - Real-time transaction display
 - Text message input with toggle button
 - File upload with progress tracking
@@ -117,6 +129,7 @@ const { transactions, sendText, refreshTransactions } = useTransactions(500);
   - Status indicators (✓ completed, ✗ failed)
 
 **Text Message Flow:**
+
 1. Click 💬 button to show text input
 2. Type message and press Enter or click Send
 3. Message sent to `/api/send-text` with direction "from client"
@@ -125,6 +138,7 @@ const { transactions, sendText, refreshTransactions } = useTransactions(500);
 ### 3. Desktop UI (`ui/frontend/src/views/DesktopView.tsx`)
 
 **Features:**
+
 - Same transaction display as mobile
 - Text message button (💬) next to Send Files
 - Expandable text input field
@@ -132,6 +146,7 @@ const { transactions, sendText, refreshTransactions } = useTransactions(500);
 - Shows both sent and received transactions
 
 **Text Message Flow:**
+
 1. Click 💬 button to show text input
 2. Type message and press Enter or click Send
 3. Message sent to `/api/send-text` with direction "from server"
@@ -140,6 +155,7 @@ const { transactions, sendText, refreshTransactions } = useTransactions(500);
 ## Transaction Lifecycle
 
 ### File Upload (Client → Server)
+
 1. **Client uploads file** → POST `/api/upload`
 2. **Server creates transaction** with:
    - Type: "file"
@@ -152,6 +168,7 @@ const { transactions, sendText, refreshTransactions } = useTransactions(500);
 4. **Client polls** and displays in chat
 
 ### File Download (Server → Client)
+
 1. **Server prepares file** via `StartTransfer()`
 2. **Server creates transaction** with:
    - Type: "file"
@@ -162,6 +179,7 @@ const { transactions, sendText, refreshTransactions } = useTransactions(500);
 4. **Transaction visible** on both UIs via polling
 
 ### Text Message
+
 1. **User sends text** via UI
 2. **POST `/api/send-text`** creates transaction:
    - Type: "text"
@@ -173,22 +191,26 @@ const { transactions, sendText, refreshTransactions } = useTransactions(500);
 ## Key Features
 
 ### ✅ Real-time Progress
+
 - Polling every 200ms ensures near-instant updates
 - Progress percentage shown for in-progress transfers
 - Status indicators for completed/failed transfers
 
 ### ✅ No Duplication
+
 - Transactions identified by unique ID
 - React key={transaction.id} prevents duplicates
 - No localStorage needed (server is source of truth)
 
 ### ✅ Unified Chat Interface
+
 - Both files and text in same chat view
 - Chronological ordering by timestamp
 - Visual distinction between sent/received
 - Auto-scroll to latest message
 
 ### ✅ Bidirectional Communication
+
 - Server can send files and text to client
 - Client can send files and text to server
 - Direction clearly indicated in UI
@@ -196,11 +218,13 @@ const { transactions, sendText, refreshTransactions } = useTransactions(500);
 ## Progress Tracking
 
 ### Transaction Percent Behavior
+
 - **During transfer**: 0-100% based on bytes transferred
 - **On completion**: Automatically resets to 0 (as per requirement)
 - **Display**: Shows percentage only when status is "in_progress"
 
 ### Status States
+
 - `pending`: Transaction created, not started
 - `in_progress`: Transfer ongoing, percentage updating
 - `completed`: Transfer finished successfully

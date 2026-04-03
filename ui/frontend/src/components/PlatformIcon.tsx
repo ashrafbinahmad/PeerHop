@@ -7,7 +7,11 @@ interface Props {
   className?: string;
 }
 
-export const PlatformIcon: React.FC<Props> = ({ platform, size = 16, className = "" }) => {
+export const PlatformIcon: React.FC<Props> = ({
+  platform,
+  size = 16,
+  className = "",
+}) => {
   const p = platform.toLowerCase();
 
   if (p === "ios" || p === "macos" || p === "darwin") {
@@ -75,8 +79,10 @@ export const PlatformIcon: React.FC<Props> = ({ platform, size = 16, className =
   }
 
   // Default Fallbacks
-  if (p.includes('mobile') || p.includes('phone')) return <Smartphone size={size} className={className} />;
-  if (p.includes('monitor') || p.includes('desktop')) return <Monitor size={size} className={className} />;
+  if (p.includes("mobile") || p.includes("phone"))
+    return <Smartphone size={size} className={className} />;
+  if (p.includes("monitor") || p.includes("desktop"))
+    return <Monitor size={size} className={className} />;
 
   // Check for "Unknown" or generic
   return <HelpCircle size={size} className={className} />;

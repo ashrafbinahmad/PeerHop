@@ -3,24 +3,26 @@
 ## ✅ Issues Fixed
 
 ### Problem 1: Mobile Download Navigation
+
 **Issue**: When clicking "Receive Files" on mobile, `window.location.href = '/api/download'` would navigate away from the page, losing the "received" message.
 
 **Fix**: Changed to use a hidden `<a>` element with `.click()` to trigger download without navigation.
 
 ```tsx
 // Before (navigates away):
-window.location.href = '/api/download';
+window.location.href = "/api/download";
 
 // After (stays on page):
-const link = document.createElement('a');
-link.href = '/api/download';
-link.download = downloadFilename || 'file';
+const link = document.createElement("a");
+link.href = "/api/download";
+link.download = downloadFilename || "file";
 document.body.appendChild(link);
 link.click();
 document.body.removeChild(link);
 ```
 
 ### Problem 2: Messages Lost on Reload
+
 **Issue**: Messages were only stored in component state, which resets on page reload or app restart.
 
 **Fix**: Added localStorage persistence for both Desktop and Mobile views.
@@ -32,16 +34,16 @@ document.body.removeChild(link);
 // Load on mount
 const [messages, setMessages] = useState<Message[]>(() => {
   try {
-    const saved = localStorage.getItem('transend_desktop_messages');
+    const saved = localStorage.getItem("transend_desktop_messages");
     if (saved) {
       const parsed = JSON.parse(saved);
       return parsed.map((msg: any) => ({
         ...msg,
-        timestamp: new Date(msg.timestamp)
+        timestamp: new Date(msg.timestamp),
       }));
     }
   } catch (e) {
-    console.error('Failed to load messages:', e);
+    console.error("Failed to load messages:", e);
   }
   return [];
 });
@@ -49,9 +51,9 @@ const [messages, setMessages] = useState<Message[]>(() => {
 // Save on change
 useEffect(() => {
   try {
-    localStorage.setItem('transend_desktop_messages', JSON.stringify(messages));
+    localStorage.setItem("transend_desktop_messages", JSON.stringify(messages));
   } catch (e) {
-    console.error('Failed to save messages:', e);
+    console.error("Failed to save messages:", e);
   }
 }, [messages]);
 ```
@@ -59,12 +61,14 @@ useEffect(() => {
 ## 🎯 Now Both Views Show All Messages!
 
 ### Desktop View:
+
 - ✅ **Sent** messages (right, indigo) - Files you selected to share
 - ✅ **Received** messages (left, white) - Files uploaded from mobile
 - ✅ Messages persist across app restarts
 - ✅ Messages saved to localStorage
 
 ### Mobile View:
+
 - ✅ **Sent** messages (right, purple) - Files you uploaded to desktop
 - ✅ **Received** messages (left, white) - Files you downloaded from desktop
 - ✅ Messages persist across page reloads
@@ -74,6 +78,7 @@ useEffect(() => {
 ## 📝 Complete Flow Examples
 
 ### Example 1: Desktop → Mobile (Download)
+
 1. **Desktop**: Click "Send Files", select `photo.jpg`
    - Desktop shows: **Sent** message (right, indigo) ✅
 2. **Mobile**: Scan QR code, click "Receive Files"
@@ -82,6 +87,7 @@ useEffect(() => {
    - Message persists even if you refresh!
 
 ### Example 2: Mobile → Desktop (Upload)
+
 1. **Mobile**: Click "Send Files", select `document.pdf`
    - Upload progress shows
    - Mobile shows: **Sent** message (right, purple) ✅
@@ -92,12 +98,14 @@ useEffect(() => {
 ## 🧪 Testing
 
 ### Test Received Messages on Desktop:
+
 1. Open desktop app
 2. From mobile, click "Send Files" and upload a file
 3. Check desktop - you should see a **white/gray bubble on the left** with the file name
 4. Restart the app - message should still be there!
 
 ### Test Received Messages on Mobile:
+
 1. From desktop, select files to share
 2. Scan QR on mobile
 3. Click "Receive Files"
@@ -107,6 +115,7 @@ useEffect(() => {
 ## 🎨 Visual Guide
 
 ### Desktop Chat:
+
 ```
 ┌──────────────────────────┐
 │ 💬 File Transfer Chat    │
@@ -129,6 +138,7 @@ useEffect(() => {
 ```
 
 ### Mobile Chat:
+
 ```
 ┌──────────────────────────┐
 │ 💬 File Transfer Chat    │
@@ -181,6 +191,7 @@ useEffect(() => {
 ## 🚀 Ready to Test!
 
 The changes are live! Try:
+
 1. Upload a file from mobile → Check desktop for received message
 2. Download a file on mobile → Check mobile for received message
 3. Refresh/restart → Messages should persist

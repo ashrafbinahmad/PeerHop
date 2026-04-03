@@ -1,5 +1,5 @@
 # Binaries
-*.exe~
+*.exe
 *.dll
 *.so
 *.dylib
@@ -7,12 +7,15 @@ bin/
 dist/
 release/
 transfer-linux
+builds/
 builds_backup/
-builds/langs/
 
 # Temporary files
 test.txt
+file_list.txt
+peerhop_ui_test.exe
 *.zip
+*.tar.gz
 *.log
 *.wixpdb
 
@@ -32,7 +35,8 @@ ui/build/windows/msix_dist/
 
 # Go
 vendor/
-builds/peerhop.cer
 share_shim/build
 ui/build
 ui/build/windows/msix_dist
+npm-package/
+temp_msix/
