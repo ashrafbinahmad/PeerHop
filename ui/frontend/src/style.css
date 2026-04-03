@@ -12,17 +12,13 @@ body {
   margin: 0;
   color: white;
   font-family:
-    "Nunito",
+    "Inter",
     -apple-system,
     BlinkMacSystemFont,
     "Segoe UI",
-    "Roboto",
-    "Oxygen",
-    "Ubuntu",
-    "Cantarell",
-    "Fira Sans",
-    "Droid Sans",
-    "Helvetica Neue",
+    Roboto,
+    Helvetica,
+    Arial,
     sans-serif;
   -webkit-user-select: none; /* Safari */
   -moz-user-select: none; /* Firefox */
@@ -30,14 +26,6 @@ body {
   user-select: none; /* Standard */
 }
 
-@font-face {
-  font-family: "Nunito";
-  font-style: normal;
-  font-weight: 400;
-  src:
-    local(""),
-    url("assets/fonts/nunito-v16-latin-regular.woff2") format("woff2");
-}
 
 #app {
   height: 100vh;
