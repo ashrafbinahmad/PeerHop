@@ -21,10 +21,16 @@ export const TransactionActions = ({
   isOnBlueBubble?: boolean;
   onOpen?: (filename: string) => void;
 }) => {
-  // Use provided filePath or fall back to transaction.filename
-  const resolvedPath = filePath || transaction.filename || "";
+  // Use provided filePath or fall back to transaction absolute paths
+  const resolvedPath =
+    filePath ||
+    transaction.serverFilePath ||
+    transaction.savedInLocation ||
+    transaction.filename ||
+    "";
 
   const handleShowInFolder = async () => {
+    console.log("Show in Folder: resolvedPath =", resolvedPath);
     try {
       await ShowInFolder(resolvedPath);
     } catch (err) {
