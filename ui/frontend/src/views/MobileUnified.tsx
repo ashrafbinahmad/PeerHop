@@ -1398,6 +1398,7 @@ export const MobileUnified: React.FC<Props> = ({
                   type="text"
                   value={textInput}
                   onChange={(e) => setTextInput(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleSendText()}
                   placeholder={
                     isSendingDisabled
                       ? t("sending_disabled")
