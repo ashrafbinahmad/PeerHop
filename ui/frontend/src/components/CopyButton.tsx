@@ -19,6 +19,7 @@ export const CopyButton: React.FC<CopyButtonProps> = ({
   const [copied, setCopied] = useState(false);
 
   const handleCopy = (e: React.MouseEvent) => {
+    e.preventDefault();
     e.stopPropagation();
 
     // Fallback copy mechanism
@@ -59,6 +60,7 @@ export const CopyButton: React.FC<CopyButtonProps> = ({
 
   return (
     <button
+      type="button"
       onClick={handleCopy}
       className={`${className} relative flex items-center justify-center transition-colors`}
       title={copied ? "Copied!" : title}

@@ -88,14 +88,12 @@ export const ChatPanel = ({
     null,
   );
   const [removeFromHistoryOnly, setRemoveFromHistoryOnly] = useState(true);
+  // SCROLL — column-reverse: scrollTop=0 is bottom
   const handleScroll = () => {
     if (!scrollContainerRef.current) return;
-    const { scrollTop, scrollHeight, clientHeight } =
-      scrollContainerRef.current;
-
-    const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
-    // If we're within 100px of the bottom, consider us "at the bottom"
-    isUserAtBottomRef.current = distanceFromBottom < 10;
+    const el = scrollContainerRef.current;
+    const isAtBottom = Math.abs(el.scrollTop) < 10;
+    isUserAtBottomRef.current = isAtBottom;
   };
 
   return (
@@ -133,13 +131,13 @@ export const ChatPanel = ({
         }}
       />
 
-      {/* MESSAGES AREA */}
+      {/* MESSAGES AREA — column-reverse anchors scroll to bottom natively */}
       <div
         ref={scrollContainerRef}
         onScroll={handleScroll}
-        className="flex-1 overflow-y-auto px-4 py-2 pt-16 flex flex-col scroll-smooth custom-scrollbar w-full overflow-hidden hide-scrollbar"
+        className="flex-1 overflow-y-auto px-4 py-2 pt-16 flex flex-col-reverse scroll-smooth custom-scrollbar w-full overflow-hidden hide-scrollbar"
       >
-        <div className="mt-auto flex flex-col gap-1">
+        <div className="flex flex-col gap-1">
           {visibleTransactions.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full gap-6 animate-in fade-in zoom-in-95 duration-500 my-auto pb-20">
               {/* Big Share File Button */}
@@ -204,19 +202,19 @@ export const ChatPanel = ({
                 if (client) clientPlatform = client.platform;
               }
 
-              const prevIsMe = index > 0 && visibleTransactions[index - 1].senderId === "server";
+              const senderChanged = index > 0 && visibleTransactions[index - 1].senderId !== transaction.senderId;
               const isLast = index === visibleTransactions.length - 1;
-              const needsTopMargin = !isMe && prevIsMe;
-              const needsBottomMargin = !isMe && isLast;
+              const needsTopMargin = senderChanged;
+              const needsBottomMargin = isLast;
 
               return (
                 <div
                   key={transaction.id}
-                  className={`flex ${alignClass} animate-in fade-in slide-in-from-bottom-2 duration-300 gap-2 items-end ${
+                  className={`flex ${alignClass} group animate-in fade-in slide-in-from-bottom-2 duration-300 gap-2 items-end ${
                     needsTopMargin ? "mt-4" : ""
                   } ${needsBottomMargin ? "mb-10" : ""}`}
                 >
-                  {/* Avatar for Client (Left Side) */}
+                  {/* Left-side tools: Avatar for receiver, OR CopyButton for sender */}
                   {!isMe && (
                     <div
                       className={`shrink-0 w-8 h-8 rounded-full flex items-center justify-center overflow-hidden mb-1 ${theme.iconBg} ${theme.iconText}`}
@@ -224,6 +222,43 @@ export const ChatPanel = ({
                       <PlatformIcon
                         platform={clientPlatform || "unknown"}
                         size={16}
+                      />
+                    </div>
+                  )}
+
+                  {isMe && transaction.type === "text" && (
+                    <div className="flex flex-row gap-0.5 items-center mb-1 shrink-0">
+                      {/* Delete Button */}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          if (transaction.status === "cancelled" || transaction.status === "failed") {
+                            deleteTransaction(transaction.id, false);
+                          } else {
+                            setTransactionToDelete(transaction);
+                          }
+                        }}
+                        className={`p-1.5 rounded-full transition-all duration-300 ${
+                          isDarkMode
+                            ? "text-slate-500 hover:bg-red-500/10 hover:text-red-400"
+                            : "text-gray-400 hover:bg-red-50 hover:text-red-500"
+                        } active:scale-90 opacity-0 group-hover:opacity-100`}
+                        title="Delete"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+
+                      {/* Copy Button */}
+                      <CopyButton
+                        text={transaction.textContent || ""}
+                        className={`p-1.5 rounded-full transition-all duration-300 ${
+                          isDarkMode
+                            ? "text-slate-500 hover:bg-slate-800 hover:text-slate-300"
+                            : "text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                        } hover:rotate-6 active:scale-90`}
+                        iconSize={14}
                       />
                     </div>
                   )}
@@ -242,20 +277,7 @@ export const ChatPanel = ({
 
                     <div className="relative z-10">
                       {transaction.type === "text" && (
-                        <div className="relative min-w-12  max-w-[calc(100vw-145px)] md:max-w-[calc(100vw-420px)] lg:max-w-[calc(100vw-545px)] max-h-[300px] overflow-y-auto custom-scrollbar">
-                          <div className="sticky top-0 right-0 float-right z-10 ml-2">
-                            <CopyButton
-                              text={transaction.textContent || ""}
-                              className={`p-1 rounded-full ${
-                                isMe
-                                  ? "text-white/70 hover:bg-white/20"
-                                  : isDarkMode
-                                    ? "text-slate-400 hover:bg-slate-700 hover:text-slate-300"
-                                    : "text-gray-400 hover:bg-gray-100 hover:text-gray-600"
-                              }`}
-                              iconSize={12}
-                            />
-                          </div>
+                        <div className="min-w-12 max-w-[calc(100vw-185px)] md:max-w-[calc(100vw-450px)] lg:max-w-[calc(100vw-575px)] max-h-[300px] overflow-y-auto overflow-x-auto custom-scrollbar">
                           <div className="text-[13px] leading-relaxed whitespace-break-spaces">
                             {transaction.textContent}
                           </div>
@@ -614,7 +636,44 @@ export const ChatPanel = ({
                     </div>
                   </div>
 
-                  {/* Avatar for Server (Right Side) */}
+                  {/* Right-side tools: CopyButton/Delete for receiver, OR Avatar for sender */}
+                  {!isMe && transaction.type === "text" && (
+                    <div className="flex flex-row gap-0.5 items-center mb-1 shrink-0">
+                      {/* Copy Button (Kept closer to the bubble) */}
+                      <CopyButton
+                        text={transaction.textContent || ""}
+                        className={`p-1.5 rounded-full transition-all duration-300 ${
+                          isDarkMode
+                            ? "text-slate-500 hover:bg-slate-800 hover:text-slate-300"
+                            : "text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                        } hover:-rotate-6 active:scale-90`}
+                        iconSize={14}
+                      />
+
+                      {/* Delete Button (On the outer edge) */}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          if (transaction.status === "cancelled" || transaction.status === "failed") {
+                            deleteTransaction(transaction.id, false);
+                          } else {
+                            setTransactionToDelete(transaction);
+                          }
+                        }}
+                        className={`p-1.5 rounded-full transition-all duration-300 ${
+                          isDarkMode
+                            ? "text-slate-500 hover:bg-red-500/10 hover:text-red-400"
+                            : "text-gray-400 hover:bg-red-50 hover:text-red-500"
+                        } active:scale-90 opacity-0 group-hover:opacity-100`}
+                        title="Delete"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
+                  )}
+
                   {isMe && (
                     <div
                       className={`shrink-0 w-8 h-8 rounded-full flex items-center justify-center overflow-hidden mb-1 ${theme.iconBg} ${theme.iconText}`}

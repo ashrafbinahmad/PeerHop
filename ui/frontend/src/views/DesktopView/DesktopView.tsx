@@ -710,8 +710,8 @@ export const DesktopView = () => {
   }, [securityEnabled]);
 
   useEffect(() => {
-    if (isUserAtBottomRef.current) {
-      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (isUserAtBottomRef.current && scrollContainerRef.current) {
+      scrollContainerRef.current.scrollTo({ top: 0, behavior: "smooth" });
     }
   }, [transactions, showTextInput]);
 

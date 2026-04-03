@@ -247,21 +247,21 @@ export const MobileUnified: React.FC<Props> = ({
     document.title = `${deviceName} - PeerHop client`;
   }, [deviceName]);
 
-  // SCROLL
+  // SCROLL — column-reverse: scrollTop=0 is bottom, negative values = scrolled up
   const handleScroll = () => {
     if (!scrollContainerRef.current) return;
-    const { scrollTop, scrollHeight, clientHeight } =
-      scrollContainerRef.current;
-
-    const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
-    const isAtBottom = distanceFromBottom < 10;
-
+    const el = scrollContainerRef.current;
+    // In column-reverse, scrollTop is 0 at the bottom (newest msgs visible)
+    // and becomes negative as user scrolls up to see older messages
+    const isAtBottom = Math.abs(el.scrollTop) < 10;
     isUserAtBottomRef.current = isAtBottom;
     setShowScrollButton(!isAtBottom);
   };
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollTo({ top: 0, behavior: "smooth" });
+    }
   };
 
   useEffect(() => {
@@ -465,6 +465,7 @@ export const MobileUnified: React.FC<Props> = ({
   };
 
   const handleDownload = (e: React.MouseEvent, transaction: any) => {
+    e.preventDefault();
     e.stopPropagation();
 
     // Check if blocked
@@ -504,6 +505,7 @@ export const MobileUnified: React.FC<Props> = ({
   };
 
   const handleCancelDownload = (e: React.MouseEvent, transaction: any) => {
+    e.preventDefault();
     e.stopPropagation();
     setTransactionToCancel(transaction);
     setShowCancelConfirm(true);
@@ -543,7 +545,10 @@ export const MobileUnified: React.FC<Props> = ({
     fileInputRef.current?.click();
   };
 
-  const handleSendText = async () => {
+  const handleSendText = async (e?: React.FormEvent | React.MouseEvent) => {
+    if (e) {
+      e.preventDefault();
+    }
     if (isSendingDisabled) return;
     if (!textInput.trim()) return;
     try {
@@ -698,7 +703,7 @@ export const MobileUnified: React.FC<Props> = ({
               {t("connection_lost")}
             </span>
           </div>
-          <button
+          <button type="button"
             onClick={() => window.location.reload()}
             className="bg-white text-red-600 active:scale-95 p-1.5 rounded-full font-bold transition-all flex items-center gap-2 text-xs shadow-sm"
           >
@@ -709,19 +714,19 @@ export const MobileUnified: React.FC<Props> = ({
         <div />
       )}
 
-      {/* MESSAGES */}
+      {/* MESSAGES — column-reverse anchors scroll to bottom natively */}
       <div
         ref={scrollContainerRef}
         onScroll={handleScroll}
-        className="flex-1 overflow-y-auto px-2 py-2 pt-16 flex flex-col scroll-smooth relative custom-scrollbar min-h-0"
+        className="flex-1 overflow-y-auto px-2 py-2 flex flex-col-reverse scroll-smooth relative custom-scrollbar min-h-0"
       >
-        <div className="mt-auto flex flex-col gap-4 pb-2">
+        <div className="flex flex-col gap-1">
           {visibleTransactions.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full gap-6 animate-in fade-in zoom-in-95 duration-500 pb-20 mt-auto mb-auto">
               {!isSendingDisabled ? (
                 <>
                   {/* Big Share File Button */}
-                  <button
+                  <button type="button"
                     onClick={handleSelectFiles}
                     disabled={isSendingDisabled}
                     className={`group relative flex flex-col items-center justify-center gap-4 w-64 h-52 rounded-2xl border shadow-sm transition-all duration-300 active:scale-[0.98] ${
@@ -749,7 +754,7 @@ export const MobileUnified: React.FC<Props> = ({
 
                   {/* Small Send Text Button - Only if enabled */}
                   {textTransferEnabled && (
-                    <button
+                    <button type="button"
                       onClick={() => {
                         setShowTextInput(true);
                       }}
@@ -794,7 +799,7 @@ export const MobileUnified: React.FC<Props> = ({
               )}
             </div>
           ) : (
-            visibleTransactions.map((transaction) => {
+            visibleTransactions.map((transaction, index) => {
               const isMe = transaction.senderId === myIp;
               const isRightSide = isMe;
               const isFile = transaction.type === "file";
@@ -804,6 +809,11 @@ export const MobileUnified: React.FC<Props> = ({
               const widthClass = isFile
                 ? "w-[calc(95vw-80px)] max-w-[500px]"
                 : "w-fit max-w-[500px] text-left";
+
+              const senderChanged = index > 0 && visibleTransactions[index - 1].senderId !== transaction.senderId;
+              const isLast = index === visibleTransactions.length - 1;
+              const needsTopMargin = senderChanged;
+              const needsBottomMargin = isLast;
 
               // Progress logic - use client-specific for downloads
               const currentFilename = transaction.filename || "";
@@ -938,9 +948,9 @@ export const MobileUnified: React.FC<Props> = ({
                   key={transaction.id}
                   className={`flex gap-2 items-end ${
                     isRightSide ? "justify-end" : "justify-start"
-                  }`}
+                  } ${needsTopMargin ? "mt-4" : ""}`}
                 >
-                  {/* Avatar for LEFT side */}
+                  {/* Avatar for LEFT side: Client (if !isMe) OR CopyButton (if isMe) */}
                   {!isRightSide && (
                     <div
                       className={`shrink-0 w-8 h-8 rounded-full flex items-center justify-center overflow-hidden mb-1 ${theme.avatarBg}`}
@@ -951,6 +961,16 @@ export const MobileUnified: React.FC<Props> = ({
                         <User size={16} />
                       )}
                     </div>
+                  )}
+
+                  {isRightSide && transaction.type === "text" && (
+                     <div className="mb-2 shrink-0">
+                        <CopyButton
+                          text={transaction.textContent || ""}
+                          className={`p-1 rounded-full text-white/50 active:scale-95`}
+                          iconSize={14}
+                        />
+                     </div>
                   )}
 
                   <div
@@ -982,19 +1002,8 @@ export const MobileUnified: React.FC<Props> = ({
                     <div className="p-3 relative z-10">
                       {/* TEXT */}
                       {transaction.type === "text" && (
-                        <div className="flex items-start gap-2">
-                          <div className="text-[16px] break-words">
-                            {transaction.textContent}
-                          </div>
-                          <CopyButton
-                            text={transaction.textContent || ""}
-                            className={`p-1 rounded-full ${
-                              isMe
-                                ? "text-white/70 hover:bg-white/20"
-                                : "text-gray-400 hover:text-gray-600 dark:text-slate-400 dark:hover:text-slate-200"
-                            }`}
-                            iconSize={14}
-                          />
+                        <div className="text-[16px] whitespace-break-spaces overflow-x-auto overflow-y-auto max-h-[300px] custom-scrollbar">
+                          {transaction.textContent}
                         </div>
                       )}
 
@@ -1254,7 +1263,7 @@ export const MobileUnified: React.FC<Props> = ({
 
                           {/* Upload Cancel Button - Same size/space as download */}
                           {isMe && transaction.status === "in_progress" && (
-                            <button
+                            <button type="button"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 handleCancelUpload();
@@ -1275,7 +1284,7 @@ export const MobileUnified: React.FC<Props> = ({
                             <>
                               {effectiveStatus === "in_progress" ? (
                                 // Cancel button during download
-                                <button
+                                <button type="button"
                                   onClick={(e) =>
                                     handleCancelDownload(e, transaction)
                                   }
@@ -1290,7 +1299,7 @@ export const MobileUnified: React.FC<Props> = ({
                                 </button>
                               ) : (
                                 // Download button when not downloading
-                                <button
+                                <button type="button"
                                   onClick={(e) =>
                                     handleDownload(e, transaction)
                                   }
@@ -1352,7 +1361,17 @@ export const MobileUnified: React.FC<Props> = ({
                     </div>
                   </div>
 
-                  {/* Avatar for RIGHT side */}
+                  {/* Avatar for RIGHT side: CopyButton (if !isMe) OR Smartphone (if isMe) */}
+                  {!isRightSide && transaction.type === "text" && (
+                     <div className="mb-2 shrink-0">
+                        <CopyButton
+                          text={transaction.textContent || ""}
+                          className={`p-1 rounded-full text-gray-400 dark:text-slate-500 active:scale-95`}
+                          iconSize={14}
+                        />
+                     </div>
+                  )}
+
                   {isRightSide && (
                     <div className="shrink-0 w-8 h-8 rounded-full bg-[#007AFF]/20 flex items-center justify-center text-[#007AFF] overflow-hidden mb-1">
                       <Smartphone size={16} />
@@ -1389,7 +1408,7 @@ export const MobileUnified: React.FC<Props> = ({
                   }`}
                   autoFocus
                 />
-                <button
+                <button type="button"
                   onClick={handleSendText}
                   className={`p-2 rounded-xl text-white transition-colors`}
                   style={{ backgroundColor: theme.accentColor }}
@@ -1403,7 +1422,7 @@ export const MobileUnified: React.FC<Props> = ({
           {visibleTransactions.length > 0 && !isSendingDisabled && (
             <div className="p-4 pt-2">
               <div className="flex gap-3">
-                <button
+                <button type="button"
                   onClick={handleSelectFiles}
                   className={`flex-1 py-3 rounded-xl font-medium flex items-center justify-center gap-2 border transition-colors ${
                     theme.selectBtn
@@ -1417,7 +1436,7 @@ export const MobileUnified: React.FC<Props> = ({
 
                 {/* Toggle Text Input */}
                 {textTransferEnabled && (
-                  <button
+                  <button type="button"
                     onClick={() => {
                       setShowTextInput(!showTextInput);
                       if (!showTextInput) {
