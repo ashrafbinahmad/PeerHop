@@ -14,6 +14,7 @@ import {
   SaveTempFile,
   GetClipboardFiles,
   GetSecureSettings,
+  SelectDownloadPath,
 } from "../../../wailsjs/go/main/App";
 import { main } from "../../../wailsjs/go/models";
 import {
@@ -279,6 +280,10 @@ export const DesktopView = () => {
     const parsed = Number(saved);
     return saved && !Number.isNaN(parsed) && parsed > 0 ? parsed : 9090;
   });
+
+  const [downloadPath, setDownloadPath] = useState<string>(
+    localStorage.getItem("downloadPath") || "",
+  );
 
   const [securityToken, setSecurityToken] = useState<string>("");
   const [adminToken, setAdminToken] = useState<string>("");
@@ -670,7 +675,10 @@ export const DesktopView = () => {
     axios
       .get(`${serverInfo.url}/api/settings?admin=${adminToken}`)
       .then((res) => {
-        // We rely on Wails binding for tokens now
+        if (res.data?.downloadPath) {
+          setDownloadPath(res.data.downloadPath);
+          localStorage.setItem("downloadPath", res.data.downloadPath);
+        }
       })
       .catch((e) => console.error("Failed to fetch settings:", e));
   }, [serverInfo?.url]);
@@ -693,6 +701,7 @@ export const DesktopView = () => {
         securityEnabled,
         staticPortEnabled,
         staticPort,
+        downloadPath,
       })
       .catch((e) => console.error("Failed to sync settings:", e));
   }, [
@@ -700,6 +709,7 @@ export const DesktopView = () => {
     securityEnabled,
     staticPortEnabled,
     staticPort,
+    downloadPath,
     serverInfo?.url,
     adminToken,
   ]);
@@ -708,6 +718,10 @@ export const DesktopView = () => {
   useEffect(() => {
     localStorage.setItem("securityEnabled", String(securityEnabled));
   }, [securityEnabled]);
+
+  useEffect(() => {
+    localStorage.setItem("downloadPath", downloadPath);
+  }, [downloadPath]);
 
   useEffect(() => {
     if (isUserAtBottomRef.current && scrollContainerRef.current) {
@@ -1159,6 +1173,8 @@ export const DesktopView = () => {
                 setNotification={setNotification}
                 deviceName={deviceName}
                 onUpdateDeviceName={handleUpdateDesktopName}
+                downloadPath={downloadPath}
+                setDownloadPath={setDownloadPath}
                 userEmail={userEmail}
               />
             ) : (

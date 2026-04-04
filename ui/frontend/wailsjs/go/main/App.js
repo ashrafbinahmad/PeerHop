@@ -38,6 +38,10 @@ export function SaveTempFile(arg1, arg2) {
   return window['go']['main']['App']['SaveTempFile'](arg1, arg2);
 }
 
+export function SelectDownloadPath(arg1) {
+  return window['go']['main']['App']['SelectDownloadPath'](arg1);
+}
+
 export function SelectFiles() {
   return window['go']['main']['App']['SelectFiles']();
 }

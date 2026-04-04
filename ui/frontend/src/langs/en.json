@@ -104,5 +104,6 @@
   "tap_to_hide_qr": "Tap to hide connection details",
   "general": "General",
   "host_name": "Device",
+  "download_location": "Download Location",
   "do_not_reload_upload": "Please do not close or reload the page while sending"
 }

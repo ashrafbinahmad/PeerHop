@@ -21,6 +21,8 @@ export function RestartServer():Promise<main.ServerInfo>;
 
 export function SaveTempFile(arg1:string,arg2:string):Promise<string>;
 
+export function SelectDownloadPath(arg1:string):Promise<string>;
+
 export function SelectFiles():Promise<Array<string>>;
 
 export function ShowInFolder(arg1:string):Promise<void>;

@@ -17,6 +17,7 @@ type PersistentSettings struct {
 	DesktopDeviceName   string `json:"desktopDeviceName"`
 	StaticPortEnabled   bool   `json:"staticPortEnabled"`
 	StaticPort          int    `json:"staticPort"`
+	DownloadPath        string `json:"downloadPath"`
 }
 
 // SettingsManager handles saving and loading settings
@@ -65,6 +66,13 @@ func (sm *SettingsManager) LoadSettings() PersistentSettings {
 		hostname = "PeerHop"
 	}
 
+	// Default downloads folder
+	downloadsDir := ""
+	homeDir, err := os.UserHomeDir()
+	if err == nil {
+		downloadsDir = filepath.Join(homeDir, "Downloads", "peerhop-desktop")
+	}
+
 	defaults := PersistentSettings{
 		TextTransferEnabled: false,
 		SecurityEnabled:     true,
@@ -74,6 +82,7 @@ func (sm *SettingsManager) LoadSettings() PersistentSettings {
 		DesktopDeviceName:   hostname,
 		StaticPortEnabled:   false,
 		StaticPort:          9090,
+		DownloadPath:        downloadsDir,
 	}
 
 	// Try to read from file
@@ -92,6 +101,11 @@ func (sm *SettingsManager) LoadSettings() PersistentSettings {
 	// If name is empty, use defaults
 	if settings.DesktopDeviceName == "" {
 		settings.DesktopDeviceName = defaults.DesktopDeviceName
+	}
+
+	// If download path is empty, use defaults
+	if settings.DownloadPath == "" {
+		settings.DownloadPath = defaults.DownloadPath
 	}
 
 	return settings

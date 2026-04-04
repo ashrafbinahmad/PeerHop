@@ -147,6 +147,7 @@ type UnifiedHandler struct {
 	WSHub             *WebSocketHub     // WebSocket hub for real-time updates
 	IsDarkMode        bool              // Track current theme
 	DesktopDeviceName string            // Desktop device name (editable)
+	DownloadPath      string            // Persistent download path
 	SecurityToken     string            // Random security token for client API authentication (file transfer, viewing)
 	SecurityEnabled   bool              // Whether security token validation is enabled
 	AdminToken        string            // Random admin token for desktop control operations (settings, theme, blocking)
@@ -518,10 +519,11 @@ func (h *UnifiedHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path == "/api/settings" {
 		if r.Method == http.MethodPost {
 			var req struct {
-				TextTransferEnabled bool `json:"textTransferEnabled"`
-				SecurityEnabled     bool `json:"securityEnabled"`
+				TextTransferEnabled bool   `json:"textTransferEnabled"`
+				SecurityEnabled     bool   `json:"securityEnabled"`
 				StaticPortEnabled   bool   `json:"staticPortEnabled"`
 				StaticPort          int    `json:"staticPort"`
+				DownloadPath        string `json:"downloadPath"`
 			}
 			if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 				http.Error(w, "Invalid body", http.StatusBadRequest)
@@ -554,6 +556,13 @@ func (h *UnifiedHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				settings.SecurityEnabled = req.SecurityEnabled
 				settings.StaticPortEnabled = req.StaticPortEnabled
 				settings.StaticPort = req.StaticPort
+				if req.DownloadPath != "" {
+					settings.DownloadPath = req.DownloadPath
+					h.mu.Lock()
+					h.DownloadPath = req.DownloadPath
+					h.mu.Unlock()
+					logger.Info("Download path updated to: %s", req.DownloadPath)
+				}
 				h.SettingsManager.SaveSettings(settings)
 			}
 
@@ -585,13 +594,15 @@ func (h *UnifiedHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			"securityEnabled":     securityEnabled,
 			"staticPortEnabled":   false, // Initial fallback
 			"staticPort":          9090,  // Initial fallback
-			"isDesktop":           isWailsDesktop, 
+			"downloadPath":        "",    // Initial fallback
+			"isDesktop":           isWailsDesktop,
 		}
 
 		if h.SettingsManager != nil {
 			settings := h.SettingsManager.LoadSettings()
 			response["staticPortEnabled"] = settings.StaticPortEnabled
 			response["staticPort"] = settings.StaticPort
+			response["downloadPath"] = settings.DownloadPath
 		}
 		// Security Token is NO LONGER returned here
 		// Mobile clients MUST obtain token via QR Code URL
@@ -1439,7 +1450,19 @@ func (h *UnifiedHandler) handleUpload(w http.ResponseWriter, r *http.Request) {
 	var saved []string
 	var transactionIDs []int
 	var currentFileSize int64
-	downloadsDir := getDownloadsDir()
+
+	// Load download directory from memory/settings
+	h.mu.RLock()
+	downloadsDir := h.DownloadPath
+	h.mu.RUnlock()
+
+	// Fallback to default if not set
+	if downloadsDir == "" {
+		downloadsDir = getDownloadsDir()
+	}
+
+	// Ensure it exists
+	os.MkdirAll(downloadsDir, 0755)
 
 	for {
 		part, err := reader.NextPart()
@@ -1736,6 +1759,7 @@ func NewUnifiedHandler(devServerURL string) *UnifiedHandler {
 		SecurityToken:     generateSecurityToken(),
 		AdminToken:        generateSecurityToken(), // Separate token for admin operations
 		SecurityEnabled:   savedSettings.SecurityEnabled,
+		DownloadPath:      savedSettings.DownloadPath,
 		SettingsManager:   settingsManager,
 	}
 }

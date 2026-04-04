@@ -11,6 +11,7 @@ import {
   UserStar,
   Coffee,
   Pencil,
+  FolderOpen,
 } from "lucide-react";
 import {
   THEME_PRESETS,
@@ -22,6 +23,7 @@ import {
 import { CopyButton } from "../../components/CopyButton";
 import { Switch } from "../../components/Switch";
 import { EditableDeviceName } from "./EditableDeviceName";
+import { SelectDownloadPath } from "../../../wailsjs/go/main/App";
 import { FeatureRequestForm } from "./FeatureRequestForm";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
 import type { Client } from "../../hooks/useDevices";
@@ -61,6 +63,8 @@ interface SettingsPanelProps {
   setNotification: (notification: { show: boolean; message: string }) => void;
   deviceName: string;
   onUpdateDeviceName: (name: string) => void;
+  downloadPath: string;
+  setDownloadPath: (val: string) => void;
   userEmail: string;
 }
 
@@ -95,6 +99,9 @@ export const SettingsPanel = ({
   setNotification,
   deviceName,
   onUpdateDeviceName,
+  downloadPath,
+  setDownloadPath,
+  userEmail,
 }: SettingsPanelProps) => {
   const { t } = useTranslation();
   const [isFeatureDrawerOpen, setFeatureDrawerOpen] = React.useState(false);
@@ -165,6 +172,18 @@ export const SettingsPanel = ({
       setNameInputValue(deviceName);
     }
     setIsEditingName(false);
+  };
+ 
+  const handleSelectDownloadPath = async (current: string) => {
+    try {
+      const path = await SelectDownloadPath(current);
+      if (path) {
+        setDownloadPath(path);
+        logActivity("settings_changed", `Download location changed to: ${path}`);
+      }
+    } catch (err) {
+      console.error("Failed to select download path:", err);
+    }
   };
 
   const ADDITIONAL_ACTIONS = [
@@ -314,6 +333,39 @@ export const SettingsPanel = ({
                       </button>
                     </div>
                   )}
+                </div>
+              </div>
+            </div>
+
+            {/* Download Location Setting */}
+            <div className="w-full relative pt-5 mt-2">
+              <div className={`absolute top-0 left-0 right-0 h-[1px] ${isDarkMode ? "bg-slate-700/80" : "bg-gray-300/50"}`} />
+              <div className="flex items-center gap-8 group">
+                <div className="min-w-0">
+                  <p className={`text-sm font-medium ${theme.text}`}>
+                    {t("download_location") || "Download Location"}
+                  </p>
+                  <p
+                    className={`text-[11px] mt-0.5 transition-all truncate max-w-[220px] ${theme.subText} ${isDarkMode ? "opacity-60" : "opacity-80"}`}
+                    title={downloadPath}
+                  >
+                    {downloadPath}
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => handleSelectDownloadPath(downloadPath)}
+                    className={`p-1.5 px-3 rounded-lg transition-all flex items-center gap-2 group/btn shrink-0 ${
+                      isDarkMode
+                        ? "bg-slate-800 hover:bg-slate-700 text-slate-300"
+                        : "bg-gray-100 hover:bg-gray-200 text-gray-600"
+                    }`}
+                    title="Change Location"
+                  >
+                    <FolderOpen size={13} />
+                    <span className="text-[11px] font-medium">Change</span>
+                  </button>
                 </div>
               </div>
             </div>

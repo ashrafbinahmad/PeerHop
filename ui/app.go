@@ -227,6 +227,20 @@ func (a *App) SelectFiles() ([]string, error) {
 	return selection, err
 }
 
+// SelectDownloadPath opens a dialog to select a directory for downloads
+func (a *App) SelectDownloadPath(currentPath string) (string, error) {
+	// If current path is set but doesn't exist, create it so dialog can open there
+	if currentPath != "" {
+		os.MkdirAll(currentPath, 0755)
+	}
+
+	selection, err := runtime.OpenDirectoryDialog(a.ctx, runtime.OpenDialogOptions{
+		Title:            "Select Folder for Received Files",
+		DefaultDirectory: currentPath,
+	})
+	return selection, err
+}
+
 const (
 	defaultWindowsStoreProductID = "9N5VVVHD710V"
 )
@@ -396,8 +410,9 @@ func removeZoneIdentifier(filePath string) {
 func (a *App) OpenSourceFile(filePath string) error {
 
 	if !filepath.IsAbs(filePath) {
-		home, _ := os.UserHomeDir()
-		dlPath := filepath.Join(home, "Downloads", filePath)
+		sm := server.NewSettingsManager()
+		settings := sm.LoadSettings()
+		dlPath := filepath.Join(settings.DownloadPath, filePath)
 
 		if _, err := os.Stat(dlPath); err == nil {
 			filePath = dlPath
@@ -414,8 +429,9 @@ func (a *App) OpenSourceFile(filePath string) error {
 func (a *App) ShowInFolder(filePath string) error {
 	// Resolve path
 	if !filepath.IsAbs(filePath) {
-		home, _ := os.UserHomeDir()
-		dlPath := filepath.Join(home, "Downloads", filePath)
+		sm := server.NewSettingsManager()
+		settings := sm.LoadSettings()
+		dlPath := filepath.Join(settings.DownloadPath, filePath)
 		if _, err := os.Stat(dlPath); err == nil {
 			filePath = dlPath
 		}
@@ -426,8 +442,9 @@ func (a *App) ShowInFolder(filePath string) error {
 // ShowOpenWithDialog opens the native Windows "Open With" dialog for a file
 func (a *App) ShowOpenWithDialog(filePath string) error {
 	if !filepath.IsAbs(filePath) {
-		home, _ := os.UserHomeDir()
-		dlPath := filepath.Join(home, "Downloads", filePath)
+		sm := server.NewSettingsManager()
+		settings := sm.LoadSettings()
+		dlPath := filepath.Join(settings.DownloadPath, filePath)
 		if _, err := os.Stat(dlPath); err == nil {
 			filePath = dlPath
 		}
