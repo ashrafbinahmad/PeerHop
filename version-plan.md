@@ -78,5 +78,15 @@
 
 
 
+* make qr code smaller if not security enabled -Done
+* add settings for file saving location
+* when restarting don't hide edit custom port button, just disable it
+* remove short from feature request, make description to feature description - feature description should be required
+* add option for custom color theme and accent color
+* make swith height and width less
+* remove icon from settings heading
+* when a device connected show two connect via qr code and connect via link to windows, Linux, mac which should show link only
+* when no device connected instead of showing url and copy button show connect to windows, Linux, mac button which toggles showing url and copy button, make that url fully visible 
+* if there is mobile hotspot in the device try turning it on and show the hotspot name with network name
 * 
 

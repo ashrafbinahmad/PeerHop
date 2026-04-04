@@ -40,6 +40,12 @@ export const QRPanel = ({
   const { t } = useTranslation();
   const [showDetails, setShowDetails] = useState(false);
 
+  // Dynamic sizing based on security status
+  const qrSize = securityEnabled ? 200 : 160;
+  const logoSize = securityEnabled ? 30 : 24;
+  const containerWidthClass = securityEnabled ? "w-[200px]" : "w-[160px]";
+  const gapClass = securityEnabled ? "gap-8" : "gap-6";
+
   // If no clients, always show details. If clients exist, only show if toggled.
   const isVisible = clients.length === 0 || showDetails;
   if (!serverInfo) {
@@ -184,7 +190,7 @@ export const QRPanel = ({
 
           {/* QR Section - Always show to allow multi-client connections */}
           <div>
-            <div className="flex flex-col items-center gap-8">
+            <div className={`flex flex-col items-center ${gapClass}`}>
               <div className="relative group">
                 <div
                   className={`p-1 rounded-2.5xl transition-all duration-700 ${
@@ -200,7 +206,7 @@ export const QRPanel = ({
                           ? `${serverInfo.url}?security=${securityToken}`
                           : serverInfo.url
                         : "",
-                      size: 200,
+                      size: qrSize,
                       quietZone: 0,
                       qrStyle: "dots",
                       fgColor: isDarkMode ? "#fff" : "#1b2636",
@@ -208,7 +214,7 @@ export const QRPanel = ({
                       logoImage: logo,
                       logoPaddingRadius: 1,
                       logoPadding: 1,
-                      logoWidth: 30,
+                      logoWidth: logoSize,
                       logoPaddingStyle: "circle",
                       logoOpacity: 1,
                       ecLevel: "H",
@@ -222,7 +228,7 @@ export const QRPanel = ({
 
               {/* URL and Copy part */}
               {serverInfo?.url ? (
-                <div className="w-[200px] space-y-4 pt-1">
+                <div className={`${containerWidthClass} space-y-4 pt-1`}>
                   <div
                     className={`flex items-center justify-between gap-3 pl-3 pr-1 py-1 rounded-xl transition-all duration-300 ${
                       isDarkMode
@@ -266,7 +272,7 @@ export const QRPanel = ({
                     )}
                 </div>
               ) : (
-                <div className="w-[200px] flex items-center justify-center gap-2 py-4 animate-pulse">
+                <div className={`${containerWidthClass} flex items-center justify-center gap-2 py-4 animate-pulse`}>
                   <div className="w-1.5 h-1.5 rounded-full bg-current opacity-30"></div>
                   <p className={`text-xs font-medium ${theme.subText}`}>
                     {t("waiting_network")}
