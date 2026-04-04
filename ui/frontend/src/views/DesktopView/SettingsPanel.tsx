@@ -498,7 +498,7 @@ export const SettingsPanel = ({
                             isDarkMode
                               ? "hover:bg-slate-700 text-slate-300"
                               : "hover:bg-gray-100 text-gray-500"
-                          } ${isCheckingNetwork ? "cursor-not-allowed hidden" : ""}`}
+                          } ${isCheckingNetwork ? "cursor-not-allowed opacity-20" : ""}`}
                         >
                           <Pencil size={12} />
                         </button>
