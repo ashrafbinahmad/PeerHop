@@ -116,31 +116,9 @@ async function main() {
   log(`\nPublishing PeerHop v${version}`, "cyan");
   log("================================\n", "cyan");
 
-  // Verify builds exist
-  const requiredFiles = [
-    "builds/peerhop_win.exe",
-    "builds/peerhop_setup.exe",
-    "builds/peerhop_setup.msi",
-    "builds/peerhop_cli_win.exe",
-    "builds/peerhop_cli_linux",
-    "builds/peerhop_store.msix",
-  ];
-
-  log("Checking for build files...", "yellow");
-  let allPresent = true;
-  for (const file of requiredFiles) {
-    if (!fs.existsSync(file)) {
-      error(`Missing: ${file}`);
-      allPresent = false;
-    }
-  }
-
-  if (!allPresent) {
-    error("\nBuild files are missing!");
-    log("Please run: npm run prepublish <version>", "yellow");
-    process.exit(1);
-  }
-  success("All build files present\n");
+  // Build check removed per request
+  log("Skipping build file verification...", "yellow");
+  success("Proceeding to publish operations\n");
 
   // Step 1: Update frontend versions
   step(1, 7, "Updating frontend versions...");
@@ -219,15 +197,26 @@ async function main() {
   if (!fs.existsSync(npmBinDir)) {
     fs.mkdirSync(npmBinDir, { recursive: true });
   }
-  fs.copyFileSync(
-    "builds/peerhop_cli_win.exe",
-    path.join(npmBinDir, "peerhop-win.exe"),
-  );
-  fs.copyFileSync(
-    "builds/peerhop_cli_linux",
-    path.join(npmBinDir, "peerhop-linux"),
-  );
-  success("Copied CLI binaries to npm-package/bin\n");
+
+  if (fs.existsSync("builds/peerhop_cli_win.exe")) {
+    fs.copyFileSync(
+      "builds/peerhop_cli_win.exe",
+      path.join(npmBinDir, "peerhop-win.exe"),
+    );
+  } else {
+    log("Warning: builds/peerhop_cli_win.exe missing, skipping npm copy.", "yellow");
+  }
+
+  if (fs.existsSync("builds/peerhop_cli_linux")) {
+    fs.copyFileSync(
+      "builds/peerhop_cli_linux",
+      path.join(npmBinDir, "peerhop-linux"),
+    );
+  } else {
+    log("Warning: builds/peerhop_cli_linux missing, skipping npm copy.", "yellow");
+  }
+  
+  success("Finished copying available CLI binaries to npm-package/bin\n");
 
   // Step 6: Create Github Release and Upload Assets
   step(6, 7, "Publishing to GitHub Releases...");
