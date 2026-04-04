@@ -160,6 +160,7 @@ export const SettingsPanel = ({
 
   const [isEditingName, setIsEditingName] = React.useState(false);
   const [nameInputValue, setNameInputValue] = React.useState(deviceName);
+  const [isRestartConfirmOpen, setIsRestartConfirmOpen] = React.useState(false);
 
   React.useEffect(() => {
     if (!isEditingName) {
@@ -574,7 +575,13 @@ export const SettingsPanel = ({
               </div>
               <div className="pt-2">
                 <button
-                  onClick={handleRestartServer}
+                  onClick={() => {
+                    if (hasActiveConnections) {
+                      setIsRestartConfirmOpen(true);
+                    } else {
+                      handleRestartServer();
+                    }
+                  }}
                   disabled={isCheckingNetwork}
                   className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${
                     theme.iconBg
@@ -720,6 +727,21 @@ export const SettingsPanel = ({
           }
         }}
         onCancel={() => setPendingAction(null)}
+        destructive={true}
+        isDarkMode={isDarkMode}
+      />
+      {/* Server Restart Confirmation */}
+      <ConfirmDialog
+        isOpen={isRestartConfirmOpen}
+        title={t("restart_confirmation_title")}
+        message={t("restart_confirmation_message")}
+        confirmText={t("proceed_and_restart")}
+        cancelText={t("cancel")}
+        onConfirm={() => {
+          handleRestartServer();
+          setIsRestartConfirmOpen(false);
+        }}
+        onCancel={() => setIsRestartConfirmOpen(false)}
         destructive={true}
         isDarkMode={isDarkMode}
       />

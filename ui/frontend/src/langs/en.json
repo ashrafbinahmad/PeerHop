@@ -117,5 +117,8 @@
   "connect_mobile": "Connect mobile",
   "connect_mobile_hint": "Android, iOS, and other mobiles",
   "connect_desktop": "Connect desktop",
-  "connect_desktop_hint": "Windows, mac, linux and others"
+  "connect_desktop_hint": "Windows, mac, linux and others",
+  "restart_confirmation_title": "Server Restart Required",
+  "restart_confirmation_message": "Restarting the server will disconnect all devices and clear current transactions. Are you sure you want to proceed?",
+  "proceed_and_restart": "Proceed & Restart"
 }

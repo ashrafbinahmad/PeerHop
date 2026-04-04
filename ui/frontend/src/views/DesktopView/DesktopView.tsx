@@ -1202,6 +1202,7 @@ export const DesktopView = () => {
                 setShowQR={setShowQR}
                 showLink={showLink}
                 setShowLink={setShowLink}
+                transactionsCount={transactions.length}
               />
             )}
           </div>

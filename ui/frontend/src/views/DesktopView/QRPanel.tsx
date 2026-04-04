@@ -7,6 +7,7 @@ import { QRCode } from "react-qrcode-logo";
 import logo from "../../assets/images/appicon.png";
 import { Theme } from "../../themeConstants";
 import { useTranslation } from "../../hooks/useTranslation";
+import { ConfirmDialog } from "../../components/ConfirmDialog";
 
 interface QRPanelProps {
   serverInfo: any;
@@ -25,6 +26,7 @@ interface QRPanelProps {
   setShowQR: (val: boolean) => void;
   showLink: boolean;
   setShowLink: (val: boolean) => void;
+  transactionsCount: number;
 }
 
 export const QRPanel = ({
@@ -44,8 +46,11 @@ export const QRPanel = ({
   setShowQR,
   showLink,
   setShowLink,
+  transactionsCount,
 }: QRPanelProps) => {
   const { t } = useTranslation();
+  const [isRestartConfirmOpen, setIsRestartConfirmOpen] = useState(false);
+  const hasActiveConnections = clients.length > 0 || transactionsCount > 0;
   const prevClientsLength = useRef(clients.length);
 
   // Automatically close any open connection method when a new device connects
@@ -258,7 +263,13 @@ export const QRPanel = ({
 
       <div className="flex justify-center pt-8 mb-20">
         <button
-          onClick={handleRestartServer}
+          onClick={() => {
+            if (hasActiveConnections) {
+              setIsRestartConfirmOpen(true);
+            } else {
+              handleRestartServer();
+            }
+          }}
           disabled={isCheckingNetwork}
           className={`group flex items-center gap-3 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all hover:scale-[1.02] active:scale-[0.98] ${theme.ghostHover} ${isCheckingNetwork ? "opacity-50 cursor-default" : ""}`}
         >
@@ -268,6 +279,21 @@ export const QRPanel = ({
           {isCheckingNetwork ? t("restarting") : t("restart_server")}
         </button>
       </div>
+      {/* Server Restart Confirmation */}
+      <ConfirmDialog
+        isOpen={isRestartConfirmOpen}
+        title={t("restart_confirmation_title")}
+        message={t("restart_confirmation_message")}
+        confirmText={t("proceed_and_restart")}
+        cancelText={t("cancel")}
+        onConfirm={() => {
+          handleRestartServer();
+          setIsRestartConfirmOpen(false);
+        }}
+        onCancel={() => setIsRestartConfirmOpen(false)}
+        destructive={true}
+        isDarkMode={isDarkMode}
+      />
     </React.Fragment>
   );
 };
