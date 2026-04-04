@@ -213,7 +213,7 @@ export const SettingsPanel = ({
 
   return (
     <div
-      className="w-full self-start text-left pt-8 px-2"
+      className="w-full self-start text-left pt-8 px-2 "
       style={{ "--accent-color": activeAccent.color } as React.CSSProperties}
     >
       {/* Left-aligned header */}
@@ -634,7 +634,7 @@ export const SettingsPanel = ({
           </h3>
 
           {/* Theme Cards - Horizontal Scroll */}
-          <div className="flex overflow-x-auto gap-3 mb-2 pb-2 -mx-8 px-7 select-none   hide-scrollbar">
+          <div className="flex overflow-x-auto gap-3 mb-2 pb-2 -mx-4 pl-4 select-none hide-scrollbar">
             {THEME_PRESETS.map((t) => (
               <button
                 key={t.id}
@@ -674,6 +674,7 @@ export const SettingsPanel = ({
                 </div>
               </button>
             ))}
+            <div className="shrink-0 w-4" />
           </div>
 
           {/* Accent Colors */}

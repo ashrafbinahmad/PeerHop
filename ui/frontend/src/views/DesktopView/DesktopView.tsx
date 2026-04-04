@@ -1118,7 +1118,7 @@ export const DesktopView = () => {
       <div
         className={`overflow-x-hidden 
             absolute top-[48px] bottom-0 right-0 w-full z-40 
-            md:relative md:w-[280px] lg:w-[350px] md:border-l md:z-30 md:pr-1 md:shrink-0
+            md:relative md:w-[280px] lg:w-[350px] md:border-l md:z-30  md:shrink-0
             flex-col shadow-xl transition-all duration-300 
             ${theme.panelBg}
             ${
@@ -1130,7 +1130,9 @@ export const DesktopView = () => {
         style={{ "--wails-draggable": "no-drag" } as React.CSSProperties}
       >
         {/* Toggle between Settings and QR Panel */}
-        <div className={`relative flex-1 animate-in slide-in-from-right duration-300 overflow-x-hidden ${isFeatureDrawerOpen ? "overflow-y-hidden" : "overflow-y-auto hide-scrollbar"}`}>
+        <div
+          className={`relative flex-1 animate-in slide-in-from-right duration-300 overflow-x-hidden  ${isFeatureDrawerOpen ? "overflow-y-hidden" : "overflow-y-auto hide-scrollbar"}`}
+        >
           <div className="min-h-full flex flex-col items-center justify-start px-2 py-8 ">
             {activeTab === "settings" ? (
               /* Settings Panel */
