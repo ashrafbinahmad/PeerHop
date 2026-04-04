@@ -1118,8 +1118,8 @@ export const DesktopView = () => {
       <div
         className={`overflow-x-hidden 
             absolute top-[48px] bottom-0 right-0 w-full z-40 
-            md:relative md:w-[280px] lg:w-[350px] md:border-l md:z-30  md:shrink-0
-            flex-col shadow-xl transition-all duration-300 
+            md:relative md:w-[280px] lg:w-[350px] md:z-30  md:shrink-0
+            flex-col transition-all duration-300 
             ${theme.panelBg}
             ${
               activeTab === "qr" || activeTab === "settings"
