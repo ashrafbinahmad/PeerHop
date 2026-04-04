@@ -83,11 +83,11 @@
   "request_feature": "Request feature",
   "name": "Name",
   "email": "Email",
-  "feature_short": "Feature (short)",
-  "feature_description": "Description",
+  "feature_description": "Feature description",
   "cancel": "Cancel",
   "submit": "Submit",
   "error_email_invalid": "Please enter a valid email address.",
-  "error_feature_short_or_description_required": "Feature title or details is required.",
-  "buy_developer_a_coffee": "Buy developer a coffee"
+  "error_feature_description_required": "Feature description is required.",
+  "buy_developer_a_coffee": "Buy developer a coffee",
+  "optional": "Optional"
 }

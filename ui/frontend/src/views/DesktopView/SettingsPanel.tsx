@@ -24,7 +24,6 @@ import { CopyButton } from "../../components/CopyButton";
 import { Switch } from "../../components/Switch";
 import { EditableDeviceName } from "./EditableDeviceName";
 import { SelectDownloadPath } from "../../../wailsjs/go/main/App";
-import { FeatureRequestForm } from "./FeatureRequestForm";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
 import type { Client } from "../../hooks/useDevices";
 import type { ActivityType } from "../../hooks/useActivity";
@@ -66,6 +65,7 @@ interface SettingsPanelProps {
   downloadPath: string;
   setDownloadPath: (val: string) => void;
   userEmail: string;
+  onOpenFeatureRequest: () => void;
 }
 
 export const SettingsPanel = ({
@@ -102,9 +102,9 @@ export const SettingsPanel = ({
   downloadPath,
   setDownloadPath,
   userEmail,
+  onOpenFeatureRequest,
 }: SettingsPanelProps) => {
   const { t } = useTranslation();
-  const [isFeatureDrawerOpen, setFeatureDrawerOpen] = React.useState(false);
   const [isEditingPort, setIsEditingPort] = React.useState(false);
   const [portInputValue, setPortInputValue] = React.useState<string>(
     String(staticPort),
@@ -195,7 +195,7 @@ export const SettingsPanel = ({
     {
       label: t("request_feature"),
       icon: <Lightbulb />,
-      onClick: () => setFeatureDrawerOpen(true),
+      onClick: onOpenFeatureRequest,
     },
     {
       label: t("buy_developer_a_coffee"),
@@ -250,15 +250,6 @@ export const SettingsPanel = ({
           </div> */}
         </div>
 
-        <FeatureRequestForm
-          isOpen={isFeatureDrawerOpen}
-          onClose={() => setFeatureDrawerOpen(false)}
-          logActivity={logActivity}
-          setNotification={setNotification}
-          theme={theme}
-          initialEmail={""}
-          initialName={deviceName}
-        />
 
         {/* General / Profile */}
         <div>

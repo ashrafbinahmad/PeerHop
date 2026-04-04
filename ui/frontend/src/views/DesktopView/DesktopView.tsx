@@ -50,6 +50,7 @@ import { ChatPanel } from "./ChatPanel";
 import { SettingsPanel } from "./SettingsPanel";
 import { QRPanel } from "./QRPanel";
 import { ReferralFeedbackModal } from "../../components/ReferralFeedbackModal";
+import { FeatureRequestForm } from "./FeatureRequestForm";
 import { APP_VERSION } from "../../version";
 
 import { ACCENT_COLORS, THEME_PRESETS } from "../../themeConstants";
@@ -104,6 +105,7 @@ export const DesktopView = () => {
   const [userEmail, setUserEmail] = useState<string>(
     localStorage.getItem("userEmail") || "",
   );
+  const [isFeatureDrawerOpen, setFeatureDrawerOpen] = useState(false);
   const { t, lang } = useTranslation();
 
   const adRef = useRef<HTMLIFrameElement>(null);
@@ -1112,7 +1114,7 @@ export const DesktopView = () => {
       <div
         className={`overflow-x-hidden 
             absolute top-[48px] bottom-0 right-0 w-full z-40 
-            md:static md:w-[280px] lg:w-[350px] md:border-l md:z-30 md:pr-1 md:shrink-0
+            md:relative md:w-[280px] lg:w-[350px] md:border-l md:z-30 md:pr-1 md:shrink-0
             flex-col shadow-xl transition-all duration-300 
             ${theme.panelBg}
             ${
@@ -1124,7 +1126,7 @@ export const DesktopView = () => {
         style={{ "--wails-draggable": "no-drag" } as React.CSSProperties}
       >
         {/* Toggle between Settings and QR Panel */}
-        <div className="relative flex-1 overflow-y-auto hide-scrollbar   animate-in slide-in-from-right duration-300 overflow-x-hidden">
+        <div className={`relative flex-1 animate-in slide-in-from-right duration-300 overflow-x-hidden ${isFeatureDrawerOpen ? "overflow-y-hidden" : "overflow-y-auto hide-scrollbar"}`}>
           <div className="min-h-full flex flex-col items-center justify-start px-2 py-8 ">
             {activeTab === "settings" ? (
               /* Settings Panel */
@@ -1176,6 +1178,7 @@ export const DesktopView = () => {
                 downloadPath={downloadPath}
                 setDownloadPath={setDownloadPath}
                 userEmail={userEmail}
+                onOpenFeatureRequest={() => setFeatureDrawerOpen(true)}
               />
             ) : (
               <QRPanel
@@ -1195,6 +1198,16 @@ export const DesktopView = () => {
             )}
           </div>
         </div>
+
+        <FeatureRequestForm
+          isOpen={isFeatureDrawerOpen}
+          onClose={() => setFeatureDrawerOpen(false)}
+          logActivity={logActivity}
+          setNotification={setNotification}
+          theme={theme}
+          initialEmail={""}
+          initialName={deviceName}
+        />
       </div>
       <ConfirmDialog
         isOpen={!!transactionToCancel}

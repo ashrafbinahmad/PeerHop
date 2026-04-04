@@ -16,7 +16,6 @@ interface FeatureRequestFormProps {
 interface FormErrors {
   name?: string;
   email?: string;
-  featureShort?: string;
   featureDescription?: string;
 }
 
@@ -32,7 +31,6 @@ export const FeatureRequestForm: React.FC<FeatureRequestFormProps> = ({
   const { t } = useTranslation();
   const [requestName, setRequestName] = React.useState("");
   const [requestEmail, setRequestEmail] = React.useState("");
-  const [requestFeatureShort, setRequestFeatureShort] = React.useState("");
   const [requestFeatureDescription, setRequestFeatureDescription] =
     React.useState("");
   const [errors, setErrors] = React.useState<FormErrors>({});
@@ -54,11 +52,10 @@ export const FeatureRequestForm: React.FC<FeatureRequestFormProps> = ({
         t("error_email_invalid") || "Please enter a valid email address.";
     }
 
-    if (!requestFeatureShort.trim() && !requestFeatureDescription.trim()) {
-      newErrors.featureShort =
-        t("error_feature_short_or_description_required") ||
-        "Feature title or details is required.";
-      newErrors.featureDescription = newErrors.featureShort;
+    if (!requestFeatureDescription.trim()) {
+      newErrors.featureDescription =
+        t("error_feature_description_required") ||
+        "Feature description is required.";
     }
 
     setErrors(newErrors);
@@ -71,7 +68,6 @@ export const FeatureRequestForm: React.FC<FeatureRequestFormProps> = ({
     const payload = {
       name: requestName,
       email: requestEmail,
-      short: requestFeatureShort,
       description: requestFeatureDescription,
     };
 
@@ -90,7 +86,6 @@ export const FeatureRequestForm: React.FC<FeatureRequestFormProps> = ({
 
     setRequestName("");
     setRequestEmail("");
-    setRequestFeatureShort("");
     setRequestFeatureDescription("");
     setErrors({});
     onClose();
@@ -115,17 +110,17 @@ export const FeatureRequestForm: React.FC<FeatureRequestFormProps> = ({
       }}
     >
       <div
-        className={`absolute bottom-0 left-0 w-full z-50 backdrop-blur-sm h-full ${theme.isDark ? "bg-black/50" : "bg-white/90"}`}
+        className={`absolute bottom-0 left-0 w-full z-50 backdrop-blur-sm h-full ${theme.isDark ? "bg-black/50" : "bg-white/50"}`}
         onClick={onClose}
       />
       <div className="absolute bottom-0 left-0 w-full z-50 flex">
         <div
           className={`relative ml-auto w-full h-full shadow-xl p-6 overflow-y-auto hide-scrollbar rounded-t-md transition-all ${theme.bg} ${theme.isDark ? "text-slate-100" : "text-slate-900"}`}
           onClick={(e) => e.stopPropagation()}
-          style={{ height: isOpen ? "35rem" : 0 }}
+          style={{ height: isOpen ? "33rem" : 0 }}
         >
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold">
+            <h2 className="text-lg font-semibold text-start">
               {t("request_feature") || "Request feature"}
             </h2>
             <button
@@ -150,8 +145,11 @@ export const FeatureRequestForm: React.FC<FeatureRequestFormProps> = ({
             className="space-y-4"
           >
             <div>
-              <label className="block text-sm font-medium mb-1">
-                {t("name") || "Name"}
+              <label className="block text-sm font-medium mb-1 text-start">
+                {t("name") || "Name"}{" "}
+                <span className="text-[10px] font-normal opacity-50 ml-1">
+                  ({t("optional") || "Optional"})
+                </span>
               </label>
               <input
                 type="text"
@@ -167,8 +165,11 @@ export const FeatureRequestForm: React.FC<FeatureRequestFormProps> = ({
             </div>
 
             <div>
-              <label className="block text-sm font-medium mb-1">
-                {t("email") || "Email"}
+              <label className="block text-sm font-medium mb-1 text-start">
+                {t("email") || "Email"}{" "}
+                <span className="text-[10px] font-normal opacity-50 ml-1">
+                  ({t("optional") || "Optional"})
+                </span>
               </label>
               <input
                 type="email"
@@ -184,27 +185,9 @@ export const FeatureRequestForm: React.FC<FeatureRequestFormProps> = ({
             </div>
 
             <div>
-              <label className="block text-sm font-medium mb-1">
-                {t("feature_short") || "Feature (short)"}
-              </label>
-              <input
-                type="text"
-                value={requestFeatureShort}
-                onChange={(e) => {
-                  setRequestFeatureShort(e.target.value);
-                  if (errors.featureShort)
-                    setErrors((prev) => ({ ...prev, featureShort: undefined }));
-                }}
-                className={inputClass(!!errors.featureShort)}
-              />
-              {errors.featureShort && (
-                <p className={errorClass}>{errors.featureShort}</p>
-              )}
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-1">
-                {t("feature_description") || "Description"}
+              <label className="block text-sm font-medium mb-1 text-start">
+                {t("feature_description") || "Feature description"}{" "}
+                <span className="text-red-500 ml-1">*</span>
               </label>
               <textarea
                 value={requestFeatureDescription}
@@ -216,7 +199,7 @@ export const FeatureRequestForm: React.FC<FeatureRequestFormProps> = ({
                       featureDescription: undefined,
                     }));
                 }}
-                className={inputClass(!!errors.featureDescription)}
+                className={`${inputClass(!!errors.featureDescription)} resize-none`}
                 rows={4}
               />
               {errors.featureDescription && (
@@ -227,7 +210,17 @@ export const FeatureRequestForm: React.FC<FeatureRequestFormProps> = ({
             <div className="flex gap-2 justify-end">
               <button
                 type="button"
-                onClick={onClose}
+                onClick={() => {
+                  const isInvalidEmail =
+                    requestEmail &&
+                    !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(requestEmail);
+                  if (isInvalidEmail) {
+                    setRequestEmail("");
+                  }
+                  setRequestFeatureDescription("");
+                  setErrors({});
+                  onClose();
+                }}
                 className={`px-4 py-2 rounded-lg border text-sm ${theme.isDark ? "border-slate-700" : "border-gray-300"}`}
               >
                 {t("cancel") || "Cancel"}
