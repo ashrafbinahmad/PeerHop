@@ -260,6 +260,10 @@ export const DesktopView = () => {
   // Tab system: 'chat' | 'qr' | 'settings'
   const [activeTab, setActiveTab] = useState<"chat" | "qr" | "settings">("qr");
 
+  // Connection method tab state (persists across activeTab changes)
+  const [showQR, setShowQR] = useState(true);
+  const [showLink, setShowLink] = useState(false);
+
   // Settings - Load from localStorage
   const [textTransferEnabled, setTextTransferEnabled] = useState(() => {
     const saved = localStorage.getItem("textTransferEnabled");
@@ -1194,6 +1198,10 @@ export const DesktopView = () => {
                 handleBlockClient={handleBlockClient}
                 handleBlockSending={handleBlockSending}
                 adminToken={adminToken}
+                showQR={showQR}
+                setShowQR={setShowQR}
+                showLink={showLink}
+                setShowLink={setShowLink}
               />
             )}
           </div>

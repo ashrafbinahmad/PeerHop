@@ -104,7 +104,7 @@ export const EditableDeviceName = ({
             ) : (
               <h3
                 onClick={() => !disabled && setIsEditing(true)}
-                className={`text-sm font-bold truncate cursor-pointer transition-colors hover:!text-[var(--accent-color)] ${theme.text}`}
+                className={`text-sm font-bold text-start truncate cursor-pointer transition-colors hover:!text-[var(--accent-color)] ${theme.text}`}
               >
                 {client.name || client.platform}
               </h3>

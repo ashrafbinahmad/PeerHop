@@ -89,5 +89,12 @@
   "error_email_invalid": "Please enter a valid email address.",
   "error_feature_description_required": "Feature description is required.",
   "buy_developer_a_coffee": "Buy developer a coffee",
-  "optional": "Optional"
+  "optional": "Optional",
+  "connect_via_qr": "Verbindung per QR-Code",
+  "connect_via_link": "Verbindung per Link",
+  "connect_to_pc": "Mit Windows, Linux, Mac verbinden",
+  "mobile_tablet": "Mobil / Tablet",
+  "pc_laptop": "Windows, Linux, Mac",
+  "unable_to_detect": "Nicht erkennbar",
+  "step_2_open_browser": "Schritt 2: URL im Browser öffnen"
 }

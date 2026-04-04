@@ -94,5 +94,12 @@
   "error_email_invalid": "Please enter a valid email address.",
   "error_feature_description_required": "Feature description is required.",
   "buy_developer_a_coffee": "Buy developer a coffee",
-  "optional": "اختياري"
+  "optional": "اختياري",
+  "connect_via_qr": "توصيل عبر كود QR",
+  "connect_via_link": "توصيل عبر الرابط",
+  "connect_to_pc": "توصيل بـ Windows، Linux، Mac",
+  "mobile_tablet": "الجوال / التابلت",
+  "pc_laptop": "Windows، Linux، Mac",
+  "unable_to_detect": "تعذر الكشف",
+  "step_2_open_browser": "الخطوة 2: افتح الرابط في المتصفح"
 }
