@@ -800,7 +800,7 @@ export const MobileUnified: React.FC<Props> = ({
                     disabled={isSendingDisabled}
                     className={`group relative flex flex-col items-center justify-center gap-4 w-64 h-52 rounded-2xl border shadow-sm transition-all duration-300 active:scale-[0.98] ${
                       theme.border
-                    } ${theme.iconBg} ${isSendingDisabled ? "opacity-50 cursor-not-allowed" : ""}`}
+                    } ${theme.iconBg} ${isSendingDisabled ? "opacity-50 cursor-default" : ""}`}
                   >
                     <Plus
                       size={54}
@@ -1385,8 +1385,8 @@ export const MobileUnified: React.FC<Props> = ({
                                   className={`p-2.5 rounded-2xl shrink-0 relative z-10 transition-all active:scale-95 shadow-lg ${
                                     downloadingTransactionId === transaction.id
                                       ? isDarkMode
-                                        ? "bg-slate-800 text-slate-600 cursor-not-allowed"
-                                        : "bg-gray-200 text-gray-400 cursor-not-allowed"
+                                        ? "bg-slate-800 text-slate-600 cursor-default"
+                                        : "bg-gray-200 text-gray-400 cursor-default"
                                       : isDarkMode
                                         ? "bg-slate-300 text-slate-800 hover:bg-white shadow-black/20"
                                         : "text-white shadow-sky-200/50 hover:opacity-90"

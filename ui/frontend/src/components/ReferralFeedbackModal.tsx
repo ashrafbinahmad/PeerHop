@@ -95,7 +95,7 @@ export const ReferralFeedbackModal: React.FC<ReferralFeedbackModalProps> = ({
             disabled={rating === 0}
             className={`flex-1 px-4 py-2 rounded-lg font-medium text-white transition-colors ${
               rating === 0
-                ? "bg-gray-300 cursor-not-allowed"
+                ? "bg-gray-300 cursor-default"
                 : "bg-blue-600 hover:bg-blue-700"
             }`}
           >

@@ -100,16 +100,7 @@ export const QRPanel = ({
         </div>
       )}
 
-      {clients.length === 0 && (
-        <div className="mb-4 flex flex-col items-center pt-8">
-          <div className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-[0.2em] mb-2 opacity-50 ${theme.text}`}>
-            {t("connect_device")}
-          </div>
-          <h1 className={`text-xl font-bold tracking-tight text-center ${theme.text}`}>
-            {t("start_sharing")}
-          </h1>
-        </div>
-      )}
+
 
       <div className="w-full max-w-full mx-auto px-2 mb-4 space-y-2.5">
         <div>
@@ -130,7 +121,7 @@ export const QRPanel = ({
                 <h3 className={`text-sm font-bold text-start transition-colors ${showQR ? theme.iconText : theme.text}`}>
                   {t("connect_mobile")}
                 </h3>
-                <p className={`text-[10px] font-medium text-start opacity-50 transition-colors ${showQR ? theme.iconText : theme.subText}`}>
+                <p className={`text-[10px] font-medium text-start opacity-80 transition-colors ${showQR ? theme.iconText : theme.subText}`}>
                   {t("connect_mobile_hint")}
                 </p>
               </div>
@@ -205,7 +196,7 @@ export const QRPanel = ({
                 <h3 className={`text-sm font-bold text-start transition-colors ${showLink ? theme.iconText : theme.text}`}>
                   {t("connect_desktop")}
                 </h3>
-                <p className={`text-[10px] font-medium text-start opacity-50 transition-colors ${showLink ? theme.iconText : theme.subText}`}>
+                <p className={`text-[10px] font-medium text-start opacity-80 transition-colors ${showLink ? theme.iconText : theme.subText}`}>
                   {t("connect_desktop_hint")}
                 </p>
               </div>
@@ -252,11 +243,7 @@ export const QRPanel = ({
                     </div>
                   </div>
 
-                  {clients.length === 0 && (
-                    <p className={`text-[9px] text-center font-bold uppercase tracking-[0.25em] opacity-20 ${theme.text} mb-2`}>
-                      {t("or_enter_url_manually")}
-                    </p>
-                  )}
+
                 </>
               ) : (
                 <div className={`${containerWidthClass} flex items-center justify-center gap-2 py-4 animate-pulse`}>
@@ -273,7 +260,7 @@ export const QRPanel = ({
         <button
           onClick={handleRestartServer}
           disabled={isCheckingNetwork}
-          className={`group flex items-center gap-3 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all hover:scale-[1.02] active:scale-[0.98] ${theme.ghostHover} ${isCheckingNetwork ? "opacity-50 cursor-not-allowed" : ""}`}
+          className={`group flex items-center gap-3 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all hover:scale-[1.02] active:scale-[0.98] ${theme.ghostHover} ${isCheckingNetwork ? "opacity-50 cursor-default" : ""}`}
         >
           <div className={`p-1 transition-transform duration-500 ${isCheckingNetwork ? "animate-spin" : "group-hover:rotate-180"}`}>
             <RefreshCw size={16} />

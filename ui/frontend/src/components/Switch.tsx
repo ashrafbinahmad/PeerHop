@@ -35,7 +35,7 @@ export const Switch: React.FC<SwitchProps> = ({
       onClick={handleClick}
       className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors shrink-0 ${
         checked ? "" : theme.iconBg
-      } ${disabled ? "opacity-50 cursor-not-allowed" : ""} ${className}`}
+      } ${disabled ? "opacity-50 cursor-default" : ""} ${className}`}
       style={{
         backgroundColor: checked ? accentColor.color : undefined,
       }}

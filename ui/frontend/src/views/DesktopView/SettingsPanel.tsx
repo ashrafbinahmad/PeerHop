@@ -168,20 +168,24 @@ export const SettingsPanel = ({
   }, [deviceName, isEditingName]);
 
   const handleNameConfirm = () => {
-    if (nameInputValue.trim() && nameInputValue !== deviceName) {
-      onUpdateDeviceName(nameInputValue.trim());
+    const trimmed = nameInputValue.trim();
+    if (trimmed && trimmed.length <= 20 && trimmed !== deviceName) {
+      onUpdateDeviceName(trimmed);
     } else {
       setNameInputValue(deviceName);
     }
     setIsEditingName(false);
   };
- 
+
   const handleSelectDownloadPath = async (current: string) => {
     try {
       const path = await SelectDownloadPath(current);
       if (path) {
         setDownloadPath(path);
-        logActivity("settings_changed", `Download location changed to: ${path}`);
+        logActivity(
+          "settings_changed",
+          `Download location changed to: ${path}`,
+        );
       }
     } catch (err) {
       console.error("Failed to select download path:", err);
@@ -207,7 +211,10 @@ export const SettingsPanel = ({
   ];
 
   return (
-    <div className="w-full self-start text-left pt-8 px-2" style={{ '--accent-color': activeAccent.color } as React.CSSProperties}>
+    <div
+      className="w-full self-start text-left pt-8 px-2"
+      style={{ "--accent-color": activeAccent.color } as React.CSSProperties}
+    >
       {/* Left-aligned header */}
       <div className="mb-8 flex items-center gap-3">
         <h1 className={`text-2xl font-bold ${theme.text}`}>{t("settings")}</h1>
@@ -251,17 +258,20 @@ export const SettingsPanel = ({
           </div> */}
         </div>
 
-
         {/* General / Profile */}
         <div>
-          <h3 className={`text-[11px] font-bold uppercase tracking-[0.12em] opacity-40 mb-4 ${theme.text}`}>
+          <h3
+            className={`text-[11px] font-bold uppercase tracking-[0.12em] opacity-40 mb-4 ${theme.text}`}
+          >
             {t("general") || "General"}
           </h3>
           <div className="space-y-5">
             {/* Host Name Setting */}
             <div className="flex items-center justify-between gap-4 group">
               <div className="min-w-0 flex-1">
-                <p className={`text-sm font-medium ${theme.text}`}>
+                <p
+                  className={`text-sm font-medium whitespace-nowrap ${theme.text}`}
+                >
                   {t("host_name") || "Device Name"}
                 </p>
               </div>
@@ -286,7 +296,8 @@ export const SettingsPanel = ({
                           }
                         }}
                         autoFocus
-                        className={`w-40 text-right text-xs font-semibold px-0 py-0 bg-transparent border-b border-dashed outline-none ${
+                        maxLength={20}
+                        className={`w-[150px] text-right text-xs font-semibold px-0 py-0 bg-transparent border-b border-dashed outline-none ${
                           isDarkMode
                             ? "border-slate-500 text-slate-100"
                             : "border-gray-400 text-gray-800"
@@ -295,17 +306,19 @@ export const SettingsPanel = ({
                     </div>
                   ) : (
                     <div className="flex items-center gap-2">
-                      <span
-                        onClick={() => {
-                          setNameInputValue(deviceName);
-                          setIsEditingName(true);
-                        }}
-                        className={`text-xs font-semibold opacity-70 truncate cursor-pointer transition-colors hover:opacity-100 hover:!text-[var(--accent-color)] ${
-                          isDarkMode ? "text-slate-300" : "text-gray-600"
-                        }`}
-                      >
-                        {deviceName}
-                      </span>
+                      <div className="min-w-0 max-w-full">
+                        <span
+                          onClick={() => {
+                            setNameInputValue(deviceName);
+                            setIsEditingName(true);
+                          }}
+                          className={`inline-block max-w-full text-xs font-semibold truncate cursor-pointer transition-colors border-b border-dashed border-current hover:border-[var(--accent-color)] hover:!text-[var(--accent-color)] ${
+                            isDarkMode ? "text-slate-300" : "text-gray-600"
+                          }`}
+                        >
+                          {deviceName}
+                        </span>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -316,15 +329,19 @@ export const SettingsPanel = ({
             <div className="w-full relative pt-2">
               <div className="flex items-start justify-between gap-4 group">
                 <div className="min-w-0 flex-1">
-                  <p className={`text-sm font-medium ${theme.text}`}>
+                  <p
+                    className={`text-sm font-medium whitespace-nowrap ${theme.text}`}
+                  >
                     {t("download_location") || "File Saving Location"}
                   </p>
                   <p
                     onClick={() => handleSelectDownloadPath(downloadPath)}
-                    className={`text-[11px] mt-0.5 transition-all truncate hover:whitespace-normal hover:overflow-visible hover:relative hover:z-10 cursor-pointer hover:opacity-100 hover:!text-[var(--accent-color)] ${theme.subText} ${isDarkMode ? "opacity-60" : "opacity-80"}`}
+                    className={`text-[11px] mt-0.5 transition-all truncate cursor-pointer hover:opacity-100 hover:!text-[var(--accent-color)] ${theme.subText} ${isDarkMode ? "text-slate-400" : "text-gray-600"}`}
                     title={downloadPath}
                   >
-                    {downloadPath}
+                    <span className="border-b border-dashed border-current hover:border-[var(--accent-color)]">
+                      {downloadPath}
+                    </span>
                   </p>
                 </div>
 
@@ -348,14 +365,18 @@ export const SettingsPanel = ({
 
         {/* Features */}
         <div>
-          <h3 className={`text-[11px] font-bold uppercase tracking-[0.12em] opacity-40 mb-4 ${theme.text}`}>
+          <h3
+            className={`text-[11px] font-bold uppercase tracking-[0.12em] opacity-40 mb-4 ${theme.text}`}
+          >
             {t("features")}
           </h3>
           <div className="space-y-5">
             {/* Text Transfer Toggle */}
             <div className="flex items-start justify-between gap-4">
               <div className="flex-1">
-                <p className={`text-sm font-medium ${theme.text}`}>
+                <p
+                  className={`text-sm font-medium whitespace-nowrap ${theme.text}`}
+                >
                   {t("text_transfer")}
                 </p>
                 {/* <p className={`text-xs mt-0.5 ${theme.subText}`}>
@@ -381,7 +402,9 @@ export const SettingsPanel = ({
             {/* Security Toggle */}
             <div className="flex items-start justify-between gap-4">
               <div className="flex-1">
-                <p className={`text-sm font-medium ${theme.text}`}>
+                <p
+                  className={`text-sm font-medium whitespace-nowrap ${theme.text}`}
+                >
                   {t("enable_security")}
                 </p>
                 {/* <p className={`text-xs mt-0.5 ${theme.subText}`}>
@@ -407,7 +430,9 @@ export const SettingsPanel = ({
             {/* Static Port Toggle */}
             <div className="flex items-center justify-between gap-4 group">
               <div className="flex-1">
-                <p className={`text-sm font-medium ${theme.text}`}>
+                <p
+                  className={`text-sm font-medium whitespace-nowrap ${theme.text}`}
+                >
                   Static Port
                 </p>
               </div>
@@ -440,7 +465,7 @@ export const SettingsPanel = ({
                             isDarkMode
                               ? "border-slate-500 text-slate-100"
                               : "border-gray-400 text-gray-800"
-                          } ${isCheckingNetwork ? "opacity-50 cursor-not-allowed" : ""}`}
+                          } ${isCheckingNetwork ? "opacity-50 cursor-default" : ""}`}
                         />
                       </div>
                     ) : (
@@ -452,9 +477,9 @@ export const SettingsPanel = ({
                               setIsEditingPort(true);
                             }
                           }}
-                          className={`text-xs font-mono font-semibold opacity-70 cursor-pointer transition-colors hover:opacity-100 hover:!text-[var(--accent-color)] ${
+                          className={`inline-block text-xs font-mono font-semibold cursor-pointer transition-colors border-b border-dashed border-current hover:border-[var(--accent-color)] hover:!text-[var(--accent-color)] ${
                             isDarkMode ? "text-slate-300" : "text-gray-600"
-                          } ${isCheckingNetwork ? "cursor-not-allowed opacity-20" : ""}`}
+                          } ${isCheckingNetwork ? "cursor-default opacity-20" : ""}`}
                         >
                           {staticPort}
                         </span>
@@ -482,7 +507,9 @@ export const SettingsPanel = ({
         {/* Server Info */}
         {serverInfo && (
           <div>
-            <h3 className={`text-[11px] font-bold uppercase tracking-[0.12em] opacity-40 mb-4 ${theme.text}`}>
+            <h3
+              className={`text-[11px] font-bold uppercase tracking-[0.12em] opacity-40 mb-4 ${theme.text}`}
+            >
               {t("server_info") || "Connection Information"}
             </h3>
             <div className="space-y-3">
@@ -492,11 +519,13 @@ export const SettingsPanel = ({
                 >
                   {t("url")}
                 </p>
-                <div className={`flex items-center min-w-0 h-9 px-1 rounded-lg border gap-1 ${
-                  isDarkMode 
-                    ? "bg-slate-800/50 border-slate-700" 
-                    : "bg-gray-50 border-gray-200"
-                }`}>
+                <div
+                  className={`flex items-center min-w-0 h-9 px-1 rounded-lg border gap-1 ${
+                    isDarkMode
+                      ? "bg-slate-800/50 border-slate-700"
+                      : "bg-gray-50 border-gray-200"
+                  }`}
+                >
                   <CopyButton
                     text={
                       serverInfo.url
@@ -506,7 +535,9 @@ export const SettingsPanel = ({
                         : ""
                     }
                     className={`p-1.5 rounded-md transition-colors ${
-                      isDarkMode ? "hover:bg-white/5 text-slate-400" : "hover:bg-black/5 text-gray-500"
+                      isDarkMode
+                        ? "hover:bg-white/5 text-slate-400"
+                        : "hover:bg-black/5 text-gray-500"
                     }`}
                     iconSize={12}
                     isDarkMode={isDarkMode}
@@ -528,11 +559,13 @@ export const SettingsPanel = ({
                 >
                   {t("wifi_network")}
                 </p>
-                <div className={`flex items-center gap-2 px-3 py-2 rounded-lg border ${
-                  isDarkMode 
-                    ? "bg-slate-800/50 border-slate-700" 
-                    : "bg-gray-50 border-gray-200"
-                }`}>
+                <div
+                  className={`flex items-center gap-2 px-3 py-2 rounded-lg border ${
+                    isDarkMode
+                      ? "bg-slate-800/50 border-slate-700"
+                      : "bg-gray-50 border-gray-200"
+                  }`}
+                >
                   <Wifi size={12} className={theme.subText} />
                   <code className={`text-xs font-mono ${theme.text}`}>
                     {serverInfo.ssid || "Unable to detect"}
@@ -546,7 +579,7 @@ export const SettingsPanel = ({
                   className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${
                     theme.iconBg
                   } ${theme.ghostHover} ${theme.text} ${
-                    isCheckingNetwork ? "opacity-50 cursor-not-allowed" : ""
+                    isCheckingNetwork ? "opacity-50 cursor-default" : ""
                   }`}
                 >
                   <RefreshCw
@@ -563,7 +596,9 @@ export const SettingsPanel = ({
         {/* Connected Devices - Always show in multi-client mode */}
         {clients.length > 0 && (
           <div>
-            <h3 className={`text-[11px] font-bold uppercase tracking-[0.12em] opacity-40 mb-4 ${theme.text}`}>
+            <h3
+              className={`text-[11px] font-bold uppercase tracking-[0.12em] opacity-40 mb-4 ${theme.text}`}
+            >
               {t("connected_devices")} ({clients.length})
             </h3>
             <div className="space-y-2">
@@ -585,7 +620,9 @@ export const SettingsPanel = ({
 
         {/* Theme Setting */}
         <div>
-          <h3 className={`text-[11px] font-bold uppercase tracking-[0.12em] opacity-40 mb-3 ${theme.text}`}>
+          <h3
+            className={`text-[11px] font-bold uppercase tracking-[0.12em] opacity-40 mb-3 ${theme.text}`}
+          >
             {t("themes")}
           </h3>
 

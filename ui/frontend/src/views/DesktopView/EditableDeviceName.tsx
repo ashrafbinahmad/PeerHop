@@ -33,7 +33,8 @@ export const EditableDeviceName = ({
   }, [client.name, isEditing]);
 
   const handleUpdateName = async () => {
-    if (!name.trim()) {
+    const trimmed = name.trim();
+    if (!trimmed || trimmed.length > 20) {
       setName(client.name || client.platform);
       setIsEditing(false);
       return;
@@ -100,13 +101,16 @@ export const EditableDeviceName = ({
                   isDarkMode ? "border-slate-500" : "border-gray-400"
                 }`}
                 autoFocus
+                maxLength={20}
               />
             ) : (
               <h3
                 onClick={() => !disabled && setIsEditing(true)}
                 className={`text-sm font-bold text-start truncate cursor-pointer transition-colors hover:!text-[var(--accent-color)] ${theme.text}`}
               >
-                {client.name || client.platform}
+                <span className="border-b border-dashed border-current hover:border-[var(--accent-color,currentColor)]">
+                  {client.name || client.platform}
+                </span>
               </h3>
             )}
             <div className={`flex items-center gap-1 text-[10px] font-mono opacity-50 ${theme.subText}`}>
@@ -116,9 +120,7 @@ export const EditableDeviceName = ({
           </div>
         </div>
 
-        <button className={`p-1.5 rounded-full opacity-0 group-hover:opacity-40 hover:opacity-100 transition-all ${theme.text}`}>
-          <MoreHorizontal size={14} />
-        </button>
+
       </div>
 
       {/* More Compact Action Buttons */}
@@ -130,7 +132,7 @@ export const EditableDeviceName = ({
             client.sendingBlocked
               ? "bg-amber-500/5 border-amber-500/10 text-amber-600/70"
               : "bg-slate-500/5 border-slate-500/10 text-slate-500 hover:text-blue-500 hover:bg-blue-500/5"
-          } ${disabled ? "opacity-30 cursor-not-allowed" : ""}`}
+          } ${disabled ? "opacity-30 cursor-default" : ""}`}
         >
           {client.sendingBlocked ? (
             <>Allow <ShieldCheck size={12} /></>
@@ -146,7 +148,7 @@ export const EditableDeviceName = ({
             client.blocked
               ? "bg-emerald-500/5 border-emerald-500/10 text-emerald-600/70"
               : "bg-slate-500/5 border-slate-500/10 text-slate-500 hover:text-red-500 hover:bg-red-500/5"
-          } ${disabled ? "opacity-30 cursor-not-allowed" : ""}`}
+          } ${disabled ? "opacity-30 cursor-default" : ""}`}
         >
           {client.blocked ? (
             <>Unblock <UserCheck size={12} /></>

@@ -98,7 +98,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
               isDarkMode
                 ? "text-[#0A84FF] hover:bg-slate-700/50 active:bg-slate-700 focus:ring-white/20"
                 : "text-[#007AFF] hover:bg-gray-50 active:bg-gray-100 focus:ring-black/10"
-            } ${isConfirming ? "opacity-50 cursor-not-allowed " : ""}`}
+            } ${isConfirming ? "opacity-50 cursor-default " : ""}`}
           >
             {cancelText}
           </button>
@@ -127,7 +127,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
                 : isDarkMode
                   ? "text-[#0A84FF]"
                   : "text-[#007AFF]"
-            } ${isConfirming ? "opacity-50 cursor-not-allowed " : ""}`}
+            } ${isConfirming ? "opacity-50 cursor-default " : ""}`}
           >
             {isConfirming ? confirmingText : confirmText}
           </button>
