@@ -12,6 +12,21 @@ function App() {
   const [mobileState, setMobileState] = useState<MetaData | null>(null);
 
   useEffect(() => {
+    const handleGlobalClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      // If click is not inside a selectable element, clear selection
+      if (!target.closest(".text-selectable")) {
+        const selection = window.getSelection();
+        if (selection && selection.toString().length > 0) {
+          selection.removeAllRanges();
+        }
+      }
+    };
+    window.addEventListener("mousedown", handleGlobalClick);
+    return () => window.removeEventListener("mousedown", handleGlobalClick);
+  }, []);
+
+  useEffect(() => {
     const checkMode = async () => {
       // Skip check if we are in Wails environment (desktop app)
       if (

@@ -158,6 +158,18 @@ export const MobileUnified: React.FC<Props> = ({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const isUserAtBottomRef = useRef(true);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Auto-resize textarea when textInput changes (handles both typing and clearing)
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = "auto";
+      textareaRef.current.style.height = `${Math.min(
+        textareaRef.current.scrollHeight,
+        120,
+      )}px`;
+    }
+  }, [textInput]);
 
   // Track highest progress seen for each transaction to prevent backwards jumps
   const highestProgressRef = useRef<Record<number, number>>({});
@@ -184,7 +196,52 @@ export const MobileUnified: React.FC<Props> = ({
 
   // Track downloaded transaction IDs to prevent re-downloading
   const downloadedIdsRef = useRef<Set<number>>(new Set());
+  const notifiedCompletionsRef = useRef<Set<number>>(new Set());
 
+  // Effect to show one-time notification for first download completion
+  useEffect(() => {
+    // Only proceed if we have transactions and myIp
+    if (!transactions || transactions.length === 0 || !myIp) return;
+
+    // Check for the very first download completion across the entire session
+    const hasShowedNotice = localStorage.getItem("hasShowedDownloadNotice");
+    if (hasShowedNotice) return;
+
+    // Find any newly completed download (not sent by me)
+    const completedDownload = transactions.find(t => {
+      // It must be a file, not sent by me, and completed
+      const isMe = t.senderId === myIp;
+      const isFile = t.type === "file";
+      const isCompleted = t.status === "completed";
+      
+      // Also check client-specific status for non-me if available
+      let isActuallyCompleted = isCompleted;
+      if (!isMe && t.clientStatus?.[myIp] === "completed") {
+        isActuallyCompleted = true;
+      }
+
+      return isFile && !isMe && isActuallyCompleted && !notifiedCompletionsRef.current.has(t.id);
+    });
+
+    if (completedDownload) {
+      // Show notification
+      setNotification({
+        show: true,
+        message: t("check_browser_downloads") || "Check your browser downloads to get the file"
+      });
+      
+      // Auto-hide after 5 seconds
+      setTimeout(() => {
+        setNotification({ show: false, message: "" });
+      }, 5000);
+
+      // Store in local storage so it never shows again
+      localStorage.setItem("hasShowedDownloadNotice", "true");
+      
+      // Also mark as notified locally
+      notifiedCompletionsRef.current.add(completedDownload.id);
+    }
+  }, [transactions, myIp, t]);
   useEffect(() => {
     // Check security status on mount
     const checkSecurity = async () => {
@@ -376,6 +433,18 @@ export const MobileUnified: React.FC<Props> = ({
     // Safely convert FileList to array and filter out any undefined entries
     const filesArray = Array.from(fileList).filter((f) => f != null);
     const fileNames = filesArray.map((f) => f.name);
+
+    const totalSize = filesArray.reduce((acc, file) => acc + file.size, 0);
+    if (totalSize > 10 * 1024 * 1024) {
+      if (!localStorage.getItem("hasShowedLargeUploadNotice")) {
+        setNotification({
+          show: true,
+          message: t("do_not_reload_upload") || "Please do not close or reload the page while sending",
+        });
+        setTimeout(() => setNotification({ show: false, message: "" }), 5000);
+        localStorage.setItem("hasShowedLargeUploadNotice", "true");
+      }
+    }
 
     // Add files to formData and initialize progress
     filesArray.forEach((file) => {
@@ -808,7 +877,7 @@ export const MobileUnified: React.FC<Props> = ({
                 : theme.bubbleOther;
               const widthClass = isFile
                 ? "w-[calc(95vw-80px)] max-w-[500px]"
-                : "w-fit max-w-[500px] text-left";
+                : "w-fit min-w-[85px] max-w-[calc(100vw-100px)] text-left";
 
               const senderChanged = index > 0 && visibleTransactions[index - 1].senderId !== transaction.senderId;
               const isLast = index === visibleTransactions.length - 1;
@@ -976,34 +1045,48 @@ export const MobileUnified: React.FC<Props> = ({
                   <div
                     className={`relative rounded-xl overflow-hidden shadow-sm ${widthClass} ${bubbleClass} transition-all duration-300 ${
                       transaction.status === "cancelled"
-                        ? "opacity-60 grayscale-[0.5]"
+                        ? "opacity-60"
                         : ""
                     }`}
                     style={
                       isRightSide ? { backgroundColor: theme.accentColor } : {}
                     }
                   >
-                    {/* Background Progress Fill */}
+                    {/* Background Progress Fill (Increased Opacity) */}
                     {(effectiveStatus === "in_progress" ||
                       (isMe && transaction.status === "in_progress")) && (
-                      <div
-                        className={`absolute top-0 left-0 h-full pointer-events-none transition-all duration-300 ${
-                          isMe ? "bg-white/20" : ""
-                        }`}
-                        style={{
-                          width: `${displayPercent}%`,
-                          backgroundColor: !isMe
-                            ? `${theme.accentColor}1A`
-                            : undefined, // 10% opacity
-                        }}
-                      />
+                      <>
+                        <div
+                          className={`absolute top-0 left-0 h-full pointer-events-none transition-all duration-300 ${
+                            isMe ? "bg-white/20" : ""
+                          }`}
+                          style={{
+                            width: `${displayPercent}%`,
+                            backgroundColor: !isMe
+                              ? `${theme.accentColor}33`
+                              : undefined, // 20% opacity instead of 10%
+                          }}
+                        />
+                        {/* More visible progress bar at the bottom */}
+                        <div
+                          className={`absolute bottom-0 left-0 h-1.5 pointer-events-none transition-all duration-300 ${
+                            isMe ? "bg-white/60" : ""
+                          }`}
+                          style={{
+                            width: `${displayPercent}%`,
+                            backgroundColor: !isMe
+                              ? theme.accentColor
+                              : undefined, // Solid accent for bar if not me
+                          }}
+                        />
+                      </>
                     )}
 
-                    <div className="p-3 relative z-10">
+                    <div className="pt-3 px-3 pb-5 relative z-10">
                       {/* TEXT */}
                       {transaction.type === "text" && (
-                        <div className="text-[16px] whitespace-break-spaces overflow-x-auto overflow-y-auto max-h-[300px] custom-scrollbar">
-                          {transaction.textContent}
+                        <div className="text-[13px] whitespace-break-spaces overflow-x-auto overflow-y-auto max-h-[300px] custom-scrollbar text-selectable leading-relaxed">
+                          <span className="text-selectable">{transaction.textContent}</span>
                         </div>
                       )}
 
@@ -1041,7 +1124,7 @@ export const MobileUnified: React.FC<Props> = ({
 
                             if (isImage && mediaUrl) {
                               return (
-                                <div className="w-12 h-12 rounded-lg bg-black/5 overflow-hidden shrink-0 border border-black/5">
+                                <div className="w-10 h-10 rounded-lg bg-black/5 overflow-hidden shrink-0 border border-black/5">
                                   <img
                                     src={`${mediaUrl}${
                                       mediaUrl.includes("?") ? "&" : "?"
@@ -1075,7 +1158,7 @@ export const MobileUnified: React.FC<Props> = ({
 
                             if (isVideo && mediaUrl) {
                               return (
-                                <div className="w-12 h-12 rounded-lg bg-black/10 overflow-hidden shrink-0 relative flex items-center justify-center border border-black/5">
+                                <div className="w-10 h-10 rounded-lg bg-black/10 overflow-hidden shrink-0 relative flex items-center justify-center border border-black/5">
                                   <video
                                     src={`${mediaUrl}${
                                       mediaUrl.includes("?") ? "&" : "?"
@@ -1113,18 +1196,18 @@ export const MobileUnified: React.FC<Props> = ({
                             );
                           })()}
 
-                          <div className="flex-1 min-w-0">
-                            <div className="font-normal truncate">
+                          <div className="flex-1 min-w-0 text-[15px]">
+                            <div className="font-medium truncate">
                               {transaction.filename}
                             </div>
-                            <div className="text-xs opacity-70">
+                            <div className="text-xs">
                               {(!isMe &&
                                 (effectiveStatus === "in_progress" ||
                                   downloadingTransactionId ===
                                     transaction.id)) ||
                               (isMe && transaction.status === "in_progress") ? (
                                 <div className="flex flex-col gap-0.5 mt-1 font-mono">
-                                  <span className="flex items-center">
+                                  <span className="flex items-center opacity-70">
                                     {(() => {
                                       // Try to use live delta-based speed
                                       // Try to use live delta-based speed
@@ -1167,7 +1250,7 @@ export const MobileUnified: React.FC<Props> = ({
                                       );
                                     })()}
                                   </span>
-                                  <span>
+                                  <span className="opacity-70">
                                     {(() => {
                                       // Use actual client bytes if available for downloads
                                       let downloadedBytes = 0;
@@ -1201,12 +1284,12 @@ export const MobileUnified: React.FC<Props> = ({
                                       "PB",
                                     ])}
                                   </span>
-                                  <span className="font-bold flex justify-between w-full">
-                                    <span className="text-md">
-                                      {displayPercent.toFixed(2)}%
+                                  <span className="font-bold flex justify-between w-full mt-1">
+                                    <span className="text-3xl font-black tracking-tighter drop-shadow-sm">
+                                      {displayPercent.toFixed(1)}%
                                     </span>
-                                    {/* Time on same line */}
-                                    <span className="opacity-70 font-normal text-xs">
+                                    {/* Time absolutely positioned at bottom-right corner */}
+                                    <span className="absolute right-1.5 bottom-1 opacity-70 font-normal text-[10px] tabular-nums">
                                       {new Date(
                                         transaction.timestamp,
                                       ).toLocaleTimeString([], {
@@ -1217,20 +1300,18 @@ export const MobileUnified: React.FC<Props> = ({
                                   </span>
                                 </div>
                               ) : (
-                                <div className="flex flex-col gap-0.5 mt-0.5">
-                                  <div className="flex items-center gap-2 flex-wrap">
-                                    {effectiveStatus !== "cancelled" && (
+                                <div className="flex flex-col gap-0.5 mt-0.5 opacity-70">
+                                    <div className="flex items-center gap-2 flex-wrap">
                                       <span>
                                         {formatBytes(transaction.fileSize)}
                                       </span>
-                                    )}
                                     {(effectiveStatus === "cancelled" ||
                                       (isMe &&
                                         transaction.status === "in_progress" &&
                                         uploadProgress[
                                           transaction.filename || ""
                                         ] === undefined)) && (
-                                      <span className="font-medium text-red-500/70">
+                                      <span className={`font-bold ${isMe ? "text-red-600 bg-white/95 px-1.5 py-0.5 rounded-md shadow-sm" : "text-red-500"}`}>
                                         {t("cancelled")}
                                       </span>
                                     )}
@@ -1244,19 +1325,14 @@ export const MobileUnified: React.FC<Props> = ({
                                           {t("downloading")}
                                         </span>
                                       )}
-                                    {!isMe &&
-                                      effectiveStatus === "completed" && (
-                                        <span className="text-green-500 font-medium">
-                                          {t("download_completed")}
-                                        </span>
-                                      )}
-                                  </div>
-                                  {!isMe && effectiveStatus === "completed" && (
-                                    <div className="text-[10px] opacity-60">
-                                      {t("check_browser_downloads")}
+                                    {!isMe && effectiveStatus === "completed" && (
+                                        <span className="text-green-500 font-medium text-[13px]">Completed</span>
+                                    )}
+                                    {isMe && effectiveStatus === "completed" && (
+                                        <span className="text-white/90 font-medium text-[13px]">{(t as any)("uploaded") || "Uploaded"}</span>
+                                    )}
                                     </div>
-                                  )}
-                                </div>
+                                  </div>
                               )}
                             </div>
                           </div>
@@ -1268,14 +1344,14 @@ export const MobileUnified: React.FC<Props> = ({
                                 e.stopPropagation();
                                 handleCancelUpload();
                               }}
-                              className={`p-2 rounded-full shrink-0 relative z-10 transition-colors ${
+                              className={`p-2.5 rounded-2xl shrink-0 relative z-10 transition-colors ${
                                 isDarkMode
                                   ? "bg-red-500/20 text-red-400 hover:bg-red-500/30"
                                   : "bg-red-100 text-red-600 hover:bg-red-200"
                               }`}
                               title={t("cancel_upload")}
                             >
-                              <X size={18} />
+                              <X size={20} />
                             </button>
                           )}
 
@@ -1288,14 +1364,14 @@ export const MobileUnified: React.FC<Props> = ({
                                   onClick={(e) =>
                                     handleCancelDownload(e, transaction)
                                   }
-                                  className={`p-2 rounded-full shrink-0 relative z-10 transition-colors ${
+                                  className={`p-2.5 rounded-2xl shrink-0 relative z-10 transition-all active:scale-95 shadow-md ${
                                     isDarkMode
-                                      ? "bg-red-500/20 text-red-400 hover:bg-red-500/30"
-                                      : "bg-red-100 text-red-600 hover:bg-red-200"
+                                      ? "bg-red-500/30 text-red-400 hover:bg-red-500/40"
+                                      : "bg-red-500 text-white hover:bg-red-600 shadow-red-200/50"
                                   }`}
                                   title={t("cancel_download")}
                                 >
-                                  <X size={18} />
+                                  <X size={20} strokeWidth={2.5} />
                                 </button>
                               ) : (
                                 // Download button when not downloading
@@ -1306,24 +1382,24 @@ export const MobileUnified: React.FC<Props> = ({
                                   disabled={
                                     downloadingTransactionId === transaction.id
                                   }
-                                  className={`p-2 rounded-full shrink-0 relative z-10 transition-colors ${
+                                  className={`p-2.5 rounded-2xl shrink-0 relative z-10 transition-all active:scale-95 shadow-lg ${
                                     downloadingTransactionId === transaction.id
                                       ? isDarkMode
                                         ? "bg-slate-800 text-slate-600 cursor-not-allowed"
                                         : "bg-gray-200 text-gray-400 cursor-not-allowed"
                                       : isDarkMode
-                                        ? "bg-slate-700 text-[#0A84FF] hover:bg-slate-600"
-                                        : `bg-gray-100 hover:bg-gray-200`
+                                        ? "bg-slate-300 text-slate-800 hover:bg-white shadow-black/20"
+                                        : "text-white shadow-sky-200/50 hover:opacity-90"
                                   }`}
                                   style={
                                     downloadingTransactionId !==
                                       transaction.id && !isDarkMode
-                                      ? { color: theme.accentColor }
+                                      ? { backgroundColor: theme.accentColor }
                                       : downloadingTransactionId !==
                                             transaction.id && isDarkMode
                                         ? {
-                                            color: theme.accentColor,
-                                            backgroundColor: theme.iconBg,
+                                            backgroundColor: "#fff",
+                                            color: "#000",
                                           }
                                         : {}
                                   }
@@ -1333,7 +1409,7 @@ export const MobileUnified: React.FC<Props> = ({
                                       : t("download")
                                   }
                                 >
-                                  <Download size={18} />
+                                  <Download size={20} strokeWidth={2.5} />
                                 </button>
                               )}
                             </>
@@ -1346,7 +1422,7 @@ export const MobileUnified: React.FC<Props> = ({
                       {(!isFile ||
                         (effectiveStatus !== "in_progress" &&
                           !(isMe && transaction.status === "in_progress"))) && (
-                        <div className="flex justify-end items-center text-[10px] opacity-70 mt-1">
+                        <div className="absolute right-1.5 bottom-1 flex items-center text-[10px] opacity-70 pointer-events-none">
                           <span>
                             {new Date(transaction.timestamp).toLocaleTimeString(
                               [],
@@ -1397,15 +1473,21 @@ export const MobileUnified: React.FC<Props> = ({
           {showTextInput && !isSendingDisabled && (
             <div className={`p-4 border-t ${activeTheme.border}`}>
               <div className="flex gap-2">
-                <input
-                  type="text"
+                <textarea
+                  ref={textareaRef}
                   value={textInput}
                   onChange={(e) => setTextInput(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && handleSendText()}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      handleSendText();
+                    }
+                  }}
                   placeholder={t("type_a_message")}
-                  className={`flex-1 px-4 py-2 rounded-xl outline-none ${
+                  className={`flex-1 px-4 py-2.5 rounded-xl outline-none resize-none min-h-[42px] max-h-[120px] custom-scrollbar overflow-y-auto ${
                     theme.inputField
                   }`}
+                  rows={1}
                   autoFocus
                 />
                 <button type="button"

@@ -64,7 +64,7 @@
   "cancel_download_title": "Cancel Download",
   "cancel_upload_title": "Cancel Upload",
   "download_completed": "Download completed.",
-  "check_browser_downloads": "Please check your browser downloads to get the file",
+  "check_browser_downloads": "Please check your browser downloads to get shared files",
   "type_a_message": "Type a message...",
   "cancel_upload": "Cancel upload",
   "cancel_download": "Cancel download",
@@ -103,5 +103,6 @@
   "tap_to_reveal_qr": "Tap to reveal QR and Network info",
   "tap_to_hide_qr": "Tap to hide connection details",
   "general": "General",
-  "host_name": "Device"
+  "host_name": "Device",
+  "do_not_reload_upload": "Please do not close or reload the page while sending"
 }

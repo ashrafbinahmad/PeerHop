@@ -1,4 +1,4 @@
-import React, { useRef, useState } from "react";
+import React, { useRef, useState, useEffect } from "react";
 import axios from "axios";
 import {
   MessageSquare,
@@ -88,6 +88,19 @@ export const ChatPanel = ({
     null,
   );
   const [removeFromHistoryOnly, setRemoveFromHistoryOnly] = useState(true);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Auto-resize textarea when textInput changes (handles both typing and clearing)
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = "auto";
+      textareaRef.current.style.height = `${Math.min(
+        textareaRef.current.scrollHeight,
+        120,
+      )}px`;
+    }
+  }, [textInput]);
+
   // SCROLL — column-reverse: scrollTop=0 is bottom
   const handleScroll = () => {
     if (!scrollContainerRef.current) return;
@@ -139,7 +152,7 @@ export const ChatPanel = ({
       >
         <div className="flex flex-col gap-1">
           {visibleTransactions.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full gap-6 animate-in fade-in zoom-in-95 duration-500 my-auto pb-20">
+            <div className="flex flex-col items-center justify-center h-full gap-6 animate-in fade-in zoom-in-95 duration-500 my-auto pb-10">
               {/* Big Share File Button */}
               <button
                 onClick={handleSelectFiles}
@@ -212,7 +225,7 @@ export const ChatPanel = ({
                   key={transaction.id}
                   className={`flex ${alignClass} group animate-in fade-in slide-in-from-bottom-2 duration-300 gap-2 items-end ${
                     needsTopMargin ? "mt-4" : ""
-                  } ${needsBottomMargin ? "mb-10" : ""}`}
+                  } ${needsBottomMargin ? "mb-2" : ""}`}
                 >
                   {/* Left-side tools: Avatar for receiver, OR CopyButton for sender */}
                   {!isMe && (
@@ -277,8 +290,8 @@ export const ChatPanel = ({
 
                     <div className="relative z-10">
                       {transaction.type === "text" && (
-                        <div className="min-w-12 max-w-[calc(100vw-185px)] md:max-w-[calc(100vw-450px)] lg:max-w-[calc(100vw-575px)] max-h-[300px] overflow-y-auto overflow-x-auto custom-scrollbar">
-                          <div className="text-[13px] leading-relaxed whitespace-break-spaces">
+                        <div className="min-w-12 max-w-[calc(100vw-185px)] md:max-w-[calc(100vw-450px)] lg:max-w-[calc(100vw-575px)] max-h-[300px] overflow-y-auto overflow-x-auto custom-scrollbar text-selectable">
+                          <div className="text-[12px] leading-relaxed whitespace-break-spaces text-selectable">
                             {transaction.textContent}
                           </div>
                         </div>
@@ -423,9 +436,9 @@ export const ChatPanel = ({
                                        {transaction.transactionPercent.toFixed(2)}%
                                      </span>
                                    </div>
-                                 ) : transaction.status !== "cancelled" ? (
+                                 ) : (
                                    formatBytes(transaction.fileSize)
-                                 ) : null}
+                                 ) }
                                  {transaction.status === "cancelled" && (
                                    <span className="font-medium text-red-500/70">
                                      Cancelled
@@ -695,13 +708,19 @@ export const ChatPanel = ({
         >
           {showTextInput && (
             <div className="flex gap-2 mb-3 animate-in slide-in-from-bottom-2">
-              <input
-                type="text"
+              <textarea
+                ref={textareaRef}
                 value={textInput}
                 onChange={(e) => setTextInput(e.target.value)}
-                onKeyPress={(e) => e.key === "Enter" && handleSendText()}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSendText();
+                  }
+                }}
                 placeholder={t("type_message")}
-                className={`flex-1 px-4 py-2 border-transparent border transition-all rounded-xl text-[15px] outline-none ${theme.inputField}`}
+                className={`flex-1 px-4 py-2.5 border-transparent border transition-all rounded-xl text-[15px] outline-none resize-none min-h-[42px] max-h-[120px] custom-scrollbar overflow-y-auto ${theme.inputField}`}
+                rows={1}
                 autoFocus
               />
               <button
