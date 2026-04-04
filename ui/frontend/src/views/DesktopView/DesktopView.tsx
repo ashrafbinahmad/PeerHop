@@ -880,6 +880,8 @@ export const DesktopView = () => {
   const theme = {
     ...activeTheme, // Spread the active theme preset properties
     accentColor: activeAccent.color,
+    accentV1: activeAccent.v1,
+    accentV2: activeAccent.v2,
 
     // Dynamic Bubble Me (uses accent)
     bubbleMe: "text-white", // Bg color handled via style
@@ -981,8 +983,13 @@ export const DesktopView = () => {
       )}
       {/* PERSISTENT HEADER - Always visible */}
       <div
-        className={`absolute top-0 left-0 right-0 z-40 h-[48px] flex items-center px-4 gap-2 ${theme.panelBg}`}
-        style={{ "--wails-draggable": "drag" } as React.CSSProperties}
+        className={`absolute top-0 left-0 right-0 z-40 h-[48px] flex items-center px-4 gap-2 border-b transition-colors duration-300 ${theme.panelBg}`}
+        style={
+          {
+            "--wails-draggable": "drag",
+            borderColor: theme.accentV2,
+          } as React.CSSProperties
+        }
         onDoubleClick={handleMaximizeToggle}
       >
         <img

@@ -1326,10 +1326,10 @@ export const MobileUnified: React.FC<Props> = ({
                                         </span>
                                       )}
                                     {!isMe && effectiveStatus === "completed" && (
-                                        <span className="text-green-500 font-medium text-[13px]">Completed</span>
+                                        <span className="text-green-500 font-medium text-[13px]">{t("received")}</span>
                                     )}
                                     {isMe && effectiveStatus === "completed" && (
-                                        <span className="text-white/90 font-medium text-[13px]">{(t as any)("uploaded") || "Uploaded"}</span>
+                                        <span className="text-white/90 font-medium text-[13px]">{t("sent")}</span>
                                     )}
                                     </div>
                                   </div>

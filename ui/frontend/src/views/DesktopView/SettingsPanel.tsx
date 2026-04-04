@@ -223,49 +223,8 @@ export const SettingsPanel = ({
 
       {/* Settings Content - No borders, left-aligned */}
       <div className="space-y-6 text-left">
-        <div className="flex flex-wrap gap-2 mt-4 text-left w-full transition-all ">
-          {ADDITIONAL_ACTIONS.map((action) => (
-            <div className="grow lg:w-[45%] md:w-full ">
-              <button
-                onClick={action.onClick}
-                className={`px-4 py-2 rounded-lg w-full   text-sm font-medium  transition-colors  gap-3  ${isDarkMode ? "hover:!text-white" : "hover:!text-black"}   `}
-                style={{
-                  backgroundColor: `${activeAccent.v2}`,
-                  color: `${isDarkMode ? "#ffffffd3" : "#00000096"}`,
-                }}
-              >
-                <div>{action.icon}</div>
-                <div className="text-nowrap text-left">{action.label}</div>
-              </button>
-            </div>
-          ))}
-          {/* <div className="grow w-[45%] ">
-            <button
-              onClick={onRequestReview}
-              className={`px-4 py-2 rounded-lg w-full    text-sm font-medium  transition-colors  gap-3  ${isDarkMode ? "hover:!text-white" : "hover:!text-black"}  `}
-              style={{
-                backgroundColor: `${activeAccent.v2}`,
-                color: `${isDarkMode ? "#ffffffd3" : "#00000096"}`,
-              }}
-            >
-              <div>
-                <UserStar />
-              </div>
-              <div className="text-nowrap text-left w-full">
-                {" "}
-                {t("rate_app")}
-              </div>
-            </button>
-          </div> */}
-        </div>
-
         {/* General / Profile */}
         <div>
-          <h3
-            className={`text-[11px] font-bold uppercase tracking-[0.12em] opacity-40 mb-4 ${theme.text}`}
-          >
-            {t("general") || "General"}
-          </h3>
           <div className="space-y-5">
             {/* Host Name Setting */}
             <div className="flex items-center justify-between gap-4 group">
@@ -365,7 +324,7 @@ export const SettingsPanel = ({
         </div>
 
         {/* Features */}
-        <div>
+        <div className="py-10">
           <h3
             className={`text-[11px] font-bold uppercase tracking-[0.12em] opacity-40 mb-4 ${theme.text}`}
           >
@@ -508,11 +467,6 @@ export const SettingsPanel = ({
         {/* Server Info */}
         {serverInfo && (
           <div>
-            <h3
-              className={`text-[11px] font-bold uppercase tracking-[0.12em] opacity-40 mb-4 ${theme.text}`}
-            >
-              {t("server_info") || "Connection Information"}
-            </h3>
             <div className="space-y-3">
               <div>
                 <p
@@ -626,7 +580,7 @@ export const SettingsPanel = ({
         )}
 
         {/* Theme Setting */}
-        <div>
+        <div className="py-10">
           <h3
             className={`text-[11px] font-bold uppercase tracking-[0.12em] opacity-40 mb-3 ${theme.text}`}
           >
@@ -641,12 +595,12 @@ export const SettingsPanel = ({
                 onClick={() => setActiveThemeId(t.id)}
                 className={`shrink-0 w-20 p-1 rounded-xl border-2 transition-all duration-200 group ${
                   activeThemeId === t.id
-                    ? "border-[#007AFF]"
+                    ? ""
                     : "border-transparent hover:border-gray-200 dark:hover:border-slate-700"
                 }`}
                 style={{
                   borderColor:
-                    activeThemeId === t.id ? activeAccent.v1 : undefined,
+                    activeThemeId === t.id ? activeAccent.color : undefined,
                 }}
               >
                 <div
@@ -705,8 +659,25 @@ export const SettingsPanel = ({
             ))}
           </div>
         </div>
+        <div className="flex flex-wrap gap-2 mt-4 text-left w-full transition-all ">
+          {ADDITIONAL_ACTIONS.map((action) => (
+            <div className="grow lg:w-[45%] md:w-full ">
+              <button
+                onClick={action.onClick}
+                className={`px-4 py-2 rounded-lg w-full   text-sm font-medium  transition-colors  gap-3  ${isDarkMode ? "hover:!text-white" : "hover:!text-black"}   `}
+                style={{
+                  backgroundColor: `${activeAccent.v2}`,
+                  color: `${isDarkMode ? "#ffffffd3" : "#00000096"}`,
+                }}
+              >
+                <div>{action.icon}</div>
+                <div className="text-nowrap text-left">{action.label}</div>
+              </button>
+            </div>
+          ))}
+        </div>
         {/* App Version */}
-        <div className="pt-8 mt-8 border-gray-100 dark:border-slate-800 opacity-40">
+        <div className="pt-8 mt-8 mb-8 pb-8 border-gray-100 dark:border-slate-800 opacity-40">
           <p className={`text-[13px] text-center ${theme.text}`}>
             {t("app_name")} {t("v")}
             {APP_VERSION}
