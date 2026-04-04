@@ -120,5 +120,13 @@
   "connect_desktop_hint": "Windows, mac, linux and others",
   "restart_confirmation_title": "Server Restart Required",
   "restart_confirmation_message": "Restarting the server will disconnect all devices and clear current transactions. Are you sure you want to proceed?",
-  "proceed_and_restart": "Proceed & Restart"
+  "proceed_and_restart": "Proceed & Restart",
+  "hotspot_name": "Wifi Hotspot",
+  "hotspot_password": "Hotspot Password",
+  "show_password": "Show password",
+  "hide_password": "Hide password",
+  "faster_badge": "Faster Connection",
+  "i_connected_to_this": "I connected to this",
+  "active": "Active",
+  "ethernet_network": "Ethernet / LAN"
 }

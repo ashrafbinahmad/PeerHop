@@ -46,6 +46,10 @@ export function SelectFiles() {
   return window['go']['main']['App']['SelectFiles']();
 }
 
+export function SelectNetworkIP(arg1) {
+  return window['go']['main']['App']['SelectNetworkIP'](arg1);
+}
+
 export function ShowInFolder(arg1) {
   return window['go']['main']['App']['ShowInFolder'](arg1);
 }

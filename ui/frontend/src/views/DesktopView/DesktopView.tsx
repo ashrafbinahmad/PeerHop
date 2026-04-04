@@ -15,6 +15,7 @@ import {
   GetClipboardFiles,
   GetSecureSettings,
   SelectDownloadPath,
+  SelectNetworkIP,
 } from "../../../wailsjs/go/main/App";
 import { main } from "../../../wailsjs/go/models";
 import {
@@ -612,6 +613,15 @@ export const DesktopView = () => {
 
     return () => clearInterval(interval);
   }, []);
+
+  const handleSelectIP = async (ip: string) => {
+    try {
+      const info = await SelectNetworkIP(ip);
+      setServerInfo(info);
+    } catch (err) {
+      console.error("Failed to select network IP:", err);
+    }
+  };
 
   // Sync theme with server and save to localStorage
   useEffect(() => {
@@ -1211,6 +1221,8 @@ export const DesktopView = () => {
                 setShowQR={setShowQR}
                 showLink={showLink}
                 setShowLink={setShowLink}
+                onSelectIP={handleSelectIP}
+                activeAccent={activeAccent}
                 transactionsCount={transactions.length}
               />
             )}

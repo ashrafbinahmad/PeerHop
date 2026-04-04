@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
@@ -28,6 +29,10 @@ type App struct {
 	httpServer      *http.Server
 	serverStartTime time.Time
 	currentPort     int
+	networks        []network.NetworkProfile
+	networksMu      sync.RWMutex
+	selectedIP      string
+	selectedIPMu    sync.RWMutex
 }
 
 // NewApp creates a new App application struct
@@ -163,16 +168,48 @@ func (a *App) startPersistentServer() error {
 	logger.Info("Server started at %s", a.serverInfo.URL)
 	a.serverStartTime = time.Now()
 
-	// Asynchronously fetch WiFi name to avoid blocking startup
-	go func() {
-		ssid := network.GetWiFiName()
-		if a.serverInfo != nil {
-			a.serverInfo.SSID = ssid
-			logger.Info("WiFi SSID detected: %s", ssid)
-		}
-	}()
+	// Asynchronously handle network discovery to avoid blocking startup
+	go a.refreshNetworksBackground()
 
 	return nil
+}
+
+// SelectNetworkIP sets the preferred IP for the QR code and URL and returns updated info
+func (a *App) SelectNetworkIP(ip string) (*ServerInfo, error) {
+	a.selectedIPMu.Lock()
+	a.selectedIP = ip
+	a.selectedIPMu.Unlock()
+	logger.Info("User selected preferred IP: %s", ip)
+	return a.GetServerInfo()
+}
+
+// refreshNetworksBackground periodically updates the list of available network interfaces
+func (a *App) refreshNetworksBackground() {
+	// 1. Initial attempt to enable hotspot (Windows only)
+	network.TryEnableHotspot()
+
+	for {
+		profiles := network.GetNetworkProfiles()
+
+		a.networksMu.Lock()
+		a.networks = profiles
+		if a.serverInfo != nil {
+			a.serverInfo.Networks = profiles
+			// Populate legacy SSID for backward compatibility if needed
+			if len(profiles) > 0 {
+				a.serverInfo.SSID = profiles[0].SSID
+			}
+		}
+		a.networksMu.Unlock()
+
+		// Refresh every 10 seconds to detect network changes without excessive CPU usage
+		time.Sleep(10 * time.Second)
+
+		// Check if context is cancelled (app shutting down)
+		if a.ctx != nil && a.ctx.Err() != nil {
+			return
+		}
+	}
 }
 
 // GetServerInfo returns the current server information
@@ -181,12 +218,48 @@ func (a *App) GetServerInfo() (*ServerInfo, error) {
 		return nil, fmt.Errorf("server not started")
 	}
 
-	// Refresh SSID and IP in case they changed (e.g. WiFi switch)
+	// Refresh primary SSID and IP for the main URL
 	ssid := network.GetWiFiName()
 	a.serverInfo.SSID = ssid
 
-	ip, err := network.GetLocalIP()
-	if err == nil && a.currentPort > 0 {
+	// Use user-selected IP if available, otherwise fallback to auto-detection
+	var ip string
+	a.selectedIPMu.Lock()
+	ip = a.selectedIP
+
+	// Validate: If the selected IP is no longer in the list of networks, clear it
+	if ip != "" {
+		found := false
+		a.networksMu.RLock()
+		for _, netProf := range a.networks {
+			if netProf.IP == ip {
+				found = true
+				break
+			}
+		}
+		a.networksMu.RUnlock()
+
+		if !found {
+			logger.Info("Selected IP %s is no longer available (Hotspot disabled?), resetting to default", ip)
+			a.selectedIP = ""
+			ip = ""
+		}
+	}
+	a.selectedIPMu.Unlock()
+
+	if ip == "" {
+		detectedIP, err := network.GetLocalIP()
+		if err == nil {
+			ip = detectedIP
+		}
+	}
+
+	// Use cached networks for Step 1
+	a.networksMu.RLock()
+	a.serverInfo.Networks = a.networks
+	a.networksMu.RUnlock()
+
+	if ip != "" && a.currentPort > 0 {
 		a.serverInfo.URL = fmt.Sprintf("http://%s:%d", ip, a.currentPort)
 	}
 
@@ -281,10 +354,13 @@ func (a *App) RequestReview() error {
 }
 
 type ServerInfo struct {
-	URL      string `json:"url"`
-	Filename string `json:"filename"`
-	Size     int64  `json:"size"`
-	SSID     string `json:"ssid"`
+	URL             string `json:"url"`
+	Filename        string `json:"filename"`
+	Size            int64  `json:"size"`
+	SSID            string                   `json:"ssid"`
+	HotspotSSID     string                   `json:"hotspotSsid"`
+	HotspotPassword string                   `json:"hotspotPassword"`
+	Networks        []network.NetworkProfile `json:"networks"`
 }
 
 // StartTransfer prepares files and makes them available for download

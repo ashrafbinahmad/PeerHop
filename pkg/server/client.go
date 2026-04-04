@@ -37,6 +37,24 @@ func NewClientStore() *ClientStore {
 
 // AddOrUpdateClient adds a new client or updates an existing one (grouped by IP)
 func (cs *ClientStore) AddOrUpdateClient(userAgent, ip string) *Client {
+	// Group ALL server local IPs to skip them
+	serverIPs := getLocalIPs()
+	isServer := false
+	for _, sip := range serverIPs {
+		if ip == sip {
+			isServer = true
+			break
+		}
+	}
+	if ip == "127.0.0.1" || ip == "::1" || ip == "localhost" || ip == "192.168.137.1" {
+		isServer = true
+	}
+
+	if isServer {
+		// Don't track the server itself as a client
+		return nil
+	}
+
 	cs.mu.Lock()
 	defer cs.mu.Unlock()
 
@@ -61,7 +79,6 @@ func (cs *ClientStore) AddOrUpdateClient(userAgent, ip string) *Client {
 	client.Platform = parsePlatform(userAgent)
 
 	// If name is still empty or matches old platform name, update it?
-	// Actually, let's keep it as is once set.
 	if client.Name == "" {
 		client.Name = client.Platform
 	}
@@ -103,8 +120,8 @@ func (cs *ClientStore) GetClients() []*Client {
 				break
 			}
 		}
-		// Also check strictly for localhost
-		if client.IP == "127.0.0.1" || client.IP == "::1" || client.IP == "localhost" {
+		// Also check strictly for localhost and common hotspot IPs
+		if client.IP == "127.0.0.1" || client.IP == "::1" || client.IP == "localhost" || client.IP == "192.168.137.1" {
 			isServer = true
 		}
 

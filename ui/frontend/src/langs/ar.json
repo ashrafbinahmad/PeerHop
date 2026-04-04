@@ -101,5 +101,9 @@
   "mobile_tablet": "الجوال / التابلت",
   "pc_laptop": "Windows، Linux، Mac",
   "unable_to_detect": "تعذر الكشف",
-  "step_2_open_browser": "الخطوة 2: افتح الرابط في المتصفح"
+  "step_2_open_browser": "الخطوة 2: افتح الرابط في المتصفح",
+  "hotspot_name": "Mobile Hotspot Name",
+  "hotspot_password": "Hotspot Password",
+  "show_password": "Show password",
+  "hide_password": "Hide password"
 }

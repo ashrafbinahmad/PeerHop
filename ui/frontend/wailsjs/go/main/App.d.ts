@@ -25,6 +25,8 @@ export function SelectDownloadPath(arg1:string):Promise<string>;
 
 export function SelectFiles():Promise<Array<string>>;
 
+export function SelectNetworkIP(arg1:string):Promise<main.ServerInfo>;
+
 export function ShowInFolder(arg1:string):Promise<void>;
 
 export function ShowOpenWithDialog(arg1:string):Promise<void>;
