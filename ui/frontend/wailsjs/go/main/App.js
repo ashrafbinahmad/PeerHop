@@ -50,6 +50,10 @@ export function SelectNetworkIP(arg1) {
   return window['go']['main']['App']['SelectNetworkIP'](arg1);
 }
 
+export function SendNotification(arg1, arg2) {
+  return window['go']['main']['App']['SendNotification'](arg1, arg2);
+}
+
 export function ShowInFolder(arg1) {
   return window['go']['main']['App']['ShowInFolder'](arg1);
 }

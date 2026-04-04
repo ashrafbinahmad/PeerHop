@@ -16,6 +16,7 @@ import {
   GetSecureSettings,
   SelectDownloadPath,
   SelectNetworkIP,
+  SendNotification,
 } from "../../../wailsjs/go/main/App";
 import { main } from "../../../wailsjs/go/models";
 import {
@@ -26,6 +27,7 @@ import {
   OnFileDropOff,
   BrowserOpenURL,
   WindowIsMaximised,
+  WindowShow,
 } from "../../../wailsjs/runtime/runtime";
 import { useTransactions } from "../../hooks/useTransactions";
 import { formatBytes } from "../../utils/format";
@@ -58,6 +60,7 @@ import { ACCENT_COLORS, THEME_PRESETS } from "../../themeConstants";
 
 import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { useTranslation } from "../../hooks/useTranslation";
+const NOTIFICATION_SIZE_THRESHOLD = 5 * 1024 * 1024; // 5 MB
 
 const blobToBase64 = (blob: Blob): Promise<string> => {
   return new Promise((resolve, reject) => {
@@ -339,17 +342,27 @@ export const DesktopView = () => {
 
   // Track previously-seen transaction statuses so we only log once per completion
   const prevTransactionStatuses = useRef<Record<number, string>>({});
+  const prevClientStatuses = useRef<Record<number, Record<string, string>>>({});
 
   // Log sent / received when a transaction first reaches "completed"
   useEffect(() => {
+    const notifyEvents: {
+      type: "sent" | "received";
+      filename: string;
+      device?: string;
+    }[] = [];
+
     transactions.forEach((txn) => {
       const prev = prevTransactionStatuses.current[txn.id];
+      const isMe = txn.senderId === "server";
+      const isFile = txn.type === "file";
+      const isLarge = (txn.fileSize || 0) >= NOTIFICATION_SIZE_THRESHOLD;
+
+      // 1. Transaction-level completion (Mainly for Receiving side or single-client)
       if (txn.status === "completed" && prev !== "completed") {
-        const isMe = txn.senderId === "server";
-        if (txn.type === "file") {
-          const sizeLabel = txn.fileSize
-            ? ` (${formatBytes(txn.fileSize)})`
-            : "";
+        const sizeLabel = txn.fileSize ? ` (${formatBytes(txn.fileSize)})` : "";
+
+        if (isFile) {
           if (isMe) {
             logActivity(
               "sending_completed",
@@ -360,6 +373,24 @@ export const DesktopView = () => {
               "receiving_completed",
               `Received ${txn.filename || "file"}${sizeLabel}`,
             );
+
+            // Add to notification queue if not focused and large
+            if (!document.hasFocus() && isLarge) {
+              notifyEvents.push({
+                type: "received",
+                filename: txn.filename || "file",
+              });
+            }
+          }
+
+          // Increment review action count on completion of a file transfer
+          if (!reviewRequested) {
+            const nextCount = Math.min(9999, reviewActionCount + 1);
+            localStorage.setItem(
+              "peerhop_review_action_count",
+              String(nextCount),
+            );
+            setReviewActionCount(nextCount);
           }
         } else if (txn.type === "text") {
           const charCount = txn.textContent?.length || 0;
@@ -375,19 +406,79 @@ export const DesktopView = () => {
             );
           }
         }
+      }
 
-        if (!reviewRequested) {
-          const nextCount = Math.min(9999, reviewActionCount + 1);
-          localStorage.setItem(
-            "peerhop_review_action_count",
-            String(nextCount),
-          );
-          setReviewActionCount(nextCount);
+      // 2. Client-level completion (For multi-client sends)
+      if (isFile && isMe && txn.clientStatus) {
+        const prevClients = prevClientStatuses.current[txn.id] || {};
+        Object.keys(txn.clientStatus).forEach((ip) => {
+          const status = txn.clientStatus![ip];
+          const prevStatus = prevClients[ip];
+
+          if (status === "completed" && prevStatus !== "completed") {
+            const client = clients.find((c) => c.ip === ip);
+            const deviceNameStr = client ? client.name || client.platform : ip;
+
+            logActivity(
+              "sending_completed",
+              `Device ${deviceNameStr} finished receiving ${txn.filename || "file"}`,
+            );
+
+            if (!document.hasFocus() && isLarge) {
+              notifyEvents.push({
+                type: "sent",
+                filename: txn.filename || "file",
+                device: deviceNameStr,
+              });
+            }
+          }
+        });
+      }
+
+      // Store current states for next effect run
+      prevTransactionStatuses.current[txn.id] = txn.status;
+      if (txn.clientStatus) {
+        prevClientStatuses.current[txn.id] = { ...txn.clientStatus };
+      }
+    });
+
+    // 3. Trigger Bundled Notifications
+    if (notifyEvents.length > 0 && !document.hasFocus()) {
+      const title = t("app_name");
+      let body = "";
+
+      if (notifyEvents.length === 1) {
+        const ev = notifyEvents[0];
+        if (ev.type === "received") {
+          body = t("notification_received_body", { filename: ev.filename });
+        } else {
+          body = t("notification_client_received_body", {
+            device: ev.device || "A device",
+            filename: ev.filename,
+          });
+        }
+      } else {
+        // Bundling Logic
+        const uniqueFiles = [...new Set(notifyEvents.map((e) => e.filename))];
+        if (uniqueFiles.length === 1) {
+          // Multiple clients, same file
+          body = t("notification_multi_client_received_body", {
+            count: notifyEvents.length,
+            filename: uniqueFiles[0],
+          });
+        } else {
+          // Multiple different transfers
+          body = t("notification_multi_files_received_body", {
+            count: notifyEvents.length,
+          });
         }
       }
-      prevTransactionStatuses.current[txn.id] = txn.status;
-    });
-  }, [transactions, logActivity, reviewActionCount, reviewRequested]);
+
+      SendNotification(title, body).catch((err: any) =>
+        console.error("Failed to send native notification:", err),
+      );
+    }
+  }, [transactions, logActivity, reviewActionCount, reviewRequested, clients]);
 
   // Log app session start / end
   useEffect(() => {

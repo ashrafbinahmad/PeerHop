@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	_ "embed"
 	"encoding/base64"
 	"fmt"
 	"net/http"
@@ -19,7 +20,14 @@ import (
 	"peerhop/pkg/network"
 	"peerhop/pkg/server"
 	"peerhop/pkg/utils"
+
+	"github.com/gen2brain/beeep"
+	"github.com/go-toast/toast"
+	stdruntime "runtime"
 )
+
+//go:embed frontend/src/assets/images/appicon44x44.png
+var appIcon []byte
 
 // App struct
 type App struct {
@@ -577,6 +585,33 @@ func (a *App) GetClipboardFiles() ([]string, error) {
 			paths = append(paths, val)
 		}
 	}
-
 	return paths, nil
+}
+
+// SendNotification sends a native system notification
+func (a *App) SendNotification(title, message string) error {
+	// Create temp icon file for notifications that require a path
+	iconPath := ""
+	if len(appIcon) > 0 {
+		tempDir := os.TempDir()
+		iconPath = filepath.Join(tempDir, "peerhop_notif_icon.png")
+		if _, err := os.Stat(iconPath); os.IsNotExist(err) {
+			_ = os.WriteFile(iconPath, appIcon, 0644)
+		}
+	}
+
+	if stdruntime.GOOS == "windows" {
+		// Use toast for Windows to support silence
+		notification := toast.Notification{
+			AppID:   "PeerHop",
+			Title:   title,
+			Message: message,
+			Icon:    iconPath,
+			Audio:   toast.Silent,
+		}
+		return notification.Push()
+	}
+
+	// Use beeep for other platforms (default sound)
+	return beeep.Notify(title, message, iconPath)
 }

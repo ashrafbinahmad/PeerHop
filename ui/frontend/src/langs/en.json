@@ -128,5 +128,10 @@
   "faster_badge": "Faster Connection",
   "i_connected_to_this": "I connected to this",
   "active": "Active",
-  "ethernet_network": "Ethernet / LAN"
+  "ethernet_network": "Ethernet / LAN",
+  "notification_sent_body": "A client finished receiving {{filename}}",
+  "notification_received_body": "Successfully received {{filename}}",
+  "notification_client_received_body": "{{device}} finished receiving {{filename}}",
+  "notification_multi_client_received_body": "{{count}} devices finished receiving {{filename}}",
+  "notification_multi_files_received_body": "{{count}} files finished transferring"
 }

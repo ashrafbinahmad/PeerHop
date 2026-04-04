@@ -27,6 +27,8 @@ export function SelectFiles():Promise<Array<string>>;
 
 export function SelectNetworkIP(arg1:string):Promise<main.ServerInfo>;
 
+export function SendNotification(arg1:string,arg2:string):Promise<void>;
+
 export function ShowInFolder(arg1:string):Promise<void>;
 
 export function ShowOpenWithDialog(arg1:string):Promise<void>;
