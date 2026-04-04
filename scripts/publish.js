@@ -103,9 +103,9 @@ async function main() {
   }
 
   const versionComparison = compareVersions(version, currentVersion);
-  if (versionComparison <= 0) {
+  if (versionComparison < 0) {
     error(
-      `New version (${version}) must be greater than current version (${currentVersion})`,
+      `New version (${version}) must be greater than or equal to current version (${currentVersion})`,
     );
     log("Please provide a higher version number", "yellow");
     process.exit(1);
