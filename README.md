@@ -86,6 +86,25 @@ A native, lightweight GUI (Wails) is included.
 peerhop.exe
 ```
 
-## 🧠 How it Works
+## 🧠 Architecture & Codebase
 
-PeerHop is built with **Go** for high performance. It uses a lightweight HTTP server to stream files directly between devices on your LAN.
+PeerHop is built with **Go** for high performance and uses **React** for the user interface, bundled together using **Wails** for the desktop application. The core engine is a lightweight HTTP server that streams files directly between devices over the local network (LAN) without routing through external servers.
+
+### Directory Structure
+
+- **`/cmd`**: Contains the CLI entry points for running PeerHop without the GUI.
+- **`/pkg`**: The core Go backend packages.
+  - **`server/`**: HTTP server logic, WebSocket implementation for real-time progress, and routing.
+  - **`network/`**: Network discovery, IP resolution, and connection handling.
+  - **`logger/`**: Custom logging utilities.
+  - **`utils/`**: Helper functions (e.g., zip creation, file handling).
+- **`/ui`**: The Wails desktop GUI application.
+  - **`main.go` / `app.go`**: Wails application lifecycle and Go bindings for the frontend.
+  - **`frontend/`**: The React, Vite, and TailwindCSS codebase for the user interface.
+- **`/npm-package` & `/scripts`**: Build and distribution scripts for NPM, Windows, and Linux releases.
+
+### Key Technologies
+- **Backend**: Go (Golang)
+- **Frontend**: React, TypeScript, Vite, TailwindCSS
+- **Desktop Framework**: Wails v2
+- **Distribution**: NPM, GitHub Releases, APT (coming soon)
