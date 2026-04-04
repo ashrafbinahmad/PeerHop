@@ -25,7 +25,7 @@
   "require_token": "Require security token for API access",
   "multi_client": "Enable Multi-Client",
   "allow_multiple_devices": "Allow multiple devices to connect simultaneously",
-  "server_info": "Server Information",
+  "server_info": "Connection Information",
   "url": "URL",
   "wifi_network": "Wi-Fi Network",
   "share_file": "Share a file",
@@ -104,7 +104,7 @@
   "tap_to_reveal_qr": "Tap to reveal QR and Network info",
   "tap_to_hide_qr": "Tap to hide connection details",
   "general": "General",
-  "host_name": "Device",
-  "download_location": "Download Location",
+  "host_name": "Device Name",
+  "download_location": "File Saving Location",
   "do_not_reload_upload": "Please do not close or reload the page while sending"
 }

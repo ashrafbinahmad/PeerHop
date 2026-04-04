@@ -2,6 +2,7 @@ package utils
 
 import (
 	"fmt"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
@@ -30,7 +31,7 @@ func OpenFileDefault(path string) error {
 	return cmd.Start()
 }
 
-// ShowInFolder opens the file manager and selects the file
+// ShowInFolder opens the file manager and selects the file (or opens the directory if it is one)
 func ShowInFolder(path string) error {
 	fmt.Printf("[DEBUG] ShowInFolder: input path = %s\n", path)
 	var cmd *exec.Cmd
@@ -41,19 +42,36 @@ func ShowInFolder(path string) error {
 	}
 	fmt.Printf("[DEBUG] ShowInFolder: absPath = %s\n", absPath)
 
+	// Check if path is a directory
+	info, err := os.Stat(absPath)
+	isDir := err == nil && info.IsDir()
+
 	switch runtime.GOOS {
 	case "windows":
-		fmt.Printf("[DEBUG] ShowInFolder (Windows): executing explorer /select,\"%s\"\n", absPath)
-		cmd = exec.Command("explorer", "/select,"+absPath)
+		if isDir {
+			fmt.Printf("[DEBUG] ShowInFolder (Windows): executing explorer \"%s\"\n", absPath)
+			cmd = exec.Command("explorer", absPath)
+		} else {
+			fmt.Printf("[DEBUG] ShowInFolder (Windows): executing explorer /select,\"%s\"\n", absPath)
+			cmd = exec.Command("explorer", "/select,"+absPath)
+		}
 		// HideWindow(cmd) // REASON: This might hide the explorer window as well!
 	case "darwin":
-		fmt.Printf("[DEBUG] ShowInFolder (Mac): executing open -R \"%s\"\n", absPath)
-		cmd = exec.Command("open", "-R", absPath)
+		if isDir {
+			fmt.Printf("[DEBUG] ShowInFolder (Mac): executing open \"%s\"\n", absPath)
+			cmd = exec.Command("open", absPath)
+		} else {
+			fmt.Printf("[DEBUG] ShowInFolder (Mac): executing open -R \"%s\"\n", absPath)
+			cmd = exec.Command("open", "-R", absPath)
+		}
 	default: // linux
-		// Try to open the parent directory
-		dir := filepath.Dir(absPath)
-		fmt.Printf("[DEBUG] ShowInFolder (Linux): executing xdg-open \"%s\"\n", dir)
-		cmd = exec.Command("xdg-open", dir)
+		// Try to open the parent directory or the directory itself
+		target := absPath
+		if !isDir {
+			target = filepath.Dir(absPath)
+		}
+		fmt.Printf("[DEBUG] ShowInFolder (Linux): executing xdg-open \"%s\"\n", target)
+		cmd = exec.Command("xdg-open", target)
 	}
 
 	err = cmd.Start()

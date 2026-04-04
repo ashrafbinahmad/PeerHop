@@ -85,23 +85,29 @@ export const EditableDeviceName = ({
                 value={name}
                 disabled={disabled}
                 onChange={(e) => setName(e.target.value)}
-                onBlur={handleUpdateName}
-                onKeyDown={(e) => e.key === "Enter" && handleUpdateName()}
-                className={`text-sm font-bold w-full bg-transparent border-b border-blue-500 outline-none ${theme.text}`}
+                onBlur={() => {
+                  setName(client.name || client.platform);
+                  setIsEditing(false);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleUpdateName();
+                  if (e.key === "Escape") {
+                    setName(client.name || client.platform);
+                    setIsEditing(false);
+                  }
+                }}
+                className={`text-sm font-bold w-full bg-transparent border-b border-dashed outline-none py-0 px-0 ${theme.text} ${
+                  isDarkMode ? "border-slate-500" : "border-gray-400"
+                }`}
                 autoFocus
               />
             ) : (
-              <div className="flex items-center gap-1.5 overflow-hidden">
-                <h3 className={`text-sm font-bold truncate ${theme.text}`}>
-                  {client.name || client.platform}
-                </h3>
-                <button
-                  onClick={() => !disabled && setIsEditing(true)}
-                  className="opacity-0 group-hover:opacity-40 transition-opacity"
-                >
-                  <Pencil size={11} className={theme.text} />
-                </button>
-              </div>
+              <h3
+                onClick={() => !disabled && setIsEditing(true)}
+                className={`text-sm font-bold truncate cursor-pointer transition-colors hover:!text-[var(--accent-color)] ${theme.text}`}
+              >
+                {client.name || client.platform}
+              </h3>
             )}
             <div className={`flex items-center gap-1 text-[10px] font-mono opacity-50 ${theme.subText}`}>
               <Globe size={10} className="shrink-0" />
