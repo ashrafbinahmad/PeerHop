@@ -1,10 +1,10 @@
 {
   "name": "peerhop-root",
-  "version": "2.5.7",
+  "version": "2.5.8",
   "description": "Root package for PeerHop build scripts",
   "scripts": {
     "prebuild:frontend": "cd ui/frontend && npm run build && cd ../.. && rm -rf pkg/server/dist && cp -r ui/frontend/dist pkg/server/dist",
-    "build:win": "npm run prebuild:frontend && cd ui && wails build -clean -platform windows/amd64 -o ../../../builds/peerhop_win.exe",
+    "build:win": "node ./scripts/build-win.js",
     "build:win:nsis": "npm run prebuild:frontend && cd ui && wails build -clean -platform windows/amd64 -nsis -o ../../../builds/peerhop_setup.exe",
     "build:win:msi": "npm run prebuild:frontend && cd ui && wails build -clean -platform windows/amd64 && cd build/windows/msi && wix build product.wxs -ext WixToolset.UI.wixext -o ../../../../builds/peerhop_setup.msi",
     "build:win:msix": "node ./scripts/build-msix.js",

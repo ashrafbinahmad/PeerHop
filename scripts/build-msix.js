@@ -482,11 +482,32 @@ function buildMSIX(version) {
 
 // Run if called directly
 if (require.main === module) {
-  const version = process.argv[2];
-  if (!version) {
-    log("Please provide version argument", "red");
-    process.exit(1);
+  let version = process.argv[2];
+  const rootDir = path.join(__dirname, "..");
+
+  if (version) {
+    log(`Updating global version to ${version}...`, "cyan");
+    try {
+      execSync(`node ./scripts/update-version.js ${version}`, {
+        stdio: "inherit",
+        cwd: rootDir,
+      });
+    } catch (err) {
+      log("Global version update failed", "red");
+      process.exit(1);
+    }
+  } else {
+    // Read from version file if no argument provided
+    const versionFilePath = path.join(rootDir, "version");
+    if (fs.existsSync(versionFilePath)) {
+      version = fs.readFileSync(versionFilePath, "utf8").trim();
+      log(`Using version from version file: ${version}`, "cyan");
+    } else {
+      log("Error: No version provided and version file missing.", "red");
+      process.exit(1);
+    }
   }
+
   buildMSIX(version);
 }
 
