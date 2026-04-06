@@ -77,8 +77,8 @@ export const useTransactions = (
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [isDarkMode, setIsDarkMode] = useState(true); // Default Dark
-  const [activeThemeId, setActiveThemeId] = useState("night");
+  const [isDarkMode, setIsDarkMode] = useState(false); // Default Day is Light
+  const [activeThemeId, setActiveThemeId] = useState("day");
   const [activeAccentId, setActiveAccentId] = useState("blue");
   const [isConnected, setIsConnected] = useState(true); // Optimistic - assume connected until proven otherwise
   const [deviceName, setDeviceName] = useState(""); // Default to empty
@@ -125,8 +125,8 @@ export const useTransactions = (
       clients: [],
       loading: false,
       error: null,
-      isDarkMode: true,
-      activeThemeId: "night",
+      isDarkMode: false,
+      activeThemeId: "day",
       activeAccentId: "blue",
       isConnected: true,
       deviceName: "PeerHop",
@@ -231,7 +231,7 @@ export const useTransactions = (
       THEME_PRESETS.find((t) => t.id === "night") ||
       THEME_PRESETS[3];
 
-    const color = "#effcf6"; //activeTheme.metaColor || (isDarkMode ? "#0f172a" : "#F2F2F7");
+    const color = activeTheme.metaColor || (isDarkMode ? "#0f172a" : "#F2F2F7");
 
     // Update meta tag
     const metaThemeColor = document.querySelector('meta[name="theme-color"]');

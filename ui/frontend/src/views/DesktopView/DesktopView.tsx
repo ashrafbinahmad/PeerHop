@@ -243,7 +243,7 @@ export const DesktopView = () => {
 
   // UI States - Load theme from localStorage
   const [activeThemeId, setActiveThemeId] = useState<string>(() => {
-    return localStorage.getItem("themeId") || "classic";
+    return localStorage.getItem("themeId") || "day";
   });
 
   // Set axios base URL when server info is available
@@ -253,7 +253,7 @@ export const DesktopView = () => {
     }
   }, [serverInfo?.url]);
   const [activeAccentId, setActiveAccentId] = useState<string>(() => {
-    return localStorage.getItem("accentId") || "sky";
+    return localStorage.getItem("accentId") || "blue";
   });
 
   const activeTheme =

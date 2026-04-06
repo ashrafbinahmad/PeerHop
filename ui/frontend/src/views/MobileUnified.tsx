@@ -281,9 +281,9 @@ export const MobileUnified: React.FC<Props> = ({
     !isBlocked && (myClient?.sendingBlocked || false);
 
   const activeTheme =
-    THEME_PRESETS.find((t) => t.id === "classic") || THEME_PRESETS[7];
+    THEME_PRESETS.find((t) => t.id === "day") || THEME_PRESETS[8];
   const activeAccent =
-    ACCENT_COLORS.find((a) => a.id === "sky") || ACCENT_COLORS[1];
+    ACCENT_COLORS.find((a) => a.id === "blue") || ACCENT_COLORS[0];
 
   const theme = {
     ...activeTheme,
