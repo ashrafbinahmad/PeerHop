@@ -96,5 +96,7 @@
   "mobile_tablet": "Mobil / Tablet",
   "pc_laptop": "Windows, Linux, Mac",
   "unable_to_detect": "Nicht erkennbar",
-  "step_2_open_browser": "Schritt 2: URL im Browser öffnen"
+  "step_2_open_browser": "Schritt 2: URL im Browser öffnen",
+  "show_network_qr": "Show connection QR",
+  "scan_to_connect_wifi": "Scan to connect to this network"
 }

@@ -786,7 +786,10 @@ export const ChatPanel = ({
                     <div
                       className={`shrink-0 w-8 h-8 rounded-full flex items-center justify-center overflow-hidden mb-1 ${theme.iconBg} ${theme.iconText}`}
                     >
-                      <Monitor size={16} />
+                      <PlatformIcon
+                        platform={serverInfo?.platform || "unknown"}
+                        size={16}
+                      />
                     </div>
                   )}
                 </div>

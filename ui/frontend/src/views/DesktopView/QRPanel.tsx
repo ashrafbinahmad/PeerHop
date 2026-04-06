@@ -10,6 +10,7 @@ import {
   Monitor,
   Eye,
   EyeOff,
+  QrCode,
 } from "lucide-react";
 import { CopyButton } from "../../components/CopyButton";
 import { EditableDeviceName } from "./EditableDeviceName";
@@ -66,6 +67,8 @@ export const QRPanel = ({
   const { t } = useTranslation();
   const [isRestartConfirmOpen, setIsRestartConfirmOpen] = useState(false);
   const [hotspotPasswordVisible, setHotspotPasswordVisible] = useState(false);
+  const [showHotspotQR, setShowHotspotQR] = useState<any>(null);
+  const [showEthernet, setShowEthernet] = useState(false);
   const hasActiveConnections = clients.length > 0 || transactionsCount > 0;
   const prevClientsLength = useRef(clients.length);
 
@@ -111,7 +114,27 @@ export const QRPanel = ({
       );
     }
 
-    return serverInfo.networks.map((net: any, idx: number) => {
+    const networks = [...serverInfo.networks].sort((a: any, b: any) => {
+      const typePriority: any = { hotspot: 0, wifi: 1, ethernet: 2 };
+      const aP = typePriority[a.type] ?? 3;
+      const bP = typePriority[b.type] ?? 3;
+      return aP - bP;
+    });
+
+    const primaryNetworks = networks.filter(
+      (net: any) =>
+        net.type === "hotspot" ||
+        net.type === "wifi" ||
+        serverInfo.url?.includes(net.ip),
+    );
+    const secondaryNetworks = networks.filter(
+      (net: any) =>
+        net.type !== "hotspot" &&
+        net.type !== "wifi" &&
+        !serverInfo.url?.includes(net.ip),
+    );
+
+    const renderNetItem = (net: any, idx: number) => {
       const isActive = serverInfo.url?.includes(net.ip);
       return (
         <div
@@ -194,23 +217,32 @@ export const QRPanel = ({
                   {hotspotPasswordVisible ? net.password : "●●●●●●●●"}
                 </code>
               </div>
-              <button
-                onClick={() =>
-                  setHotspotPasswordVisible(!hotspotPasswordVisible)
-                }
-                className={`p-1 rounded-md hover:bg-black/5 dark:hover:bg-white/5 transition-colors ${theme.subText}`}
-                title={
-                  hotspotPasswordVisible
-                    ? t("hide_password")
-                    : t("show_password")
-                }
-              >
-                {hotspotPasswordVisible ? (
-                  <EyeOff size={14} />
-                ) : (
-                  <Eye size={14} />
-                )}
-              </button>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setShowHotspotQR(net)}
+                  className={`p-1 rounded-md hover:bg-black/5 dark:hover:bg-white/5 transition-colors ${theme.subText}`}
+                  title={t("show_network_qr")}
+                >
+                  <QrCode size={14} />
+                </button>
+                <button
+                  onClick={() =>
+                    setHotspotPasswordVisible(!hotspotPasswordVisible)
+                  }
+                  className={`p-1 rounded-md hover:bg-black/5 dark:hover:bg-white/5 transition-colors ${theme.subText}`}
+                  title={
+                    hotspotPasswordVisible
+                      ? t("hide_password")
+                      : t("show_password")
+                  }
+                >
+                  {hotspotPasswordVisible ? (
+                    <EyeOff size={14} />
+                  ) : (
+                    <Eye size={14} />
+                  )}
+                </button>
+              </div>
             </div>
           )}
 
@@ -234,7 +266,38 @@ export const QRPanel = ({
           )}
         </div>
       );
-    });
+    };
+
+    return (
+      <div className="space-y-2">
+        {primaryNetworks.map((net, idx) => renderNetItem(net, idx))}
+        {secondaryNetworks.length > 0 && (
+          <div className="flex flex-col gap-2">
+            {!showEthernet && (
+              <button
+                onClick={() => setShowEthernet(true)}
+                className={`w-full flex items-center justify-center py-1.5 rounded-lg border border-dashed transition-all duration-300 active:scale-[0.98] ${theme.deviceItemBg} ${theme.border} text-[9px] font-bold uppercase tracking-[0.1em] ${theme.subText}`}
+              >
+                + {t("show_more")}
+              </button>
+            )}
+            {showEthernet && (
+              <React.Fragment>
+                {secondaryNetworks.map((net, idx) =>
+                  renderNetItem(net, idx + primaryNetworks.length),
+                )}
+                <button
+                  onClick={() => setShowEthernet(false)}
+                  className={`w-full flex items-center justify-center py-1.5 rounded-lg border border-dashed transition-all duration-300 active:scale-[0.98] ${theme.deviceItemBg} ${theme.border} text-[9px] font-bold uppercase tracking-[0.1em] ${theme.subText}`}
+                >
+                  - {t("show_less")}
+                </button>
+              </React.Fragment>
+            )}
+          </div>
+        )}
+      </div>
+    );
   };
 
   return (
@@ -315,7 +378,7 @@ export const QRPanel = ({
           </button>
 
           <div
-            className={`transition-all duration-500 overflow-hidden ${showQR ? "opacity-100 max-h-[500px] py-4 mt-2.5" : "opacity-0 max-h-0 pointer-events-none"}`}
+            className={`transition-all duration-500 overflow-hidden ${showQR ? "opacity-100 _max-h-[1200px] py-4 mt-2.5" : "opacity-0 max-h-0 pointer-events-none"}`}
           >
             <div className="flex flex-col items-center gap-6">
               <div className="w-full px-2">
@@ -422,7 +485,7 @@ export const QRPanel = ({
           </button>
 
           <div
-            className={`transition-all duration-500 overflow-hidden ${showLink ? "opacity-100 max-h-[500px] py-4 mt-2.5" : "opacity-0 max-h-0 pointer-events-none"}`}
+            className={`transition-all duration-500 overflow-hidden ${showLink ? "opacity-100 max-h-[1200px] py-4 mt-2.5" : "opacity-0 max-h-0 pointer-events-none"}`}
           >
             <div className="flex flex-col items-center gap-6">
               {serverInfo?.url ? (
@@ -517,6 +580,55 @@ export const QRPanel = ({
         destructive={true}
         isDarkMode={isDarkMode}
       />
+      {showHotspotQR && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            onClick={() => setShowHotspotQR(null)}
+          />
+          <div
+            className={`relative backdrop-blur-xl rounded-2xl shadow-2xl w-full max-w-[260px] p-5 text-center animate-in zoom-in-95 duration-200 ${
+              isDarkMode ? "bg-[#1e293b]/95 text-slate-100" : "bg-white/95"
+            }`}
+          >
+            <div className="mb-4">
+              <h3 className="text-base font-bold mb-1 truncate px-2">
+                {showHotspotQR.ssid}
+              </h3>
+              <p className={`text-[10px] opacity-60 ${theme.subText}`}>
+                {t("scan_to_connect_wifi")}
+              </p>
+            </div>
+
+            <div className="bg-white p-3.5 rounded-2xl inline-block mb-5 shadow-sm">
+              <QRCode
+                value={`WIFI:S:${showHotspotQR.ssid};T:WPA;P:${showHotspotQR.password};;`}
+                size={160}
+                qrStyle="dots"
+                eyeRadius={50}
+                fgColor="#1b2636"
+                bgColor="#ffffff"
+                logoImage={`data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IiMxYjI2MzYiIHN0cm9rZS13aWR0aD0iMi41IiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiPjxjaXJjbGUgY3g9IjEyIiBjeT0iMTIiIHI9IjIiLz48cGF0aCBkPSJNMTYuMiA3LjhhNiA2IDAgMCAxIDAgOC40bTMuNS0xMS45YTExIDExIDAgMCAxIDAgMTUuNG0tMTUuNCAwYTExIDExIDAgMCAxIDAtMTUuNG0zLjUgMTEuOWE2IDYgMCAwIDEgMC04LjQiLz48L3N2Zz4=`}
+                logoWidth={32}
+                logoPadding={1.5}
+                logoPaddingStyle="circle"
+                ecLevel="H"
+              />
+            </div>
+
+            <button
+              onClick={() => setShowHotspotQR(null)}
+              className={`w-full py-2.5 rounded-xl text-sm font-bold transition-all active:scale-[0.97] ${
+                isDarkMode
+                  ? "bg-slate-700/80 hover:bg-slate-700 text-white"
+                  : "bg-gray-100 hover:bg-gray-200 text-gray-900"
+              }`}
+            >
+              {t("cancel")}
+            </button>
+          </div>
+        </div>
+      )}
     </React.Fragment>
   );
 };

@@ -104,5 +104,7 @@
   "mobile_tablet": "Ponsel / Tablet",
   "pc_laptop": "Windows, Linux, Mac",
   "unable_to_detect": "Tidak terdeteksi",
-  "step_2_open_browser": "Langkah 2: Buka URL di browser"
+  "step_2_open_browser": "Langkah 2: Buka URL di browser",
+  "show_network_qr": "Show connection QR",
+  "scan_to_connect_wifi": "Scan to connect to this network"
 }

@@ -1027,11 +1027,11 @@ export const DesktopView = () => {
 
   return (
     <div
-      className={`flex h-screen w-[calc(100vw)] font-sans overflow-hidden transition-colors duration-300 ${theme.bg} ${theme.text} relative hide-scrollbar`}
+      className={`flex h-full w-full font-sans overflow-hidden transition-colors duration-300 ${theme.bg} ${theme.text} relative hide-scrollbar rounded-xl border ${theme.border}`}
       style={
         {
+          "--wails-border": "1", // Hint for some platforms
           "--wails-drop-target": "drop",
-          "--wails-draggable": "drag",
         } as React.CSSProperties
       }
       onDragEnter={handleDragEnter}
@@ -1084,7 +1084,7 @@ export const DesktopView = () => {
       )}
       {/* PERSISTENT HEADER - Always visible */}
       <div
-        className={`absolute top-0 left-0 right-0 z-40 h-[48px] flex items-center px-4 gap-2 border-b transition-colors duration-300 ${theme.panelBg}`}
+        className={`absolute top-0 left-0 w-full z-40 h-[48px] flex items-center px-4 gap-2 border-b transition-colors duration-300  ${theme.panelBg}`}
         style={
           {
             "--wails-draggable": "drag",

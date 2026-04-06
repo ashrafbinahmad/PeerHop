@@ -8,6 +8,7 @@ export namespace main {
 	    hotspotSsid: string;
 	    hotspotPassword: string;
 	    networks: network.NetworkProfile[];
+	    platform: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new ServerInfo(source);
@@ -22,6 +23,7 @@ export namespace main {
 	        this.hotspotSsid = source["hotspotSsid"];
 	        this.hotspotPassword = source["hotspotPassword"];
 	        this.networks = this.convertValues(source["networks"], network.NetworkProfile);
+	        this.platform = source["platform"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

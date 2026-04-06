@@ -133,5 +133,9 @@
   "notification_received_body": "Successfully received {{filename}}",
   "notification_client_received_body": "{{device}} finished receiving {{filename}}",
   "notification_multi_client_received_body": "{{count}} devices finished receiving {{filename}}",
-  "notification_multi_files_received_body": "{{count}} files finished transferring"
+  "notification_multi_files_received_body": "{{count}} files finished transferring",
+  "show_network_qr": "Show connection QR",
+  "scan_to_connect_wifi": "Scan to connect to this network",
+  "show_more": "Show more",
+  "show_less": "Show less"
 }

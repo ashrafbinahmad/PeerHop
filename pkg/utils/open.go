@@ -48,14 +48,31 @@ func ShowInFolder(path string) error {
 
 	switch runtime.GOOS {
 	case "windows":
+		absPath = filepath.Clean(absPath)
 		if isDir {
 			fmt.Printf("[DEBUG] ShowInFolder (Windows): executing explorer \"%s\"\n", absPath)
 			cmd = exec.Command("explorer", absPath)
 		} else {
-			fmt.Printf("[DEBUG] ShowInFolder (Windows): executing explorer /select,\"%s\"\n", absPath)
-			cmd = exec.Command("explorer", "/select,"+absPath)
+			// Check if file exists. If it doesn't, we can't select it, so open the parent folder.
+			// This prevents Explorer from defaulting to the Documents folder.
+			exists := false
+			if _, err := os.Stat(absPath); err == nil {
+				exists = true
+			}
+
+			if exists {
+				fmt.Printf("[DEBUG] ShowInFolder (Windows): file exists, selecting: %s\n", absPath)
+				// The most reliable way in Go to call /select, with spaces:
+				// Pass "/select," as the first arg and the path as the second.
+				// This ensures Go quotes ONLY the path part correctly.
+				cmd = exec.Command("explorer", "/select,", absPath)
+			} else {
+				parent := filepath.Dir(absPath)
+				fmt.Printf("[DEBUG] ShowInFolder (Windows): file not found, opening parent: %s\n", parent)
+				// If parent doesn't exist either, Explorer will fallback to Documents or This PC.
+				cmd = exec.Command("explorer", parent)
+			}
 		}
-		// HideWindow(cmd) // REASON: This might hide the explorer window as well!
 	case "darwin":
 		if isDir {
 			fmt.Printf("[DEBUG] ShowInFolder (Mac): executing open \"%s\"\n", absPath)

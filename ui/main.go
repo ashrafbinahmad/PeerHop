@@ -2,70 +2,17 @@ package main
 
 import (
 	"embed"
-	"encoding/json"
 	"os"
-	"syscall"
-	"time"
-	"unsafe"
 
-	"github.com/Microsoft/go-winio"
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
-	winopts "github.com/wailsapp/wails/v2/pkg/options/windows"
-	"golang.org/x/sys/windows"
+	"github.com/wailsapp/wails/v2/pkg/options/linux"
+	"github.com/wailsapp/wails/v2/pkg/options/mac"
 )
 
 //go:embed all:frontend/dist
 var assets embed.FS
-
-var (
-	moduser32         = syscall.NewLazyDLL("user32.dll")
-	procFindWindowW   = moduser32.NewProc("FindWindowW")
-	procShowWindow    = moduser32.NewProc("ShowWindow")
-	procSetForeground = moduser32.NewProc("SetForegroundWindow")
-)
-
-func findAndFocusExistingWindow(title string) {
-	titlePtr, _ := syscall.UTF16PtrFromString(title)
-	hwnd, _, _ := procFindWindowW.Call(0, uintptr(unsafe.Pointer(titlePtr)))
-	if hwnd != 0 {
-		procShowWindow.Call(hwnd, 9) // SW_RESTORE = 9
-		procSetForeground.Call(hwnd)
-	}
-}
-
-func sendShareToExistingInstance(files []string) bool {
-	if len(files) == 0 {
-		return false
-	}
-
-	data := struct {
-		Title string   `json:"title"`
-		Files []string `json:"files"`
-	}{
-		Title: "Shared from command-line",
-		Files: files,
-	}
-
-	payload, err := json.Marshal(data)
-	if err != nil {
-		return false
-	}
-
-	pipeName := `\\.\pipe\peerhop-share`
-	for i := 0; i < 5; i++ {
-		conn, err := winio.DialPipe(pipeName, nil)
-		if err != nil {
-			time.Sleep(100 * time.Millisecond)
-			continue
-		}
-		_, err = conn.Write(payload)
-		conn.Close()
-		return err == nil
-	}
-	return false
-}
 
 func main() {
 	cmdFiles := []string{}
@@ -75,22 +22,9 @@ func main() {
 		}
 	}
 
-	// Single-instance guard: create a named mutex so only one window can run.
-	mutexName, _ := windows.UTF16PtrFromString("Local\\PeerHopSingleInstance")
-	handle, err := windows.CreateMutex(nil, true, mutexName)
-	if err != nil && err != windows.ERROR_ALREADY_EXISTS {
-		panic(err)
-	}
-	if err == windows.ERROR_ALREADY_EXISTS {
-		if len(cmdFiles) > 0 {
-			sendShareToExistingInstance(cmdFiles)
-		}
-		findAndFocusExistingWindow("PeerHop")
-		os.Exit(0)
-	}
-	if handle != 0 {
-		defer windows.CloseHandle(handle)
-	}
+	// Platform-specific single-instance handling
+	_, cleanup := handleSingleInstance(cmdFiles)
+	defer cleanup()
 
 	// Create an instance of the app structure
 	app := NewApp()
@@ -106,15 +40,20 @@ func main() {
 			Assets: assets,
 		},
 		Frameless:        true,
-		BackgroundColour: &options.RGBA{R: 27, G: 38, B: 54, A: 1},
+		DisableResize:    false,
+		BackgroundColour: &options.RGBA{R: 27, G: 38, B: 54, A: 0},
 		OnStartup:        app.startup,
 		DragAndDrop: &options.DragAndDrop{
 			EnableFileDrop:     true,
 			DisableWebViewDrop: true,
 		},
-		Windows: &winopts.Options{
-			WebviewIsTransparent: false,
-			WindowIsTranslucent:  false,
+		Windows: getWindowsOptions(),
+		Mac: &mac.Options{
+			WebviewIsTransparent: true,
+			WindowIsTranslucent:  true,
+		},
+		Linux: &linux.Options{
+			WindowIsTranslucent: true,
 		},
 		Bind: []interface{}{
 			app,

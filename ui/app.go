@@ -2,12 +2,10 @@ package main
 
 import (
 	"context"
-	_ "embed"
 	"encoding/base64"
 	"fmt"
 	"net/http"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -21,9 +19,7 @@ import (
 	"peerhop/pkg/server"
 	"peerhop/pkg/utils"
 
-	"github.com/gen2brain/beeep"
-	"github.com/go-toast/toast"
-	stdruntime "runtime"
+	_ "embed"
 )
 
 //go:embed frontend/src/assets/images/appicon44x44.png
@@ -49,7 +45,6 @@ func NewApp() *App {
 }
 
 // GetSecureSettings allows the frontend to securely retrieve tokens
-// This method is only accessible via Wails IPC, not via HTTP network
 func (a *App) GetSecureSettings() server.SecuritySettings {
 	if a.unifiedHandler == nil {
 		return server.SecuritySettings{}
@@ -63,8 +58,11 @@ func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
 
 	// Initialize logger
-	logDir := filepath.Join(os.Getenv("APPDATA"), "PeerHop", "logs")
-	if logDir == "" {
+	appData := os.Getenv("APPDATA")
+	var logDir string
+	if appData != "" {
+		logDir = filepath.Join(appData, "PeerHop", "logs")
+	} else {
 		// Fallback for non-Windows or if APPDATA not set
 		home, _ := os.UserHomeDir()
 		logDir = filepath.Join(home, ".peerhop", "logs")
@@ -89,10 +87,7 @@ func (a *App) startup(ctx context.Context) {
 		logger.Error("Failed to start server: %v", err)
 	}
 
-	// Check for Windows Share Target activation and context-menu file args.
-	// Called synchronously so currentShareData is populated before the frontend
-	// calls GetSharedFiles() on mount. The named pipe listener is started
-	// inside a goroutine within CheckShareActivation itself.
+	// Check for Platform-specific Share Target activation and context-menu file args.
 	a.CheckShareActivation()
 }
 
@@ -158,10 +153,12 @@ func (a *App) startPersistentServer() error {
 		Handler: mux,
 	}
 
-	// Store server info (start with empty SSID, will be populated asynchronously)
+	// Store server info
+	env = runtime.Environment(a.ctx)
 	a.serverInfo = &ServerInfo{
-		URL:  fmt.Sprintf("http://%s:%d", ip, port),
-		SSID: "",
+		URL:      fmt.Sprintf("http://%s:%d", ip, port),
+		SSID:     "",
+		Platform: env.Platform,
 	}
 
 	a.httpServer = httpServer
@@ -193,7 +190,7 @@ func (a *App) SelectNetworkIP(ip string) (*ServerInfo, error) {
 
 // refreshNetworksBackground periodically updates the list of available network interfaces
 func (a *App) refreshNetworksBackground() {
-	// 1. Initial attempt to enable hotspot (Windows only)
+	// Try to enable hotspot (Platform-specific dummy for non-Windows)
 	network.TryEnableHotspot()
 
 	for {
@@ -262,7 +259,7 @@ func (a *App) GetServerInfo() (*ServerInfo, error) {
 		}
 	}
 
-	// Use cached networks for Step 1
+	// Use cached networks
 	a.networksMu.RLock()
 	a.serverInfo.Networks = a.networks
 	a.networksMu.RUnlock()
@@ -270,6 +267,10 @@ func (a *App) GetServerInfo() (*ServerInfo, error) {
 	if ip != "" && a.currentPort > 0 {
 		a.serverInfo.URL = fmt.Sprintf("http://%s:%d", ip, a.currentPort)
 	}
+
+	// Add platform info
+	env := runtime.Environment(a.ctx)
+	a.serverInfo.Platform = env.Platform
 
 	return a.serverInfo, nil
 }
@@ -337,38 +338,15 @@ func getWindowsStoreProductID() string {
 	return id
 }
 
-// RequestReview triggers the native Windows Store rating dialog using WinRT StoreRequestHelper request type 16.
-// If WinRT does not work, it falls back to opening the ms-windows-store review URI.
-func (a *App) RequestReview() error {
-	storeID := getWindowsStoreProductID()
-	fws := "ms-windows-store://review/?ProductId=" + storeID
-	psCmd := fmt.Sprintf(`try {
-		$req = [Windows.Services.Store.StoreRequestHelper]::SendRequestAsync(16, '%s')
-		$req.GetResults() | Out-Null
-	} catch {
-		Start-Process -FilePath '%s'
-	}`, storeID, fws)
-
-	cmd := exec.Command("powershell", "-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", psCmd)
-	utils.HideWindow(cmd)
-	if err := cmd.Run(); err != nil {
-		logger.Warn("RequestReview PowerShell failed: %v", err)
-		if a.ctx != nil {
-			runtime.BrowserOpenURL(a.ctx, fws)
-		}
-		return nil
-	}
-	return nil
-}
-
 type ServerInfo struct {
-	URL             string `json:"url"`
-	Filename        string `json:"filename"`
-	Size            int64  `json:"size"`
+	URL             string                   `json:"url"`
+	Filename        string                   `json:"filename"`
+	Size            int64                    `json:"size"`
 	SSID            string                   `json:"ssid"`
 	HotspotSSID     string                   `json:"hotspotSsid"`
 	HotspotPassword string                   `json:"hotspotPassword"`
 	Networks        []network.NetworkProfile `json:"networks"`
+	Platform        string                   `json:"platform"`
 }
 
 // StartTransfer prepares files and makes them available for download
@@ -434,7 +412,7 @@ func (a *App) StartTransfer(paths []string) (*ServerInfo, error) {
 		return a.serverInfo, nil
 	}
 
-	// Multiple files (no directories) - send each individually
+	// Multiple files
 	var totalSize int64
 	var filenames []string
 
@@ -447,7 +425,7 @@ func (a *App) StartTransfer(paths []string) (*ServerInfo, error) {
 		totalSize += stat.Size()
 		filenames = append(filenames, filepath.Base(filePath))
 
-		// Create transaction for each file
+		// Create transaction
 		if a.unifiedHandler != nil && a.unifiedHandler.TxStore != nil {
 			txn := &server.Transaction{
 				Type:               server.TransactionTypeFile,
@@ -484,15 +462,8 @@ func (a *App) StartTransfer(paths []string) (*ServerInfo, error) {
 	return a.serverInfo, nil
 }
 
-
-func removeZoneIdentifier(filePath string) {
-	zonePath := filePath + ":Zone.Identifier"
-	os.Remove(zonePath)
-}
-
 // OpenSourceFile opens the file in default app
 func (a *App) OpenSourceFile(filePath string) error {
-
 	if !filepath.IsAbs(filePath) {
 		sm := server.NewSettingsManager()
 		settings := sm.LoadSettings()
@@ -503,7 +474,7 @@ func (a *App) OpenSourceFile(filePath string) error {
 		}
 	}
 
-	// Remove Windows Internet security flag
+	// Handle platform-specific cleanup (e.g. Zone.Identifier on Windows)
 	removeZoneIdentifier(filePath)
 
 	return utils.OpenFileDefault(filePath)
@@ -511,19 +482,15 @@ func (a *App) OpenSourceFile(filePath string) error {
 
 // ShowInFolder opens the file manager and selects the file
 func (a *App) ShowInFolder(filePath string) error {
-	// Resolve path
 	if !filepath.IsAbs(filePath) {
 		sm := server.NewSettingsManager()
 		settings := sm.LoadSettings()
-		dlPath := filepath.Join(settings.DownloadPath, filePath)
-		if _, err := os.Stat(dlPath); err == nil {
-			filePath = dlPath
-		}
+		filePath = filepath.Join(settings.DownloadPath, filePath)
 	}
 	return utils.ShowInFolder(filePath)
 }
 
-// ShowOpenWithDialog opens the native Windows "Open With" dialog for a file
+// ShowOpenWithDialog opens the native system's "Open With" dialog
 func (a *App) ShowOpenWithDialog(filePath string) error {
 	if !filepath.IsAbs(filePath) {
 		sm := server.NewSettingsManager()
@@ -538,7 +505,6 @@ func (a *App) ShowOpenWithDialog(filePath string) error {
 
 // SaveTempFile saves base64 data to a temporary file and returns the path
 func (a *App) SaveTempFile(filename string, dataB64 string) (string, error) {
-	// Decode base64
 	data, err := base64.StdEncoding.DecodeString(dataB64)
 	if err != nil {
 		return "", fmt.Errorf("failed to decode base64: %w", err)
@@ -546,7 +512,6 @@ func (a *App) SaveTempFile(filename string, dataB64 string) (string, error) {
 
 	// Create temp file
 	tempDir := os.TempDir()
-	// Add timestamp to ensure uniqueness
 	name := filepath.Base(filename)
 	ext := filepath.Ext(name)
 	base := name[:len(name)-len(ext)]
@@ -560,58 +525,4 @@ func (a *App) SaveTempFile(filename string, dataB64 string) (string, error) {
 	}
 
 	return filePath, nil
-}
-
-// GetClipboardFiles returns a list of file paths currently in the clipboard (Windows only)
-func (a *App) GetClipboardFiles() ([]string, error) {
-	// Use PowerShell to get the file drop list
-	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
-	defer cancel()
-	cmd := exec.CommandContext(ctx, "powershell", "-NoProfile", "-NonInteractive", "-Command", "Get-Clipboard -Format FileDropList | Select-Object -ExpandProperty FullName")
-
-	utils.HideWindow(cmd)
-
-	output, err := cmd.Output()
-	if err != nil {
-		// It might error if clipboard is empty or not files
-		return []string{}, nil
-	}
-
-	lines := strings.Split(string(output), "\r\n")
-	var paths []string
-	for _, line := range lines {
-		val := strings.TrimSpace(line)
-		if val != "" {
-			paths = append(paths, val)
-		}
-	}
-	return paths, nil
-}
-
-// SendNotification sends a native system notification
-func (a *App) SendNotification(title, message string) error {
-	// Create temp icon file for notifications that require a path
-	iconPath := ""
-	if len(appIcon) > 0 {
-		tempDir := os.TempDir()
-		iconPath = filepath.Join(tempDir, "peerhop_notif_icon.png")
-		if _, err := os.Stat(iconPath); os.IsNotExist(err) {
-			_ = os.WriteFile(iconPath, appIcon, 0644)
-		}
-	}
-
-	if stdruntime.GOOS == "windows" {
-		// Use toast for Windows to support silence
-		notification := toast.Notification{
-			AppID:   "PeerHop",
-			Title:   title,
-			Message: message,
-			Icon:    iconPath,
-			Audio:   toast.Silent,
-		}
-		return notification.Push()
-	}
-
-	// Use beeep for other platforms (default sound)
-	return beeep.Notify(title, message, iconPath)
 }

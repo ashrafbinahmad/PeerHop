@@ -105,5 +105,7 @@
   "hotspot_name": "Mobile Hotspot Name",
   "hotspot_password": "Hotspot Password",
   "show_password": "Show password",
-  "hide_password": "Hide password"
+  "hide_password": "Hide password",
+  "show_network_qr": "Show connection QR",
+  "scan_to_connect_wifi": "Scan to connect to this network"
 }

@@ -47,33 +47,68 @@ export const PlatformIcon: React.FC<Props> = ({
   }
 
   if (p === "windows") {
-    // Windows Logo
+    // Windows 11 Logo (Modern)
     return (
       <svg
         width={size}
         height={size}
-        viewBox="0 0 448 512"
+        viewBox="0 0 24 24"
         fill="currentColor"
         className={className}
         xmlns="http://www.w3.org/2000/svg"
       >
-        <path d="M0 93.7l183.6-25.3v177.4H0V93.7zm0 189h183.6v190.1L0 418.3V282.7zm215.7-251.2l232.3-31.5v205.3H215.7V31.5zm0 302.2l232.3 46.8V175.4H215.7v158.3z" />
+        <path d="M0 0h11.5v11.5H0V0zm12.5 0H24v11.5H12.5V0zM0 12.5h11.5V24H0V12.5zm12.5 0H24V24H12.5v-11.5z" />
       </svg>
     );
   }
 
   if (p === "linux") {
-    // Linux Penguin (Tux) - Simplified
     return (
       <svg
         width={size}
         height={size}
-        viewBox="0 0 448 512"
-        fill="currentColor"
+        viewBox="0 0 64 64"
+        fill="none"
         className={className}
         xmlns="http://www.w3.org/2000/svg"
       >
-        <path d="M429.6 156.4c-3.4-3.5-8.4-5.1-13.1-4.3l-84.9 14.1c-22-26.5-62.8-51.5-103.1-51.5-40.4 0-82.9 25.3-104.9 51.5L34.1 152.1c-4.7-.8-9.6.8-13.1 4.3C-1.8 181.3-6.1 271.7 10.9 337.8c10.2 39.8 45.3 71.7 86.8 77.2-2.3 8.2-3.8 17.5-3.8 27.5 0 44.5 31.7 82.2 74.5 89.2 14 2.3 28.2 3.6 42.6 3.6 13.9 0 27.7-1.2 41.3-3.4 43.1-6.8 75.3-44.4 75.3-89.4 0-9.6-1.5-18.7-3.7-26.5 41.5-6.5 76-37.4 86.1-77.2 16.9-66.3 12.8-156.9-10.4-182.4zM245.9 333c0 9.2-7.8 16.6-17.5 16.6-9.7 0-17.5-7.4-17.5-16.6 0-9.2 7.8-16.6 17.5-16.6 9.7 0 17.5 7.4 17.5 16.6zm-59.5 0c0 9.2-7.8 16.6-17.5 16.6-9.7 0-17.5-7.4-17.5-16.6 0-9.2 7.8-16.6 17.5-16.6 9.7 0 17.5 7.4 17.5 16.6zm81.4-96.1c-13.7 13.8-31 23-49.9 23-18.7 0-35.9-8.9-49.6-22.6-13.7 13.6-30.9 22.6-49.6 22.6-18.9 0-36.2-9.2-49.9-23-4-.7-7.9-1.9-11.7-3.4 9.1-39.2 24.3-94.4 69.3-95.3 19.3-.4 35.3 9.6 51 24.5 5.2 4.9 13.6 4.8 18.6-.2l.2-.2c15.8-15.1 31.9-25.1 51.2-24.8 45.4 1 60.1 56 69.3 95.3-4.1 1.7-8.1 2.9-12.1 3.7z" />
+        {/* Outer body */}
+        <path
+          d="M32 4C22 4 16 12 16 22c0 6 3 11 6 15-5 2-10 7-10 13 0 8 8 10 20 10s20-2 20-10c0-6-5-11-10-13 3-4 6-9 6-15C48 12 42 4 32 4Z"
+          fill="currentColor"
+        />
+
+        {/* Belly */}
+        <ellipse cx="32" cy="38" rx="12" ry="16" fill="white" />
+
+        {/* Eyes */}
+        <ellipse cx="26" cy="22" rx="4" ry="6" fill="white" />
+        <ellipse cx="38" cy="22" rx="4" ry="6" fill="white" />
+
+        {/* Pupils */}
+        <ellipse cx="26" cy="24" rx="2" ry="3" fill="black" />
+        <ellipse cx="38" cy="24" rx="2" ry="3" fill="black" />
+
+        {/* Beak */}
+        <path d="M28 30c2 2 6 2 8 0l-4 4-4-4Z" fill="#F4A300" />
+
+        {/* Feet */}
+        <ellipse cx="22" cy="54" rx="6" ry="3" fill="#F4A300" />
+        <ellipse cx="42" cy="54" rx="6" ry="3" fill="#F4A300" />
+
+        {/* Arms (subtle curves) */}
+        <path
+          d="M18 34c2 6 6 10 6 10"
+          stroke="white"
+          strokeWidth="2"
+          strokeLinecap="round"
+        />
+        <path
+          d="M46 34c-2 6-6 10-6 10"
+          stroke="white"
+          strokeWidth="2"
+          strokeLinecap="round"
+        />
       </svg>
     );
   }
