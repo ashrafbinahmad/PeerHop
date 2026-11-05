@@ -79,7 +79,7 @@ peerhop -r
 
 ## 📱 Desktop GUI
 
-A native, lightweight GUI (Wails) is included.
+A native, lightweight GUI (Rust + egui) is included. Drop, paste (Ctrl+V) or pick files to share; phones connect by scanning the QR code.
 
 ```bash
 # Run the standalone executable
@@ -88,23 +88,36 @@ peerhop.exe
 
 ## 🧠 Architecture & Codebase
 
-PeerHop is built with **Go** for high performance and uses **React** for the user interface, bundled together using **Wails** for the desktop application. The core engine is a lightweight HTTP server that streams files directly between devices over the local network (LAN) without routing through external servers.
+PeerHop is written in **Rust**. The desktop app is a native **egui** window; phones and other browsers use a **React** web page that the app serves itself (embedded in the binary). The core engine is a lightweight HTTP server (axum/tokio) that streams files directly between devices over the local network (LAN) without routing through external servers.
 
 ### Directory Structure
 
-- **`/cmd`**: Contains the CLI entry points for running PeerHop without the GUI.
-- **`/pkg`**: The core Go backend packages.
-  - **`server/`**: HTTP server logic, WebSocket implementation for real-time progress, and routing.
-  - **`network/`**: Network discovery, IP resolution, and connection handling.
-  - **`logger/`**: Custom logging utilities.
-  - **`utils/`**: Helper functions (e.g., zip creation, file handling).
-- **`/ui`**: The Wails desktop GUI application.
-  - **`main.go` / `app.go`**: Wails application lifecycle and Go bindings for the frontend.
-  - **`frontend/`**: The React, Vite, and TailwindCSS codebase for the user interface.
+- **`/src`**: The Rust crate.
+  - **`store.rs`** / **`hub.rs`**: Transactions, connected devices and the shared session state (with the WebSocket broadcast channel).
+  - **`server/`**: HTTP API, range-aware downloads, streaming uploads, WebSocket updates and the embedded web UI.
+  - **`net.rs`**: LAN IP, Wi-Fi/hotspot discovery and Wi-Fi QR payloads.
+  - **`platform.rs`**: OS integration (open/reveal files, notifications, clipboard, single instance, Windows share target).
+  - **`settings.rs`**, **`util.rs`**: Persistent settings (same file as earlier versions) and helpers (zip, file names, logging).
+  - **`gui/`**: The egui desktop UI (chat, connect, settings, themes, translations).
+  - **`main.rs`** / **`bin/peerhop-cli.rs`**: Desktop app and CLI entry points.
+- **`/ui/frontend`**: The React, Vite and TailwindCSS web UI used by phones and browsers (`build.rs` builds it if `dist/` is missing).
+- **`/ui/build`**: Windows icon and MSI (WiX) sources. **`/share_shim`**: the MSIX share-target helper.
 - **`/npm-package` & `/scripts`**: Build and distribution scripts for NPM, Windows, and Linux releases.
 
+### Development
+
+```bash
+npm run dev          # run the desktop app (cargo run)
+npm run dev:cli -- <file>   # run the CLI
+npm test             # cargo test
+npm run build:win    # release build -> builds/peerhop_win.exe
+npm run build:linux:wsl     # Linux GUI + CLI via WSL
+```
+
+Requires a Rust toolchain (1.85+, edition 2024) and Node.js for the web UI. On Linux the GUI also needs the usual X11/Wayland and GTK development packages.
+
 ### Key Technologies
-- **Backend**: Go (Golang)
-- **Frontend**: React, TypeScript, Vite, TailwindCSS
-- **Desktop Framework**: Wails v2
-- **Distribution**: NPM, GitHub Releases, APT (coming soon)
+- **Core & server**: Rust, tokio, axum
+- **Desktop UI**: egui / eframe
+- **Web UI**: React, TypeScript, Vite, TailwindCSS
+- **Distribution**: NPM, GitHub Releases, Microsoft Store (MSIX), MSI

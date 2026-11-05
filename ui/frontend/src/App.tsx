@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import "./App.css";
 import { getMetaData, MetaData } from "./api";
-import { DesktopView } from "./views/DesktopView/DesktopView";
 import { MobileUnified } from "./views/MobileUnified";
 
 import { MobileUpload } from "./views/MobileUpload";
@@ -28,16 +27,6 @@ function App() {
 
   useEffect(() => {
     const checkMode = async () => {
-      // Skip check if we are in Wails environment (desktop app)
-      if (
-        window.location.host.includes("wails.localhost") ||
-        (window as any).wails ||
-        (window as any).runtime
-      ) {
-        setLoading(false);
-        return;
-      }
-
       // Check if we are in environment where /api/meta works (mobile/web)
       const meta = await getMetaData();
       if (meta) {
@@ -55,36 +44,22 @@ function App() {
       </div>
     );
 
-  // Mobile/Web view
-  if (
-    mobileState ||
-    (import.meta.env.DEV && !window.location.host.includes("wails.localhost"))
-  ) {
-    // UI App (Unified View)
-    if (mobileState?.app === "ui" || import.meta.env.DEV) {
-      return (
-        <MobileUnified
-          downloadFilename={mobileState?.filename}
-          downloadSize={mobileState?.size}
-        />
-      );
-    }
-
-    // CLI App (Split Views)
-    if (mobileState?.mode === "upload") {
-      return <MobileUpload />;
-    } else {
-      return (
-        <MobileDownload
-          filename={mobileState?.filename || "file"}
-          size={mobileState?.size || 0}
-        />
-      );
-    }
+  // CLI sessions get the single-purpose views; the desktop app gets the unified view.
+  if (mobileState?.app === "cli") {
+    if (mobileState.mode === "upload") return <MobileUpload />;
+    return (
+      <MobileDownload
+        filename={mobileState.filename || "file"}
+        size={mobileState.size || 0}
+      />
+    );
   }
-
-  // Desktop view
-  return <DesktopView />;
+  return (
+    <MobileUnified
+      downloadFilename={mobileState?.filename}
+      downloadSize={mobileState?.size}
+    />
+  );
 }
 
 export default App;

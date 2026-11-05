@@ -515,7 +515,7 @@ export const MobileUnified: React.FC<Props> = ({
     // Call API to cancel on server (don't await strictly to ensure abort happens)
     activeUploads.forEach((t) => {
       axios
-        .post(`/api/cancel-transaction/${t.id}`)
+        .post(`/api/cancel-transaction/${t.id}${securityToken ? `?security=${securityToken}` : ""}`)
         .catch((err) => console.error("Failed to cancel txn on server", err));
     });
 

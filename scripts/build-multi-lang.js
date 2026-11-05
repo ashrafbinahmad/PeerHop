@@ -2,6 +2,7 @@ const { execSync } = require("child_process");
 const fs = require("fs");
 const path = require("path");
 const { buildMSIX } = require("./build-msix");
+const { buildFrontend, cargoBuild, copyBinary } = require("./cargo");
 
 // ANSI color codes
 const colors = {
@@ -30,8 +31,6 @@ const ROOT_DIR = path.join(__dirname, "..");
 const BUILDS_DIR = path.join(ROOT_DIR, "builds");
 const LANGS_DIR = path.join(BUILDS_DIR, "langs");
 const FRONTEND_DIR = path.join(ROOT_DIR, "ui", "frontend");
-const UI_DIR = path.join(ROOT_DIR, "ui");
-const SERVER_DIST_DIR = path.join(ROOT_DIR, "pkg", "server", "dist");
 
 // Dynamically get languages from index.ts
 function getLanguages() {
@@ -68,50 +67,18 @@ async function build() {
     log(`Building for Language: ${lang.toUpperCase()}`, "cyan");
     log(`================================\n`, "white");
 
-    // 1. Build Frontend with default language
+    // 1. Build frontend with the default language (embedded into the exe)
     log(`Building frontend for ${lang}...`, "yellow");
-    process.chdir(FRONTEND_DIR);
-    execSync(`npm run build`, {
-      env: { ...process.env, VITE_DEFAULT_LANG: lang },
-      stdio: "inherit",
-    });
+    const env = { VITE_DEFAULT_LANG: lang };
+    buildFrontend(env);
 
-    // 2. Copy to server dist
-    log(`Copying frontend to server dist...`, "yellow");
-    if (fs.existsSync(SERVER_DIST_DIR))
-      fs.rmSync(SERVER_DIST_DIR, { recursive: true });
-    fs.cpSync(path.join(FRONTEND_DIR, "dist"), SERVER_DIST_DIR, {
-      recursive: true,
-    });
-
-    // 3. Build Wails GUI (Windows EXE)
-    log(`Building Wails GUI for ${lang}...`, "yellow");
-    process.chdir(UI_DIR);
-    const buildFlags = `-ldflags "-X main.version=${version}"`;
+    // 2. Build the GUI with the same default language
+    log(`Building GUI for ${lang}...`, "yellow");
+    cargoBuild(["PeerHop"], env);
     const outputName = `peerhop_win_${lang}.exe`;
+    const destPath = copyBinary("PeerHop", path.join("builds", "langs", outputName));
 
-    execSync(
-      `wails build -platform windows/amd64 ${buildFlags} -o "${outputName}"`,
-      {
-        env: { ...process.env, VITE_DEFAULT_LANG: lang },
-        stdio: "inherit",
-      },
-    );
-
-    // Wails builds to ui/build/bin/ by default when -o is a filename.
-    // Move it to the root builds directory.
-    const sourcePath = path.join(UI_DIR, "build", "bin", outputName);
-    const destPath = path.join(LANGS_DIR, outputName);
-
-    log(`Moving ${outputName} to language directory...`, "white");
-    if (fs.existsSync(sourcePath)) {
-      if (fs.existsSync(destPath)) fs.unlinkSync(destPath);
-      fs.renameSync(sourcePath, destPath);
-    } else {
-      throw new Error(`Could not find built executable at ${sourcePath}`);
-    }
-
-    // 4. Build MSIX for this language
+    // 3. Build MSIX for this language
     log(`Building MSIX for ${lang}...`, "yellow");
     process.chdir(ROOT_DIR);
 

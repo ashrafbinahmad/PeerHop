@@ -4,6 +4,7 @@ const fs = require("fs");
 const path = require("path");
 const readline = require("readline");
 const { buildMSIX } = require("./build-msix");
+const { cargoBuild, copyBinary, buildWindowsGui } = require("./cargo");
 
 // ANSI color codes
 const colors = {
@@ -66,8 +67,8 @@ log("Build Process Overview:", "cyan");
 log("  1. Clean old builds", "white");
 log("  2. Install frontend dependencies", "white");
 log("  3. Build frontend (embedded)", "white");
-log("  4. Build CLI binaries", "white");
-log("  5. Build GUI applications", "white");
+log("  4. Build CLI binary (cargo)", "white");
+log("  5. Build GUI + installers (cargo, WiX, MSIX)", "white");
 log("  6. Verify all builds\n", "white");
 
 const buildsDir = path.join(__dirname, "..", "builds");
@@ -180,7 +181,7 @@ try {
   process.exit(1);
 }
 
-// Step 2.6: Clean cached icon files to force regeneration
+// Step 2.6: (Wails regenerated icons; build.rs now embeds ui/build/windows/icon.ico as-is)
 step("2.6", 6, "Cleaning cached icon files...");
 const iconsToClean = [
   path.join(__dirname, "..", "ui", "build", "windows", "icon.ico"),
@@ -208,8 +209,8 @@ if (iconsRemoved > 0) {
   info("No cached icon files found to clean\n");
 }
 
-// Step 3: Build frontend (CRITICAL: Must be done before Wails/CLI build)
-// Wails and CLI use Go's embed directive to bundle frontend assets at compile time.
+// Step 3: Build frontend (CRITICAL: Must be done before cargo build)
+// The binaries embed ui/frontend/dist at compile time.
 // If we don't rebuild the frontend here, the binaries will contain stale/old UI code.
 step(3, 6, "Building frontend...");
 const frontendDir = path.join(__dirname, "..", "ui", "frontend");
@@ -235,67 +236,33 @@ if (distFiles.length === 0) {
 }
 info(`Frontend dist contains ${distFiles.length} items`);
 
-// Copy dist to pkg/server/dist (CRITICAL for Mobile UI)
-log("  Copying frontend build to pkg/server/dist...", "white");
-const serverDistDir = path.join(__dirname, "..", "pkg", "server", "dist");
-
-// Clear existing server dist
-if (fs.existsSync(serverDistDir)) {
-  fs.rmSync(serverDistDir, { recursive: true, force: true });
-}
-fs.mkdirSync(serverDistDir, { recursive: true });
-
-// Copy all files
-fs.cpSync(distDir, serverDistDir, { recursive: true });
-success("Copied frontend to pkg/server/dist\n");
-
+// cargo embeds ui/frontend/dist directly (rust-embed), no copy needed.
 log("");
 
-// Step 4: Build CLI binaries (Must be done after frontend copy)
-step(4, 6, "Building CLI binaries...");
-log("  Building Windows CLI...", "white");
-if (!exec("npm run build:cli:win", "Windows CLI build")) {
+step(4, 6, "Building CLI binary...");
+try {
+  cargoBuild(["peerhop-cli"]);
+} catch (err) {
+  error("Windows CLI build failed");
   process.exit(1);
 }
+copyBinary("peerhop-cli", "builds/peerhop_cli_win.exe");
 success("Built Windows CLI");
+info("Linux CLI is built in WSL together with the Linux GUI\n");
 
-log("  Building Linux CLI...", "white");
-if (!exec("npm run build:cli:linux", "Linux CLI build")) {
-  process.exit(1);
-}
-success("Built Linux CLI\n");
-
-// Step 4: Build GUI applications (Windows only - Linux requires WSL)
 step(5, 6, "Building GUI applications...");
-
-// Build flags with version info
-const buildFlags = `-ldflags "-X main.version=${version}"`;
-const uiDir = path.join(__dirname, "..", "ui");
-
-log("  Building Windows GUI NSIS installer...", "white");
-process.chdir(uiDir);
-if (
-  !exec(
-    `wails build -platform windows/amd64 -nsis ${buildFlags} -o ../../../builds/peerhop_setup.exe`,
-    "Windows GUI NSIS build",
-  )
-) {
+log("  Building Windows GUI executable...", "white");
+try {
+  buildWindowsGui();
+} catch (err) {
+  error("Windows GUI build failed");
   process.exit(1);
 }
-process.chdir(path.join(__dirname, ".."));
-success("Built Windows GUI NSIS installer");
+const targetBinary = path.join(__dirname, "..", "builds", "peerhop_win.exe");
+success(`Built Windows GUI (${(fs.statSync(targetBinary).size / 1024 / 1024).toFixed(2)} MB)`);
 
 log("  Building Windows GUI MSI installer...", "white");
-process.chdir(uiDir);
-if (
-  !exec(
-    `wails build -platform windows/amd64 ${buildFlags}`,
-    "Windows GUI build for MSI",
-  )
-) {
-  process.exit(1);
-}
-process.chdir(path.join(uiDir, "build", "windows", "msi"));
+process.chdir(path.join(__dirname, "..", "ui", "build", "windows", "msi"));
 if (
   !exec(
     "wix build product.wxs -ext WixToolset.UI.wixext -o ../../../../builds/peerhop_setup.msi",
@@ -304,54 +271,12 @@ if (
 ) {
   process.exit(1);
 }
-// Cleanup wixpdb
 try {
   const wixpdb = path.join(__dirname, "..", "builds", "peerhop_setup.wixpdb");
   if (fs.existsSync(wixpdb)) fs.unlinkSync(wixpdb);
 } catch (e) {}
 process.chdir(path.join(__dirname, ".."));
-success("Built Windows GUI MSI installer");
-
-log("  Building Windows GUI executable...", "white");
-process.chdir(uiDir);
-// Build to default location (ui/build/bin/PeerHop.exe) - this ensures proper frontend embedding
-if (
-  !exec(
-    `wails build -platform windows/amd64 ${buildFlags}`,
-    "Windows GUI build",
-  )
-) {
-  process.exit(1);
-}
-process.chdir(path.join(__dirname, ".."));
-
-// Copy the built binary to builds directory
-const sourceBinary = path.join(uiDir, "build", "bin", "PeerHop.exe");
-const targetBinary = path.join(__dirname, "..", "builds", "peerhop_win.exe");
-
-if (!fs.existsSync(sourceBinary)) {
-  error(`Built binary not found at: ${sourceBinary}`);
-  process.exit(1);
-}
-
-// Get source binary size for verification
-const sourceSize = fs.statSync(sourceBinary).size;
-info(`Source binary size: ${(sourceSize / 1024 / 1024).toFixed(2)} MB`);
-
-// Copy to builds directory
-try {
-  fs.copyFileSync(sourceBinary, targetBinary);
-  const targetSize = fs.statSync(targetBinary).size;
-  if (targetSize !== sourceSize) {
-    error("Binary copy size mismatch!");
-    process.exit(1);
-  }
-  success(`Built Windows GUI (${(targetSize / 1024 / 1024).toFixed(2)} MB)\n`);
-  success(`Built Windows GUI (${(targetSize / 1024 / 1024).toFixed(2)} MB)\n`);
-} catch (err) {
-  error(`Failed to copy binary: ${err.message}`);
-  process.exit(1);
-}
+success("Built Windows GUI MSI installer\n");
 
 // Step 4.5: Build MSIX for Microsoft Store
 step("5.5", 6, "Building MSIX package for Microsoft Store...");
@@ -408,13 +333,11 @@ try {
 step(6, 6, "Verifying builds...");
 const requiredFiles = [
   "builds/peerhop_win.exe",
-  "builds/peerhop_setup.exe",
   "builds/peerhop_setup.msi",
   "builds/peerhop_cli_win.exe",
-  "builds/peerhop_cli_linux",
 ];
 
-const optionalFiles = ["builds/peerhop_linux"];
+const optionalFiles = ["builds/peerhop_linux", "builds/peerhop_cli_linux"];
 
 let missingFiles = [];
 const copiedFromBackup = [];

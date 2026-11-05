@@ -114,7 +114,18 @@ try {
   console.error(`❌ Failed to update npm-package/package.json: ${err.message}`);
 }
 
-// 6. Update version file
+// 6. Update Cargo.toml (the app reads its version from here)
+const cargoTomlPath = path.join(rootDir, "Cargo.toml");
+try {
+  let cargoToml = fs.readFileSync(cargoTomlPath, "utf8");
+  cargoToml = cargoToml.replace(/^version = "[^"]*"/m, `version = "${version}"`);
+  fs.writeFileSync(cargoTomlPath, cargoToml);
+  console.log("✓ Updated Cargo.toml");
+} catch (err) {
+  console.error(`❌ Failed to update Cargo.toml: ${err.message}`);
+}
+
+// 7. Update version file
 const versionFilePath = path.join(rootDir, "version");
 try {
   fs.writeFileSync(versionFilePath, version);

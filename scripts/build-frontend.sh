@@ -1,11 +1,5 @@
 #!/bin/bash
-# Sync frontend dist to all embedded locations
-
-echo "Building frontend..."
-cd ui/frontend && npm run build && cd ../..
-
-echo "Copying dist to pkg/server/dist..."
-rm -rf pkg/server/dist
-cp -r ui/frontend/dist pkg/server/dist
-
-echo "✓ Frontend synced to all locations!"
+# Build the web UI that cargo embeds into the binaries (ui/frontend/dist).
+set -e
+cd "$(dirname "$0")/../ui/frontend" && npm run build
+echo "✓ Frontend built; run cargo build to embed it"

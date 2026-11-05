@@ -40,3 +40,6 @@ ui/build
 ui/build/windows/msix_dist
 npm-package/
 temp_msix/
+
+# Rust
+target/
