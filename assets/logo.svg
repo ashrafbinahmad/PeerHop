@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- Vector twin of scripts/make-logo.ps1: two peers joined by a hopping arc. -->
+  <defs>
+    <linearGradient id="ph-bg" x1="0" y1="0" x2="1024" y2="1024" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#2dd4bf"/>
+      <stop offset="1" stop-color="#4f46e5"/>
+    </linearGradient>
+  </defs>
+  <rect width="1024" height="1024" rx="230" fill="url(#ph-bg)"/>
+  <circle cx="262" cy="690" r="69" fill="none" stroke="#fff" stroke-width="54"/>
+  <circle cx="762" cy="690" r="96" fill="#fff"/>
+  <path d="M262 554C302 170 722 170 762 444" fill="none" stroke="#fff" stroke-width="72" stroke-linecap="round"/>
+  <path d="M784.4 597.4 648.3 440.4 869.9 408Z" fill="#fff"/>
+</svg>

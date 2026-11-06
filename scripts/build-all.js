@@ -181,34 +181,6 @@ try {
   process.exit(1);
 }
 
-// Step 2.6: (Wails regenerated icons; build.rs now embeds ui/build/windows/icon.ico as-is)
-step("2.6", 6, "Cleaning cached icon files...");
-const iconsToClean = [
-  path.join(__dirname, "..", "ui", "build", "windows", "icon.ico"),
-  path.join(__dirname, "..", "ui", "build", "windows", "_icon.ico"),
-  path.join(__dirname, "..", "ui", "build", "_appicon.png"),
-];
-
-let iconsRemoved = 0;
-for (const iconPath of iconsToClean) {
-  try {
-    if (fs.existsSync(iconPath)) {
-      fs.unlinkSync(iconPath);
-      iconsRemoved++;
-    }
-  } catch (err) {
-    info(`Could not remove ${path.basename(iconPath)}: ${err.message}`);
-  }
-}
-
-if (iconsRemoved > 0) {
-  success(
-    `Removed ${iconsRemoved} cached icon file(s) - will be regenerated from appicon.png\n`,
-  );
-} else {
-  info("No cached icon files found to clean\n");
-}
-
 // Step 3: Build frontend (CRITICAL: Must be done before cargo build)
 // The binaries embed ui/frontend/dist at compile time.
 // If we don't rebuild the frontend here, the binaries will contain stale/old UI code.

@@ -23,7 +23,6 @@ npm run prepublish 1.5.2
 - Builds CLI binaries (Windows & Linux)
 - Installs frontend dependencies
 - Updates MSI version in product.wxs
-- Cleans cached icon files
 - Builds GUI applications (NSIS, MSI, EXE)
 - Verifies all builds
 
@@ -101,16 +100,13 @@ npm run release 1.5.2
 ### Example 3: Update Icon or Files Then Publish
 
 ```bash
-# Step 1: Build with old icon
+# Step 1: Edit the drawing in scripts/make-logo.ps1, then regenerate every icon
+powershell -File scripts/make-logo.ps1
+
+# Step 2: Rebuild (also rebuilds the web UI, which bundles the icon)
 npm run prepublish 1.5.2
 
-# Step 2: Replace icon
-cp new_icon.png ui/build/appicon.png
-
-# Step 3: Rebuild to apply new icon
-npm run prepublish 1.5.2
-
-# Step 4: Test and publish
+# Step 3: Test and publish
 npm run publish
 ```
 
@@ -144,6 +140,6 @@ Verifies all required build files exist.
 ## Notes
 
 - The `prepublish` script updates the MSI version automatically
-- Icon cache is cleared automatically to use updated appicon.png
+- All icons (exe, MSI, MSIX tiles, web UI, README banner) come from `scripts/make-logo.ps1`
 - Version info is embedded in all binaries via ldflags
 - The `publish` script can read version from the version file if not provided

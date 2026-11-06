@@ -28,7 +28,7 @@ import {
   Coffee,
   Globe,
 } from "lucide-react";
-import logo from "../assets/images/logo-universal.png";
+import logo from "../assets/images/appicon.png";
 import { ACCENT_COLORS, THEME_PRESETS } from "../themeConstants";
 import { useTranslation } from "../hooks/useTranslation";
 
