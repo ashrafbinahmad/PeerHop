@@ -174,9 +174,8 @@ impl App {
             });
         }
         let current = self.current_ip();
-        // The network in use first, then the rest in the order the OS reported them.
-        let mut nets = self.networks.clone();
-        nets.sort_by_key(|n| n.ip != current);
+        // Kept in the order the OS reported them, so picking one doesn't move cards.
+        let nets = self.networks.clone();
         let count = nets.len() + 1;
         let gap = 8.0;
         let avail = ui.available_width();
