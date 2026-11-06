@@ -17,7 +17,7 @@ use peerhop::net::NetworkProfile;
 use peerhop::platform::{self, ShareData};
 use peerhop::server::Server;
 use peerhop::settings::Settings;
-use peerhop::store::{Client, SERVER_SENDER, Transaction};
+use peerhop::store::{Client, Kind, SERVER_SENDER, Status, Transaction};
 
 use super::i18n::{self, I18n};
 use super::notifier::{self, Note};
@@ -105,6 +105,10 @@ pub struct App {
     notes: Sender<Note>,
 
     pub(crate) txs: Vec<Transaction>,
+    pub(crate) analytics: peerhop::analytics::Analytics,
+    /// Deliveries already reported to analytics: (transaction, receiving device; "" = this desktop).
+    /// `None` until the first snapshot, whose finished history is never reported.
+    reported: Option<HashSet<(u64, String)>>,
     pub(crate) clients: Vec<Client>,
     speeds: HashMap<(u64, String), Speed>,
     pub(crate) networks: Vec<NetworkProfile>,
@@ -231,6 +235,7 @@ impl App {
         };
         let name_edit = settings.desktop_device_name.clone();
         let port_edit = settings.static_port.to_string();
+        let analytics = peerhop::analytics::Analytics::start(settings.usage_stats);
         let mut app = Self {
             rt,
             web,
@@ -250,6 +255,8 @@ impl App {
             focused,
             notes,
             txs: Vec::new(),
+            analytics,
+            reported: None,
             clients: Vec::new(),
             speeds: HashMap::new(),
             networks: Vec::new(),
@@ -589,11 +596,44 @@ impl App {
         }
         self.speeds.retain(|k, _| live.contains(k));
 
+        self.report_transfers();
+
         let ids: HashSet<u64> = self.txs.iter().map(|t| t.id).collect();
         for id in &ids {
             self.appeared.entry(*id).or_insert(now);
         }
         self.appeared.retain(|id, _| ids.contains(id));
+    }
+
+    /// Counts each completed file delivery once: an incoming file, or an outgoing
+    /// file finishing on each receiving device.
+    fn report_transfers(&mut self) {
+        let done: Vec<((u64, String), u64)> = self
+            .txs
+            .iter()
+            .filter(|t| t.kind == Kind::File)
+            .flat_map(|t| {
+                let size = t.file_size;
+                let keys: Vec<String> = if t.is_outgoing() {
+                    t.client_status.iter().filter(|(_, s)| **s == Status::Completed).map(|(k, _)| k.clone()).collect()
+                } else if t.status == Status::Completed {
+                    vec![String::new()]
+                } else {
+                    Vec::new()
+                };
+                keys.into_iter().map(move |k| ((t.id, k), size))
+            })
+            .collect();
+        match &mut self.reported {
+            None => self.reported = Some(done.into_iter().map(|(k, _)| k).collect()),
+            Some(seen) => {
+                for (key, size) in done {
+                    if seen.insert(key) {
+                        self.analytics.transfer(size);
+                    }
+                }
+            }
+        }
     }
 
     fn animate_theme(&mut self) {
@@ -1061,6 +1101,7 @@ impl eframe::App for App {
 
 impl Drop for App {
     fn drop(&mut self) {
+        self.analytics.flush(Duration::from_secs(3));
         if let Some(mut s) = self.server.take() {
             s.stop();
         }

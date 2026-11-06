@@ -3324,7 +3324,7 @@ dependencies = [
 
 [[package]]
 name = "peerhop"
-version = "2.5.9"
+version = "3.0.0"
 dependencies = [
  "aes-gcm",
  "arboard",

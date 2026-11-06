@@ -2,8 +2,6 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import axios from "axios";
 import { THEME_PRESETS } from "../themeConstants";
 import WebSocketClient from "../utils/WebSocketClient";
-import { ActivityType } from "./useActivity";
-import { formatBytes } from "../utils/format";
 
 export interface Transaction {
   id: number;
@@ -71,7 +69,6 @@ export const useTransactions = (
   isDesktop: boolean = false,
   securityToken?: string,
   securityEnabled?: boolean,
-  logActivity?: (type: ActivityType, details: string) => void,
 ): UseTransactionsResult => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
@@ -415,35 +412,6 @@ export const useTransactions = (
                 updatedTxn.lastTime![ip] = now;
               });
             }
-
-            // log
-            Object.keys(updatedTxn.clientStatus || {}).forEach((clientIp) => {
-              // updatedTxn.clientStatus?.forEach((status, clientIp) => {
-              const prevStatus =
-                previousTxn?.clientStatus && previousTxn.clientStatus[clientIp]
-                  ? previousTxn.clientStatus[clientIp]
-                  : "pending";
-              const status = updatedTxn.clientStatus
-                ? updatedTxn.clientStatus[clientIp] || "pending"
-                : "pending";
-              if (
-                logActivity &&
-                prevStatus !== "completed" &&
-                status === "completed"
-              ) {
-                if (
-                  updatedTxn.type === "file" &&
-                  updatedTxn.senderId === "server"
-                ) {
-                  logActivity(
-                    "sending_completed",
-                    `From ${clientIp} (${updatedTxn.filename || "text"}) completed. Size: ${formatBytes(
-                      updatedTxn.fileSize,
-                    )}`,
-                  );
-                }
-              }
-            });
 
             if (existingIndex >= 0) {
               const newTransactions = [...prevTransactions];

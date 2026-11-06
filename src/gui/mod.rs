@@ -17,6 +17,8 @@ mod widgets;
 
 pub const FEEDBACK_URL: &str = "https://github.com/ashrafbinahmad/peerhop/issues/new";
 pub const COFFEE_URL: &str = "https://buymeacoffee.com/peerhop";
+pub const SOURCE_URL: &str = "https://github.com/ashrafbinahmad/PeerHop";
+pub const LICENSES_URL: &str = "https://github.com/ashrafbinahmad/PeerHop/blob/main/THIRD_PARTY_LICENSES.md";
 
 pub fn run(initial_files: Vec<String>) -> eframe::Result {
     let mut viewport = egui::ViewportBuilder::default()

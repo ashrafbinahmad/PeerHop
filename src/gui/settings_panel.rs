@@ -145,6 +145,13 @@ impl App {
                     }
                 });
             }
+            divider(ui, &p);
+            let mut v = self.settings.usage_stats;
+            if widgets::switch_row(ui, &p, self.t("usage_stats"), self.t("usage_stats_hint"), &mut v) {
+                self.settings.usage_stats = v;
+                self.analytics.set_enabled(v);
+                self.save_settings();
+            }
         });
 
         ui.add_space(8.0);
@@ -158,6 +165,12 @@ impl App {
             }
             if link(ui, &p, icon::COFFEE, self.t("buy_developer_a_coffee")) {
                 peerhop::platform::open_url(super::COFFEE_URL);
+            }
+            if link(ui, &p, icon::GITHUB_LOGO, self.t("source_code")) {
+                peerhop::platform::open_url(super::SOURCE_URL);
+            }
+            if link(ui, &p, icon::SCALES, self.t("open_source_licenses")) {
+                peerhop::platform::open_url(super::LICENSES_URL);
             }
         });
         ui.add_space(4.0);

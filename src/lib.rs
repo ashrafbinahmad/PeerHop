@@ -5,7 +5,9 @@
 //! - [`hub`]: one server session's shared state and its WebSocket broadcast channel.
 //! - [`server`]: the HTTP/WebSocket API consumed by the mobile web UI.
 //! - [`settings`], [`net`], [`platform`], [`util`]: supporting pieces.
+//! - [`analytics`]: anonymous per-country usage counters.
 
+pub mod analytics;
 pub mod hub;
 pub mod net;
 pub mod p2p;

@@ -30,16 +30,21 @@ ui/release/
 ui/dist-electron/
 ui/build/windows/msix_dist/
 
-# Certificates
+# Certificates and keys (MSIX signing uses your certificate store; see scripts/build-msix.js)
 *.pfx
+*.p12
+*.pem
+*.key
+*.cer
 
-# Go
-vendor/
+# Generated build files (ui/build keeps only the icons and the MSI sources)
 share_shim/build
-ui/build
-ui/build/windows/msix_dist
+ui/build/bin/
+ui/build/windows/msi/*.msi
+ui/build/windows/msi/*.txt
 npm-package/
 temp_msix/
+*.timestamp-*.mjs
 
 # Rust
 target/

@@ -116,8 +116,38 @@ npm run build:linux:wsl     # Linux GUI + CLI via WSL
 
 Requires a Rust toolchain (1.85+, edition 2024) and Node.js for the web UI. On Linux the GUI also needs the usual X11/Wayland and GTK development packages.
 
+### Microsoft Store package (MSIX)
+
+```bash
+cargo msix            # bump the patch version (2.5.9 -> 2.5.10), build and pack builds/peerhop_store.msix
+cargo msix minor      # or: major, an explicit X.Y.Z, or --same to rebuild without bumping
+```
+
+Needs the Windows 10/11 SDK (MakeAppx, SignTool), CMake and Visual Studio for the share-target helper. The package is signed with a self-signed certificate from your own certificate store (created on first run by `scripts/generate-test-cert.ps1`), or with `PEERHOP_SIGN_PFX` / `PEERHOP_SIGN_PASSWORD` if set. No certificate or password is kept in the repo, and Store uploads are re-signed by Microsoft.
+
 ### Key Technologies
 - **Core & server**: Rust, tokio, axum
 - **Desktop UI**: egui / eframe
 - **Web UI**: React, TypeScript, Vite, TailwindCSS
 - **Distribution**: NPM, GitHub Releases, Microsoft Store (MSIX), MSI
+
+## 🔒 Privacy
+
+Transfers go directly between devices on your network; files never pass through a PeerHop server.
+
+The desktop app sends **anonymous usage counts per country** to a Firebase Realtime Database: one count per install, and the number and total size of completed file transfers. The country comes from [ipinfo.io](https://ipinfo.io). No files, file names, device names, IP addresses or identifiers are stored. Turn it off in **Settings > Share usage stats**. The code is in [`src/analytics.rs`](src/analytics.rs) and the database rules in [`firebase/database.rules.json`](firebase/database.rules.json).
+
+## 🍴 Forks
+
+You're welcome to fork and modify PeerHop under the license below. Two requests:
+
+- **Use your own name and logo.** The license covers the code, not the PeerHop name or logo; please don't publish forks (on the Microsoft Store, npm or elsewhere) as "PeerHop" or with its icon.
+- **Point analytics at your own database** (`DB` in `src/analytics.rs`) or remove it, so your users aren't counted as PeerHop's.
+
+## 🤝 Contributing
+
+Issues and pull requests are welcome. Please run `cargo test` before sending a PR. Report security issues privately, see [SECURITY.md](SECURITY.md).
+
+## 📄 License
+
+[ISC](LICENSE) © Muhammed Asraf. Third-party licenses are listed in [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md).

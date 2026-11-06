@@ -1,2 +1,0 @@
-F:\transender\ui\build\windows\msi\product.wxs(22) : error WIX0200: The Package element contains an unhandled extension element 'RegistrySearch'. Please ensure that the extension for elements in the 'http://wixtoolset.org/schemas/v4/wxs/util' namespace has been provided.
----

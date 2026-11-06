@@ -26,6 +26,8 @@ pub struct Settings {
     pub web_visible: bool,
     /// PeerHop desktops pinned to the sidebar, by device name.
     pub saved_desktops: Vec<String>,
+    /// Send anonymous per-country counts (installs, file transfers); see `analytics`.
+    pub usage_stats: bool,
 }
 
 impl Default for Settings {
@@ -45,6 +47,7 @@ impl Default for Settings {
             has_reviewed: false,
             web_visible: false,
             saved_desktops: Vec::new(),
+            usage_stats: true,
         }
     }
 }

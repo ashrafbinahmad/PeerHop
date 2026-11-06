@@ -1,0 +1,20 @@
+{
+  "rules": {
+    ".read": "auth != null && auth.token.email === 'ashrafp216@gmail.com' && auth.token.email_verified === true",
+    ".write": "auth != null && auth.token.email === 'ashrafp216@gmail.com' && auth.token.email_verified === true",
+
+    "countryStats": {
+      "$cc": {
+        "downloads": {
+          ".write": "$cc.matches(/^([A-Z]{2}|Unknown)$/) && newData.isNumber() && ((!data.exists() && newData.val() === 1) || (data.exists() && newData.val() === data.val() + 1))"
+        },
+        "transfers": {
+          ".write": "$cc.matches(/^([A-Z]{2}|Unknown)$/) && newData.isNumber() && ((!data.exists() && newData.val() >= 1 && newData.val() <= 10000) || (data.exists() && newData.val() > data.val() && newData.val() <= data.val() + 10000))"
+        },
+        "bytes": {
+          ".write": "$cc.matches(/^([A-Z]{2}|Unknown)$/) && newData.isNumber() && ((!data.exists() && newData.val() >= 0 && newData.val() <= 10000000000000) || (data.exists() && newData.val() >= data.val() && newData.val() <= data.val() + 10000000000000))"
+        }
+      }
+    }
+  }
+}

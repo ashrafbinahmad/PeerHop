@@ -12,8 +12,6 @@
  * The log is capped at ACTIVITY_CAP entries (oldest pruned first).
  */
 
-import { useCallback } from "react";
-
 const STORAGE_KEY = "activity";
 const ACTIVITY_CAP = 200; // maximum entries retained
 
@@ -120,33 +118,4 @@ export function checkAndShowFeedbackPopup(): void {
   } catch {
     // silently ignore
   }
-}
-
-/**
- * Hook that exposes a stable `logActivity` function.
- * Can be also used as a standalone utility without the hook.
- */
-export function useActivity(iframeRef: React.RefObject<HTMLIFrameElement>) {
-  const logActivity = useCallback(
-    (type: ActivityType, details: string) => {
-      const hostName = localStorage.getItem("deviceName") || "";
-      const detailedMessage = `[${hostName}] ${details}`;
-      appendActivity({ type, details: detailedMessage });
-      if (!iframeRef.current?.contentWindow) return;
-      iframeRef.current?.contentWindow?.postMessage(
-        {
-          type: "activity",
-          data: {
-            type,
-            details: detailedMessage,
-            timestamp: new Date().toISOString(),
-          },
-        },
-        "*",
-      );
-    },
-    [iframeRef],
-  );
-
-  return { logActivity, readActivity };
 }

@@ -32,7 +32,6 @@ const APP_DISPLAY_NAME = "PeerHop";
 const APP_IDENTITY_NAME = "Transender.PeerHop";
 const PUBLISHER_DISPLAY_NAME = "Peerhop";
 const CERT_SUBJECT = "CN=CBE90A45-8594-4076-AEDB-BD3B88F1C249";
-const CERT_PASSWORD = "PeerHop123";
 const SCRIPT_DIR = __dirname;
 const ROOT_DIR = path.join(SCRIPT_DIR, "..");
 const BUILDS_DIR = path.join(ROOT_DIR, "builds");
@@ -47,7 +46,13 @@ const SHIM_EXE = path.join(
   "ShareShim.exe",
 );
 const OUTPUT_MSIX = path.join(BUILDS_DIR, "peerhop_store.msix");
-const CERT_PATH = path.join(SCRIPT_DIR, "PeerHop_SelfSigned.pfx");
+// Signing: by default the code-signing certificate with CERT_SUBJECT in the
+// current user's certificate store (created by scripts/generate-test-cert.ps1).
+// CI or other machines can instead set PEERHOP_SIGN_PFX (+ PEERHOP_SIGN_PASSWORD).
+// No certificate or password lives in the repo. Store uploads are re-signed by
+// Microsoft, so this signature only matters for local sideloading.
+const SIGN_PFX = process.env.PEERHOP_SIGN_PFX;
+const SIGN_PASSWORD = process.env.PEERHOP_SIGN_PASSWORD || "";
 
 const SDK_PATH =
   "C:\\Program Files (x86)\\Windows Kits\\10\\bin\\10.0.26100.0\\x64";
@@ -462,22 +467,44 @@ function buildMSIX(version) {
   // 4. Sign
   log("Signing MSIX...", "white");
 
-  if (!fs.existsSync(CERT_PATH)) {
-    log("Certificate not found. Generating self-signed cert...", "yellow");
-    const psCmd = `powershell -ExecutionPolicy Bypass -File "${path.join(SCRIPT_DIR, "generate-test-cert.ps1")}"`;
-    execSync(psCmd, { stdio: "inherit" });
+  let signArgs;
+  if (SIGN_PFX) {
+    if (!fs.existsSync(SIGN_PFX)) {
+      log(`Error: PEERHOP_SIGN_PFX points to a missing file: ${SIGN_PFX}`, "red");
+      return false;
+    }
+    signArgs = `/f "${SIGN_PFX}"` + (SIGN_PASSWORD ? ` /p "${SIGN_PASSWORD}"` : "");
+  } else {
+    if (!hasStoreCert()) {
+      log("No signing certificate in your certificate store. Creating one...", "yellow");
+      const psCmd = `powershell -ExecutionPolicy Bypass -File "${path.join(SCRIPT_DIR, "generate-test-cert.ps1")}"`;
+      execSync(psCmd, { stdio: "inherit" });
+    }
+    if (!hasStoreCert()) {
+      log("Error: no code-signing certificate found for " + CERT_SUBJECT, "red");
+      return false;
+    }
+    signArgs = `/s My /n "${CERT_SUBJECT.replace(/^CN=/, "")}"`;
   }
 
-  if (!fs.existsSync(CERT_PATH)) {
-    log("Error: Certificate missing even after generation attempt.", "red");
-    return false;
-  }
-
-  const signCmd = `${signToolPath} sign /fd SHA256 /a /f "${CERT_PATH}" /p "${CERT_PASSWORD}" "${OUTPUT_MSIX}"`;
+  const signCmd = `${signToolPath} sign /fd SHA256 /a ${signArgs} "${OUTPUT_MSIX}"`;
   if (!exec(signCmd)) return false;
 
   log(`\nSuccessfully created signed MSIX: ${OUTPUT_MSIX}`, "green");
   return true;
+}
+
+/** True when the current user's store holds a usable signing cert for CERT_SUBJECT. */
+function hasStoreCert() {
+  try {
+    const out = execSync(
+      `powershell -NoProfile -Command "$s = New-Object Security.Cryptography.X509Certificates.X509Store('My','CurrentUser'); $s.Open('ReadOnly'); @($s.Certificates | Where-Object { $_.Subject -eq '${CERT_SUBJECT}' -and $_.HasPrivateKey -and $_.NotAfter -gt (Get-Date) }).Count"`,
+      { encoding: "utf8" },
+    );
+    return parseInt(out.trim(), 10) > 0;
+  } catch {
+    return false;
+  }
 }
 
 // Run if called directly
