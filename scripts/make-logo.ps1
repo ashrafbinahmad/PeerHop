@@ -3,6 +3,7 @@
 #   ui/build/windows/icon.ico                   exe icon (build.rs)
 #   ui/build/appicon.png and the appicon*/logo-universal tiles   MSIX (build-msix.js)
 #   assets/header.png                           README banner
+#   assets/store/*.png                          Microsoft Store listing art (poster, box art, tiles)
 # and, when checked out next to this repo, the sites' copies:
 #   ../PeerHop-landing/public (favicons, PWA icons, banner)   ../PeerHop-web/public (favicon, logo, PWA icons)
 # The web UI imports appicon.png / logo-universal.png, so rebuild it
@@ -26,11 +27,13 @@ function P($x, $y) { New-Object System.Drawing.PointF $x, $y }
 # A white curved arrow sweeping up and out to the right on a blue gradient
 # tile, drawn as round-capped strokes (feather-icon style).
 # $r: tile corner radius; 0 = full-bleed square (MSIX tiles sit on a solid plate).
-function New-Logo([int]$r) {
-    $bmp = New-Object System.Drawing.Bitmap $N, $N
+# $size: output pixels; the 1024-unit drawing is scaled, so large sizes stay sharp.
+function New-Logo([int]$r, [int]$size = $N) {
+    $bmp = New-Object System.Drawing.Bitmap $size, $size
     $g = [System.Drawing.Graphics]::FromImage($bmp)
     $g.SmoothingMode = "AntiAlias"
     $g.Clear([System.Drawing.Color]::Transparent)
+    $g.ScaleTransform($size / $N, $size / $N)
 
     $tile = New-Object System.Drawing.Drawing2D.GraphicsPath
     if ($r -gt 0) {
@@ -40,10 +43,16 @@ function New-Logo([int]$r) {
         $tile.AddArc(0, $N - 2*$r, 2*$r, 2*$r, 90, 90)
         $tile.CloseFigure()
     } else {
-        $tile.AddRectangle((New-Object System.Drawing.Rectangle 0, 0, $N, $N))
+        $tile.AddRectangle((New-Object System.Drawing.Rectangle -2, -2, ($N + 4), ($N + 4)))   # overfill: no half-transparent anti-aliased edge
     }
     $g.FillPath((New-Object System.Drawing.Drawing2D.LinearGradientBrush (P 0 0), (P $N $N), $top, $deep), $tile)
+    Draw-Arrow $g
+    $g.Dispose()
+    return ,$bmp
+}
 
+# The white arrow in 1024x1024 drawing units (scale/translate $g to place it).
+function Draw-Arrow($g) {
     $pen = New-Object System.Drawing.Pen ([System.Drawing.Color]::White), 76
     $pen.StartCap = "Round"; $pen.EndCap = "Round"; $pen.LineJoin = "Round"
 
@@ -60,18 +69,18 @@ function New-Logo([int]$r) {
         $bx = -($ux*$cs - $uy*$sn); $by = -($ux*$sn + $uy*$cs)
         $g.DrawLine($pen, $p3, (P ($p3.X + $bx*$arm) ($p3.Y + $by*$arm)))
     }
-
-    $g.Dispose()
-    return ,$bmp
 }
 
-function Resize($src, [int]$size) {
-    $out = New-Object System.Drawing.Bitmap $size, $size
+function Resize($src, [int]$size, [int]$height = $size) {
+    $out = New-Object System.Drawing.Bitmap $size, $height
     $g = [System.Drawing.Graphics]::FromImage($out)
     $g.InterpolationMode = "HighQualityBicubic"
     $g.SmoothingMode = "AntiAlias"
     $g.PixelOffsetMode = "HighQuality"
-    $g.DrawImage($src, 0, 0, $size, $size)
+    # Mirror at the edges so bicubic doesn't blend in transparent pixels from outside the source.
+    $attr = New-Object System.Drawing.Imaging.ImageAttributes
+    $attr.SetWrapMode("TileFlipXY")
+    $g.DrawImage($src, (New-Object System.Drawing.Rectangle 0, 0, $size, $height), 0, 0, $src.Width, $src.Height, "Pixel", $attr)
     $g.Dispose()
     return ,$out
 }
@@ -125,6 +134,43 @@ function New-Header {
     return ,$bmp
 }
 
+# Store 9:16 poster art (Xbox): full-bleed gradient, the arrow, and the wordmark.
+function New-Poster {
+    $W = 1440; $H = 2160
+    $bmp = New-Object System.Drawing.Bitmap $W, $H
+    $g = [System.Drawing.Graphics]::FromImage($bmp)
+    $g.SmoothingMode = "AntiAlias"
+    $g.TextRenderingHint = "AntiAlias"
+    $bg = New-Object System.Drawing.Drawing2D.LinearGradientBrush (P 0 0), (P $W $H), $top, $deep
+    $bg.WrapMode = "TileFlipXY"   # no wrapped 1px seam at the edges
+    $g.FillRectangle($bg, -2, -2, $W + 4, $H + 4)   # overfill: no half-transparent anti-aliased edge
+    $state = $g.Save()
+    $g.TranslateTransform(180, 380)          # 1080px mark, centred, upper half
+    $g.ScaleTransform(1080 / $N, 1080 / $N)
+    Draw-Arrow $g
+    $g.Restore($state)
+    $fmt = New-Object System.Drawing.StringFormat
+    $fmt.Alignment = "Center"
+    $white = New-Object System.Drawing.SolidBrush ([System.Drawing.Color]::White)
+    $soft = New-Object System.Drawing.SolidBrush ([System.Drawing.Color]::FromArgb(220, 255, 255, 255))
+    $g.DrawString("PeerHop", (New-Object System.Drawing.Font "Segoe UI", 200, ([System.Drawing.FontStyle]::Bold), ([System.Drawing.GraphicsUnit]::Pixel)), $white, (New-Object System.Drawing.RectangleF 0, 1480, $W, 300), $fmt)
+    $g.DrawString("Simple, fast, local file transfer", (New-Object System.Drawing.Font "Segoe UI", 64, ([System.Drawing.GraphicsUnit]::Pixel)), $soft, (New-Object System.Drawing.RectangleF 0, 1760, $W, 120), $fmt)
+    $g.Dispose()
+    return ,$bmp
+}
+
+# Microsoft Store listing art (uploaded in Partner Center, not packaged).
+# Square art is full bleed: the Store and Xbox crop/round it themselves.
+function Save-StoreArt([string]$dir) {
+    $poster = New-Poster
+    Save-Png $poster "$dir\poster-1440x2160.png"
+    Save-Png (Resize $poster 720 1080) "$dir\poster-720x1080.png"
+    $big = New-Logo 0 2160
+    Save-Png $big "$dir\boxart-2160x2160.png"
+    foreach ($sz in 1080, 300, 150, 71) { Save-Png (Resize $big $sz) "$dir\store-${sz}x${sz}.png" }
+    Write-Host "Wrote Store art to $dir"
+}
+
 $rounded = New-Logo 230
 # Full-bleed variant for MSIX tiles: Start and the installer draw tiles on a
 # solid plate, so transparent rounded corners would show its colour.
@@ -136,6 +182,7 @@ if ($OutDir) {
     Save-Png $square "$OutDir\logo-square.png"
     Save-Png (Resize $rounded 44) "$OutDir\logo-44.png"
     Save-Png (New-Header) "$OutDir\header.png"
+    Save-StoreArt "$OutDir\store"
     Write-Host "Wrote preview to $OutDir"
     return
 }
@@ -154,6 +201,7 @@ foreach ($sz in 16, 24, 32, 44, 48, 256) {
 }
 Save-Png (Resize $square 512) "$root\ui\build\appicon.png"
 Save-Ico $rounded @(16, 24, 32, 48, 64, 128, 256) "$root\ui\build\windows\icon.ico"
+Save-StoreArt "$root\assets\store"
 Write-Host "Wrote PeerHop icons (appicon.png, icon.ico, MSIX tiles)"
 
 $landing = Join-Path (Split-Path -Parent $root) "PeerHop-landing"
