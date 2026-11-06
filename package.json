@@ -1,6 +1,6 @@
 {
   "name": "peerhop-root",
-  "version": "3.0.0",
+  "version": "3.1.0",
   "description": "Root package for PeerHop build scripts",
   "scripts": {
     "dev": "cargo run --bin PeerHop",
