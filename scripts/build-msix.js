@@ -1,6 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 const { execSync } = require("child_process");
+const { cargoBuild, releaseBinary } = require("./cargo");
 
 // ANSI color codes
 const colors = {
@@ -38,13 +39,7 @@ const BUILDS_DIR = path.join(ROOT_DIR, "builds");
 const DIST_DIR = path.join(ROOT_DIR, "ui", "build", "windows", "msix_dist");
 
 const INPUT_EXE = path.join(BUILDS_DIR, "peerhop_win.exe");
-const SHIM_EXE = path.join(
-  ROOT_DIR,
-  "share_shim",
-  "build",
-  "Release",
-  "ShareShim.exe",
-);
+const SHIM_EXE = releaseBinary("ShareShim");
 const OUTPUT_MSIX = path.join(BUILDS_DIR, "peerhop_store.msix");
 // Signing: by default the code-signing certificate with CERT_SUBJECT in the
 // current user's certificate store (created by scripts/generate-test-cert.ps1).
@@ -218,19 +213,13 @@ function generateManifest(version) {
 function buildMSIX(version) {
   log("\nBuilding MSIX Package...", "cyan");
 
-  // Build ShareShim
-  const SHIM_BUILD_BAT = path.join(ROOT_DIR, "scripts", "build-shim.bat");
-  if (fs.existsSync(SHIM_BUILD_BAT)) {
-    log("Building ShareShim utility...", "cyan");
-    try {
-      execSync(`"${SHIM_BUILD_BAT}"`, { stdio: "inherit", cwd: ROOT_DIR });
-      log("ShareShim build completed.", "green");
-    } catch (error) {
-      log(
-        "Error: Failed to build ShareShim. Please ensure CMake and Visual Studio are installed.",
-        "red",
-      );
-    }
+  // Build ShareShim (share-target / "Send with PeerHop" entry point)
+  log("Building ShareShim...", "cyan");
+  try {
+    cargoBuild(["ShareShim"]);
+  } catch {
+    log("Error: cargo build of ShareShim failed.", "red");
+    return false;
   }
 
   if (!fs.existsSync(INPUT_EXE)) {
@@ -256,7 +245,6 @@ function buildMSIX(version) {
     log("Copied ShareShim.exe to layout", "green");
   } else {
     log(`Error: ShareShim.exe not found at ${SHIM_EXE}.`, "red");
-    log("Please build it first using: scripts\\build-shim.bat", "red");
     process.exit(1);
   }
 
@@ -535,7 +523,7 @@ if (require.main === module) {
     }
   }
 
-  buildMSIX(version);
+  if (!buildMSIX(version)) process.exit(1);
 }
 
 module.exports = { buildMSIX };

@@ -12,6 +12,10 @@ name = "PeerHop"
 path = "src/main.rs"
 
 [[bin]]
+name = "ShareShim"
+path = "src/bin/share-shim.rs"
+
+[[bin]]
 name = "peerhop-cli"
 path = "src/bin/peerhop-cli.rs"
 
@@ -65,8 +69,15 @@ windows-sys = { version = "0.61", features = [
     "Win32_System_Memory",
     "Win32_UI_Shell",
     "Win32_UI_Input_KeyboardAndMouse",
-    "Win32_UI_Input_KeyboardAndMouse",
     "Win32_UI_WindowsAndMessaging",
+] }
+# WinRT Share Target activation, used only by ShareShim.
+windows = { version = "0.62", features = [
+    "ApplicationModel_Activation",
+    "ApplicationModel_DataTransfer_ShareTarget",
+    "Foundation_Collections",
+    "Storage",
+    "Win32_System_WinRT",
 ] }
 
 [target.'cfg(windows)'.build-dependencies]

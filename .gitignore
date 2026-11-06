@@ -38,7 +38,6 @@ ui/build/windows/msix_dist/
 *.cer
 
 # Generated build files (ui/build keeps only the icons and the MSI sources)
-share_shim/build
 ui/build/bin/
 ui/build/windows/msi/*.msi
 ui/build/windows/msi/*.txt

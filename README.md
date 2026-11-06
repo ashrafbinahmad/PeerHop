@@ -101,7 +101,7 @@ PeerHop is written in **Rust**. The desktop app is a native **egui** window; pho
   - **`gui/`**: The egui desktop UI (chat, connect, settings, themes, translations).
   - **`main.rs`** / **`bin/peerhop-cli.rs`**: Desktop app and CLI entry points.
 - **`/ui/frontend`**: The React, Vite and TailwindCSS web UI used by phones and browsers (`build.rs` builds it if `dist/` is missing).
-- **`/ui/build`**: Windows icon and MSI (WiX) sources. **`/share_shim`**: the MSIX share-target helper.
+- **`/ui/build`**: Windows icon and MSI (WiX) sources. `src/bin/share-shim.rs`: the MSIX share-target helper (ShareShim.exe).
 - **`/npm-package` & `/scripts`**: Build and distribution scripts for NPM, Windows, and Linux releases.
 
 ### Development

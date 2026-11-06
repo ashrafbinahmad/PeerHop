@@ -138,10 +138,38 @@ pub fn clipboard_files() -> Vec<PathBuf> {
 
 /// Share payload left by ShareShim when the app was not running (cold start).
 pub fn take_cold_start_share() -> Option<ShareData> {
-    let path = std::env::temp_dir().join("peerhop_share.json");
+    let path = cold_start_share_path();
     let bytes = std::fs::read(&path).ok()?;
     let _ = std::fs::remove_file(&path);
     serde_json::from_slice(&bytes).ok()
+}
+
+fn cold_start_share_path() -> PathBuf {
+    std::env::temp_dir().join("peerhop_share.json")
+}
+
+/// Hands a share payload (see [`ShareData`]) to the running app, or leaves it
+/// for [`take_cold_start_share`] when the app is not running. Used by ShareShim.
+#[cfg(windows)]
+pub fn deliver_share(payload: &serde_json::Value) {
+    let payload = payload.to_string();
+    if !write_share_pipe(&payload, 1) {
+        let _ = std::fs::write(cold_start_share_path(), payload);
+    }
+}
+
+#[cfg(windows)]
+fn write_share_pipe(payload: &str, attempts: u32) -> bool {
+    use std::io::Write;
+    for i in 0..attempts {
+        if i > 0 {
+            std::thread::sleep(std::time::Duration::from_millis(100));
+        }
+        if let Ok(mut pipe) = std::fs::OpenOptions::new().write(true).open(SHARE_PIPE) {
+            return pipe.write_all(payload.as_bytes()).is_ok();
+        }
+    }
+    false
 }
 
 /// Existing paths passed on the command line ("Send with PeerHop").
@@ -177,15 +205,8 @@ pub fn acquire_single_instance(files: &[String]) -> bool {
 
 #[cfg(windows)]
 fn send_to_running(files: &[String]) {
-    use std::io::Write;
     let payload = serde_json::json!({ "title": "Shared from command-line", "files": files }).to_string();
-    for _ in 0..5 {
-        if let Ok(mut pipe) = std::fs::OpenOptions::new().write(true).open(SHARE_PIPE) {
-            let _ = pipe.write_all(payload.as_bytes());
-            return;
-        }
-        std::thread::sleep(std::time::Duration::from_millis(100));
-    }
+    write_share_pipe(&payload, 5);
 }
 
 #[cfg(windows)]
