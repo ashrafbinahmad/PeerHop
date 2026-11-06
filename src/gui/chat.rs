@@ -132,6 +132,10 @@ impl App {
             egui::ScrollArea::vertical().stick_to_bottom(true).auto_shrink(false).show(ui, |ui| {
                 ui.add_space((view_h - prev_h).max(0.0) + 6.0);
                 let top = ui.cursor().top();
+                // The QR stays above the public room's messages so more phones can join.
+                if matches!(conv, Conv::Public) {
+                    self.inline_connect_card(ui);
+                }
                 let mut rows: Vec<(&Transaction, Option<f32>)> = live.iter().map(|t| (t, None)).collect();
                 rows.extend(leaving.iter().map(|(t, at)| (t, Some(1.0 - at.elapsed().as_secs_f32() / LEAVE_SECS))));
                 rows.sort_by_key(|(t, _)| t.id);
@@ -454,6 +458,14 @@ impl App {
         ui.painter().galley(pill.center() - galley.size() / 2.0, galley, p.sub_text);
     }
 
+    /// QR and network selectors, sitting straight on the chat background, centred, no card around it.
+    fn inline_connect_card(&mut self, ui: &mut Ui) {
+        ui.vertical_centered(|ui| {
+            ui.allocate_ui_with_layout(vec2(540.0_f32.min(ui.available_width() - 32.0), 0.0), Layout::top_down(Align::Center), |ui| self.connect_card(ui));
+        });
+        ui.add_space(10.0);
+    }
+
     fn empty_state(&mut self, ui: &mut Ui, conv: &Conv) {
         let p = self.pal;
         egui::ScrollArea::vertical().auto_shrink(false).show(ui, |ui| {
@@ -462,10 +474,8 @@ impl App {
                 ui.multiply_opacity(e);
                 match conv {
                     Conv::Public if self.clients.is_empty() => {
-                        // Sits straight on the chat background, centred, no card around it.
                         ui.add_space((ui.available_height() * 0.08).clamp(10.0, 40.0));
-                        ui.allocate_ui_with_layout(vec2(540.0_f32.min(ui.available_width() - 32.0), 0.0), Layout::top_down(Align::Center), |ui| self.connect_card(ui));
-                        ui.add_space(10.0);
+                        self.inline_connect_card(ui);
                     }
                     _ => {
                         ui.add_space((ui.available_height() * 0.22).max(24.0));
@@ -782,7 +792,7 @@ impl App {
             }
             ui.vertical(|ui| {
                 ui.spacing_mut().item_spacing.y = 2.0;
-                ui.add(egui::Label::new(widgets::bold(&t.filename, 13.5).color(p.text)).truncate().selectable(false)).on_hover_text(&t.filename);
+                ui.add(egui::Label::new(widgets::bold(&t.filename, 13.5).color(p.text)).truncate().selectable(false));
                 let meta_c = if mine { p.mine_meta } else { p.sub_text };
                 if running {
                     let mut parts = vec![format!("{} / {}", format_bytes(bytes), format_bytes(t.file_size))];

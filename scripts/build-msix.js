@@ -53,6 +53,7 @@ const SDK_PATH =
   "C:\\Program Files (x86)\\Windows Kits\\10\\bin\\10.0.26100.0\\x64";
 let makeAppxPath = "MakeAppx.exe";
 let signToolPath = "SignTool.exe";
+let makePriPath = "MakePri.exe";
 
 // Supported file types for share target and file association
 // Add more extensions here as needed — no wildcards, must start with a dot
@@ -88,22 +89,25 @@ function checkTools() {
     try {
       execSync("MakeAppx.exe /?", { stdio: "ignore" });
       execSync("SignTool.exe /?", { stdio: "ignore" });
+      execSync("MakePri.exe /?", { stdio: "ignore" });
       return true;
     } catch (e) {
       const explicitMakeAppx = path.join(SDK_PATH, "MakeAppx.exe");
       const explicitSignTool = path.join(SDK_PATH, "SignTool.exe");
+      const explicitMakePri = path.join(SDK_PATH, "MakePri.exe");
 
-      if (fs.existsSync(explicitMakeAppx) && fs.existsSync(explicitSignTool)) {
+      if (fs.existsSync(explicitMakeAppx) && fs.existsSync(explicitSignTool) && fs.existsSync(explicitMakePri)) {
         log(`Found tools at ${SDK_PATH}`, "green");
         makeAppxPath = `"${explicitMakeAppx}"`;
         signToolPath = `"${explicitSignTool}"`;
+        makePriPath = `"${explicitMakePri}"`;
         return true;
       }
       throw e;
     }
   } catch (e) {
     log(
-      "Error: MakeAppx.exe or SignTool.exe not found in PATH or standard location.",
+      "Error: MakeAppx.exe, SignTool.exe or MakePri.exe not found in PATH or standard location.",
       "red",
     );
     log(`Checked PATH and ${SDK_PATH}`, "yellow");
@@ -170,7 +174,7 @@ function generateManifest(version) {
       <uap:VisualElements
         DisplayName="${APP_DISPLAY_NAME}"
         Description="Fast local file transfer"
-        BackgroundColor="white"
+        BackgroundColor="#1A5ED6"
         Square150x150Logo="Assets\\Square150x150Logo.png"
         Square44x44Logo="Assets\\Square44x44Logo.png">
       </uap:VisualElements>
@@ -248,211 +252,49 @@ function buildMSIX(version) {
     process.exit(1);
   }
 
-  // Copy assets
-  const sourceIcon = path.join(ROOT_DIR, "ui", "build", "appicon.png");
-  const source150Icon = path.join(
-    ROOT_DIR,
-    "ui",
-    "frontend",
-    "src",
-    "assets",
-    "images",
-    "appicon150x150.png",
-  );
-  const source44Icon = path.join(
-    ROOT_DIR,
-    "ui",
-    "frontend",
-    "src",
-    "assets",
-    "images",
-    "appicon44x44.png",
-  );
-  const source44IconAlt44 = path.join(
-    ROOT_DIR,
-    "ui",
-    "frontend",
-    "src",
-    "assets",
-    "images",
-    "appicon44x44.targetsize-44_altform-unplated.png",
-  );
-  const source44IconAlt256 = path.join(
-    ROOT_DIR,
-    "ui",
-    "frontend",
-    "src",
-    "assets",
-    "images",
-    "appicon44x44.targetsize-256_altform-unplated.png",
-  );
-  const source44IconAlt48 = path.join(
-    ROOT_DIR,
-    "ui",
-    "frontend",
-    "src",
-    "assets",
-    "images",
-    "appicon44x44.targetsize-48_altform-unplated.png",
-  );
-  const source44IconIco = path.join(
-    ROOT_DIR,
-    "ui",
-    "frontend",
-    "src",
-    "assets",
-    "images",
-    "appicon44x44.ico",
-  );
-  const sourceLogoUniversal = path.join(
-    ROOT_DIR,
-    "ui",
-    "frontend",
-    "src",
-    "assets",
-    "images",
-    "logo-universal.png",
-  );
-
-  function copyIfExists(src, dest) {
-    if (fs.existsSync(src)) {
-      fs.copyFileSync(src, dest);
-      return true;
+  // Copy assets (all drawn by scripts/make-logo.ps1).
+  const IMAGES = path.join(ROOT_DIR, "ui", "frontend", "src", "assets", "images");
+  const assets = [
+    // Tiles are full-bleed: Windows draws them on a plate anyway.
+    [path.join(ROOT_DIR, "ui", "build", "appicon.png"), "StoreLogo.png"],
+    [path.join(IMAGES, "appicon150x150.png"), "Square150x150Logo.png"],
+    // App list / taskbar: rounded on transparent. The qualified "unplated"
+    // variants (picked via resources.pri) stop Windows drawing an
+    // accent-colour plate behind the icon.
+    [path.join(IMAGES, "appicon44x44.png"), "Square44x44Logo.png"],
+    ...[16, 24, 32, 44, 48, 256].map((sz) => [
+      path.join(IMAGES, `appicon44x44.targetsize-${sz}_altform-unplated.png`),
+      `Square44x44Logo.targetsize-${sz}_altform-unplated.png`,
+    ]),
+  ];
+  for (const [src, name] of assets) {
+    if (!fs.existsSync(src)) {
+      log(`Error: ${path.relative(ROOT_DIR, src)} not found. Run scripts/make-logo.ps1.`, "red");
+      process.exit(1);
     }
-    log(
-      `Warning: ${path.relative(ROOT_DIR, src)} not found; skipping ${path.relative(ROOT_DIR, dest)}`,
-      "yellow",
-    );
-    return false;
+    fs.copyFileSync(src, path.join(DIST_DIR, "Assets", name));
   }
-
-  if (!fs.existsSync(sourceIcon)) {
-    log(
-      "Error: appicon.png not found. Please build the frontend before packaging MSIX.",
-      "red",
-    );
-    process.exit(1);
-  }
-
-  copyIfExists(sourceIcon, path.join(DIST_DIR, "Assets", "StoreLogo.png"));
-  copyIfExists(
-    source150Icon,
-    path.join(DIST_DIR, "Assets", "Square150x150Logo.png"),
-  );
-  copyIfExists(
-    source150Icon,
-    path.join(DIST_DIR, "Assets", "Square150x150Logo.altform-unplated.png"),
-  );
-  copyIfExists(
-    source150Icon,
-    path.join(
-      DIST_DIR,
-      "Assets",
-      "Square150x150Logo.scale-100.altform-unplated.png",
-    ),
-  );
-  copyIfExists(
-    source150Icon,
-    path.join(
-      DIST_DIR,
-      "Assets",
-      "Square150x150Logo.scale-125.altform-unplated.png",
-    ),
-  );
-  copyIfExists(
-    source150Icon,
-    path.join(
-      DIST_DIR,
-      "Assets",
-      "Square150x150Logo.scale-150.altform-unplated.png",
-    ),
-  );
-  copyIfExists(
-    source150Icon,
-    path.join(
-      DIST_DIR,
-      "Assets",
-      "Square150x150Logo.scale-200.altform-unplated.png",
-    ),
-  );
-  copyIfExists(
-    source44Icon,
-    path.join(DIST_DIR, "Assets", "Square44x44Logo.png"),
-  );
-  copyIfExists(
-    source44IconAlt44,
-    path.join(DIST_DIR, "Assets", "Peerhop.altform-unplated.png"),
-  );
-  copyIfExists(
-    source44IconAlt44,
-    path.join(
-      DIST_DIR,
-      "Assets",
-      "Square44x44Logo.scale-100.altform-unplated.png",
-    ),
-  );
-  copyIfExists(
-    source44IconAlt44,
-    path.join(
-      DIST_DIR,
-      "Assets",
-      "Square44x44Logo.scale-125.altform-unplated.png",
-    ),
-  );
-  copyIfExists(
-    source44IconAlt44,
-    path.join(
-      DIST_DIR,
-      "Assets",
-      "Square44x44Logo.scale-150.altform-unplated.png",
-    ),
-  );
-  copyIfExists(
-    source44IconAlt44,
-    path.join(
-      DIST_DIR,
-      "Assets",
-      "Square44x44Logo.scale-200.altform-unplated.png",
-    ),
-  );
-  copyIfExists(
-    source44IconAlt256,
-    path.join(
-      DIST_DIR,
-      "Assets",
-      "Square44x44Logo.targetsize-256_altform-unplated.png",
-    ),
-  );
-  copyIfExists(
-    source44IconAlt48,
-    path.join(
-      DIST_DIR,
-      "Assets",
-      "Square44x44Logo.targetsize-48_altform-unplated.png",
-    ),
-  );
-  copyIfExists(
-    source44IconIco,
-    path.join(DIST_DIR, "Assets", "Square44x44Logo.ico"),
-  );
-  copyIfExists(
-    sourceLogoUniversal,
-    path.join(DIST_DIR, "Assets", "LogoUniversal.png"),
-  );
 
   // 2. Generate Manifest
   log("Generating AppxManifest.xml...", "white");
   const manifest = generateManifest(version);
   fs.writeFileSync(path.join(DIST_DIR, "AppxManifest.xml"), manifest);
 
-  // 3. Pack MSIX
+  // 3. Resource index: without resources.pri Windows ignores the qualified
+  // (targetsize/unplated) icons and plates the plain Square44x44Logo.png.
+  log("Indexing resources...", "white");
+  const priConfig = path.join(require("os").tmpdir(), "peerhop-priconfig.xml");
+  if (!exec(`${makePriPath} createconfig /cf "${priConfig}" /dq en-US /o`)) return false;
+  if (!exec(`${makePriPath} new /pr "${DIST_DIR}" /cf "${priConfig}" /mn "${path.join(DIST_DIR, "AppxManifest.xml")}" /of "${path.join(DIST_DIR, "resources.pri")}" /o`)) return false;
+
+  // 4. Pack MSIX
   log("Packing MSIX...", "white");
   if (fs.existsSync(OUTPUT_MSIX)) fs.unlinkSync(OUTPUT_MSIX);
 
   const packCmd = `${makeAppxPath} pack /d "${DIST_DIR}" /p "${OUTPUT_MSIX}"`;
   if (!exec(packCmd)) return false;
 
-  // 4. Sign
+  // 5. Sign
   log("Signing MSIX...", "white");
 
   let signArgs;

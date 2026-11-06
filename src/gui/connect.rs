@@ -283,14 +283,13 @@ impl App {
         if (h > 0.0 && h < 1.0) || (s > 0.0 && s < 1.0) {
             ui.ctx().request_repaint();
         }
-        let r = rect.translate(vec2(0.0, -2.0 * h));
+        // Hover only tints the colors; the card never moves or casts a shadow.
+        let r = rect;
         let painter = ui.painter();
-        if h > 0.0 {
-            painter.rect_filled(r.translate(vec2(0.0, 3.0)), 14, egui::Color32::from_black_alpha((26.0 * h) as u8));
-        }
         let fill = widgets::lerp_color(widgets::lerp_color(p.panel, p.icon_bg, 0.5 * h), p.accent_soft, s);
         painter.rect_filled(r, 14, fill);
-        painter.rect_stroke(r, 14, Stroke::new(1.0 + 0.5 * s, widgets::lerp_color(p.border, p.accent, s)), egui::StrokeKind::Inside);
+        let border = widgets::lerp_color(widgets::lerp_color(p.border, p.accent, 0.45 * h), p.accent, s);
+        painter.rect_stroke(r, 14, Stroke::new(1.0 + 0.5 * s, border), egui::StrokeKind::Inside);
 
         let ic = pos2(r.left() + 26.0, r.top() + 26.0);
         painter.circle_filled(ic, 16.0, widgets::lerp_color(p.icon_bg, p.accent, s));
