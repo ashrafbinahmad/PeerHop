@@ -10,7 +10,7 @@ use std::time::{Duration, Instant};
 use tokio::io::AsyncWriteExt;
 
 use super::{AppState, client_ip};
-use crate::hub::{HubEvent, Mode};
+use crate::hub::Mode;
 use crate::store::{Status, Transaction};
 
 const PROGRESS_EVERY: Duration = Duration::from_millis(200);
@@ -62,10 +62,8 @@ pub async fn handle(State(hub): State<AppState>, ConnectInfo(addr): ConnectInfo<
 
         match receive(&hub, &ip, id, &path, &mut field, declared_size).await {
             Ok(written) => {
-                hub.txs.lock().finish_upload(id, written);
-                hub.broadcast_txn(id);
+                hub.file_received(id, &stored_name, written);
                 crate::log_info!("Received {stored_name} ({written} bytes) from {ip}");
-                hub.emit(HubEvent::FileReceived { name: stored_name.clone(), size: written });
                 saved.push(stored_name);
             }
             Err(abort) => {

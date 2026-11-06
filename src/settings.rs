@@ -22,6 +22,10 @@ pub struct Settings {
     pub language: String,
     pub share_count: u32,
     pub has_reviewed: bool,
+    /// Announce this PC to browsers on web.peerhop.in and accept their connections.
+    pub web_visible: bool,
+    /// PeerHop desktops pinned to the sidebar, by device name.
+    pub saved_desktops: Vec<String>,
 }
 
 impl Default for Settings {
@@ -39,6 +43,8 @@ impl Default for Settings {
             language: String::new(),
             share_count: 0,
             has_reviewed: false,
+            web_visible: false,
+            saved_desktops: Vec::new(),
         }
     }
 }

@@ -90,9 +90,12 @@ pub fn network_profiles() -> Vec<NetworkProfile> {
     let mut out: Vec<NetworkProfile> = if_addrs::get_if_addrs()
         .unwrap_or_default()
         .into_iter()
-        .filter(|i| !i.is_loopback() && i.oper_status == if_addrs::IfOperStatus::Up)
+        .filter(|i| !i.is_loopback() && i.oper_status == if_addrs::IfOperStatus::Up && !is_virtual(&i.name))
         .filter_map(|i| {
             let IpAddr::V4(v4) = i.ip() else { return None };
+            if v4.is_link_local() {
+                return None;
+            }
             let mut p = NetworkProfile {
                 name: i.name.clone(),
                 ip: v4,
@@ -158,6 +161,15 @@ fn wifi_ssids() -> HashMap<String, String> {
     map
 }
 
+/// Adapters that only reach VMs/containers on this machine (WSL, Hyper-V, Docker,
+/// VirtualBox, VMware…): phones can never connect through them.
+fn is_virtual(name: &str) -> bool {
+    let n = name.to_ascii_lowercase();
+    const PARTS: [&str; 9] = ["wsl", "hyper-v", "vethernet", "virtualbox", "vbox", "vmware", "vmnet", "docker", "default switch"];
+    const PREFIXES: [&str; 6] = ["docker", "br-", "veth", "virbr", "lxcbr", "lxdbr"];
+    PARTS.iter().any(|p| n.contains(p)) || PREFIXES.iter().any(|p| n.starts_with(p))
+}
+
 fn is_wireless(name: &str) -> bool {
     cfg!(target_os = "linux")
         && (std::path::Path::new(&format!("/sys/class/net/{name}/wireless")).exists()
@@ -216,6 +228,16 @@ if ($tm.TetheringOperationalState -ne 'On') {{
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn virtual_adapters_skipped() {
+        for n in ["vEthernet (WSL (Hyper-V firewall))", "vEthernet (Default Switch)", "VirtualBox Host-Only Network", "VMware Network Adapter VMnet8", "docker0", "br-1a2b", "virbr0"] {
+            assert!(super::is_virtual(n), "{n}");
+        }
+        for n in ["Wi-Fi", "Ethernet", "Local Area Connection* 10", "wlan0", "enp3s0"] {
+            assert!(!super::is_virtual(n), "{n}");
+        }
+    }
+
     #[test]
     fn wifi_payload_escapes() {
         assert_eq!(super::wifi_qr_payload("My;Net", "p:w"), r"WIFI:S:My\;Net;T:WPA;P:p\:w;;");

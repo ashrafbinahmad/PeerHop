@@ -77,6 +77,10 @@ pub struct Transaction {
     pub client_bytes: BTreeMap<String, u64>,
     #[serde(skip)]
     client_ranges: HashMap<String, Vec<(u64, u64)>>,
+    /// Transfer with a web.peerhop.in peer: shown on this desktop only, never
+    /// broadcast to LAN devices or downloadable over HTTP.
+    #[serde(skip)]
+    pub web: bool,
 }
 
 impl Transaction {
@@ -101,6 +105,7 @@ impl Transaction {
             client_status: BTreeMap::new(),
             client_bytes: BTreeMap::new(),
             client_ranges: HashMap::new(),
+            web: false,
         }
     }
 
@@ -184,9 +189,22 @@ impl TxStore {
         self.txs.get(&id)
     }
 
+    pub fn get_mut(&mut self, id: u64) -> Option<&mut Transaction> {
+        self.txs.get_mut(&id)
+    }
+
     /// All transactions, oldest first.
     pub fn all(&self) -> Vec<Transaction> {
         self.txs.values().cloned().collect()
+    }
+
+    /// Transactions LAN devices may see (excludes private web.peerhop.in transfers).
+    pub fn lan_all(&self) -> Vec<Transaction> {
+        self.txs.values().filter(|t| !t.web).cloned().collect()
+    }
+
+    pub fn lan_get(&self, id: u64) -> Option<&Transaction> {
+        self.txs.get(&id).filter(|t| !t.web)
     }
 
     pub fn len(&self) -> usize {
@@ -205,7 +223,7 @@ impl TxStore {
         self.txs
             .values()
             .rev()
-            .find(|t| t.kind == Kind::File && t.is_outgoing() && t.filename == filename)
+            .find(|t| t.kind == Kind::File && t.is_outgoing() && !t.web && t.filename == filename)
             .map(|t| t.id)
     }
 

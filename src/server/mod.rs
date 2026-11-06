@@ -192,7 +192,7 @@ async fn download_by_id(
     Query(q): Query<HashMap<String, String>>,
     headers: HeaderMap,
 ) -> Response {
-    let path = hub.txs.lock().get(id).and_then(|t| t.local_path());
+    let path = hub.txs.lock().lan_get(id).and_then(|t| t.local_path());
     let Some(path) = path else {
         return (StatusCode::NOT_FOUND, "File not found").into_response();
     };
@@ -222,7 +222,7 @@ async fn settings(State(hub): State<AppState>) -> Json<serde_json::Value> {
 }
 
 async fn transactions(State(hub): State<AppState>) -> Json<serde_json::Value> {
-    Json(json!({ "transactions": hub.txs.lock().all() }))
+    Json(json!({ "transactions": hub.txs.lock().lan_all() }))
 }
 
 #[derive(Deserialize)]
@@ -255,7 +255,7 @@ async fn cancel_download(State(hub): State<AppState>, ConnectInfo(addr): Connect
 /// Lets a device stop its own in-flight upload.
 async fn cancel_transaction(State(hub): State<AppState>, ConnectInfo(addr): ConnectInfo<SocketAddr>, UrlPath(id): UrlPath<u64>) -> Response {
     let ip = client_ip(addr).to_string();
-    let owned = hub.txs.lock().get(id).map(|t| t.sender_id == ip);
+    let owned = hub.txs.lock().lan_get(id).map(|t| t.sender_id == ip);
     match owned {
         Some(true) => {
             hub.cancel_transaction(id);
@@ -269,7 +269,8 @@ async fn cancel_transaction(State(hub): State<AppState>, ConnectInfo(addr): Conn
 /// Mobile "delete" removes the entry from history; files on the desktop are never
 /// deleted on a remote device's request.
 async fn delete_transaction(State(hub): State<AppState>, UrlPath(id): UrlPath<u64>) -> Response {
-    if hub.delete_transaction(id, false) {
+    let visible = hub.txs.lock().lan_get(id).is_some();
+    if visible && hub.delete_transaction(id, false) {
         Json(json!({ "success": true })).into_response()
     } else {
         (StatusCode::NOT_FOUND, "Transaction not found").into_response()

@@ -1,0 +1,8 @@
+[alias]
+# Bump the version (patch by default), build the release GUI and pack + sign
+# builds/peerhop_store.msix. See xtask/src/main.rs.
+#   cargo msix            2.5.9 -> 2.5.10
+#   cargo msix minor      2.5.9 -> 2.6.0
+#   cargo msix 3.0.0      explicit
+#   cargo msix --same     rebuild without changing the version
+msix = "run --quiet --package xtask -- msix"

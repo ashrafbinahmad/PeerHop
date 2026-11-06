@@ -42,12 +42,16 @@ pub fn toggle(ui: &mut Ui, p: &Palette, on_: &mut bool) -> Response {
         resp.mark_changed();
     }
     let t = ui.ctx().animate_bool_responsive(resp.id, *on_);
-    let fill = lerp_color(p.border, p.accent, t);
-    let painter = ui.painter();
-    painter.rect_filled(rect, CornerRadius::same(10), fill);
-    let x = egui::lerp(rect.left() + 10.0..=rect.right() - 10.0, t);
-    painter.circle_filled(pos2(x, rect.center().y), 7.5, Color32::WHITE);
+    paint_switch(ui.painter(), rect, t, p);
     resp.on_hover_cursor(egui::CursorIcon::PointingHand)
+}
+
+/// Draws a switch track + knob at `t` (0 off .. 1 on) inside `rect`.
+pub fn paint_switch(painter: &egui::Painter, rect: Rect, t: f32, p: &Palette) {
+    let r = rect.height() / 2.0;
+    painter.rect_filled(rect, CornerRadius::same(r as u8), lerp_color(p.border, p.accent, t));
+    let x = egui::lerp(rect.left() + r..=rect.right() - r, t);
+    painter.circle_filled(pos2(x, rect.center().y), r - 2.5, Color32::WHITE);
 }
 
 pub fn lerp_color(a: Color32, b: Color32, t: f32) -> Color32 {
@@ -129,6 +133,61 @@ pub fn icon_btn_colored(ui: &mut Ui, p: &Palette, glyph: &str, tip: &str, color:
     if tip.is_empty() { resp } else { resp.on_hover_text(tip) }
 }
 
+/// Larger round icon button (headers).
+pub fn icon_btn_big(ui: &mut Ui, p: &Palette, glyph: &str, tip: &str) -> Response {
+    icon_btn_big_colored(ui, p, glyph, tip, p.sub_text)
+}
+
+pub fn icon_btn_big_colored(ui: &mut Ui, p: &Palette, glyph: &str, tip: &str, color: Color32) -> Response {
+    let (rect, resp) = ui.allocate_exact_size(Vec2::splat(38.0), Sense::click());
+    let t = ui.ctx().animate_bool_with_time(resp.id, resp.hovered(), 0.12);
+    let press = ui.ctx().animate_bool_with_time(resp.id.with("p"), resp.is_pointer_button_down_on(), 0.08);
+    if t > 0.0 {
+        ui.painter().circle_filled(rect.center(), 17.0 * (0.7 + 0.3 * t) * (1.0 - 0.08 * press), p.icon_bg.gamma_multiply(t));
+    }
+    if (t > 0.0 && t < 1.0) || (press > 0.0 && press < 1.0) {
+        ui.ctx().request_repaint();
+    }
+    ui.painter().text(rect.center(), Align2::CENTER_CENTER, glyph, FontId::proportional(20.0), lerp_color(color, p.text, t * 0.6));
+    let resp = resp.on_hover_cursor(egui::CursorIcon::PointingHand);
+    if tip.is_empty() { resp } else { resp.on_hover_text(tip) }
+}
+
+/// Large action button: icon + label (or just an icon when `label` is empty).
+/// Lifts slightly on hover and dips on press; `drift` offsets it while animating out.
+#[allow(clippy::too_many_arguments)]
+pub fn big_btn(ui: &mut Ui, p: &Palette, glyph: &str, label: &str, w: f32, h: f32, fill: Color32, fg: Color32, enabled: bool, drift: Vec2) -> Response {
+    let (rect, resp) = ui.allocate_exact_size(vec2(w, h), if enabled { Sense::click() } else { Sense::hover() });
+    let hov = ui.ctx().animate_bool_with_time(resp.id, resp.hovered() && enabled, 0.12);
+    let press = ui.ctx().animate_bool_with_time(resp.id.with("p"), resp.is_pointer_button_down_on(), 0.07);
+    if (hov > 0.0 && hov < 1.0) || (press > 0.0 && press < 1.0) {
+        ui.ctx().request_repaint();
+    }
+    let r = Rect::from_center_size(rect.center() + drift - vec2(0.0, 1.5 * hov), rect.size() * (1.0 - 0.03 * press));
+    let (fill, fg) = if enabled { (fill, fg) } else { (p.icon_bg, p.sub_text.gamma_multiply(0.6)) };
+    // Hover brightens toward white on dark fills, darkens slightly on light ones.
+    let lit = if p.dark || fill != p.input { lerp_color(fill, Color32::WHITE, 0.08 * hov) } else { lerp_color(fill, p.border, 0.5 * hov) };
+    let painter = ui.painter();
+    if hov > 0.0 && enabled {
+        painter.rect_filled(r.translate(vec2(0.0, 3.0)), CornerRadius::same(14), Color32::from_black_alpha((30.0 * hov) as u8));
+    }
+    painter.rect_filled(r, CornerRadius::same(14), lit);
+    if label.is_empty() {
+        painter.text(r.center(), Align2::CENTER_CENTER, glyph, FontId::proportional(22.0), fg);
+    } else {
+        let font = FontId::new(14.5, super::theme::semibold());
+        let g = painter.layout_no_wrap(label.to_string(), font, fg);
+        let icon_w = 22.0 + 8.0;
+        let total = (icon_w + g.size().x).min(r.width() - 16.0);
+        let x0 = r.center().x - total / 2.0;
+        painter.text(pos2(x0 + 11.0, r.center().y), Align2::CENTER_CENTER, glyph, FontId::proportional(21.0 + hov), fg);
+        if g.size().x <= r.width() - icon_w - 16.0 {
+            painter.galley(pos2(x0 + icon_w, r.center().y - g.size().y / 2.0), g, fg);
+        }
+    }
+    if enabled { resp.on_hover_cursor(egui::CursorIcon::PointingHand) } else { resp }
+}
+
 /// Filled accent button.
 pub fn primary(ui: &mut Ui, p: &Palette, text: &str) -> Response {
     filled(ui, p.accent, text)
@@ -145,29 +204,18 @@ pub fn secondary(ui: &mut Ui, p: &Palette, text: &str) -> Response {
     ui.add(b).on_hover_cursor(egui::CursorIcon::PointingHand)
 }
 
-/// Small pill badge.
-pub fn badge(ui: &mut Ui, text: &str, color: Color32) {
-    egui::Frame::new().fill(color.gamma_multiply(0.15)).corner_radius(10).inner_margin(egui::Margin::symmetric(8, 2)).show(ui, |ui| {
-        ui.label(bold(text, 11.0).color(color));
-    });
-}
-
 pub fn platform_icon(platform: &str) -> &'static str {
     match platform.to_ascii_lowercase().as_str() {
         "android" => icon::ANDROID_LOGO,
         "ios" => icon::APPLE_LOGO,
         "windows" => icon::WINDOWS_LOGO,
         "linux" => icon::LINUX_LOGO,
+        "peerhop" => icon::DESKTOP,
+        "phone" => icon::DEVICE_MOBILE,
+        "tablet" => icon::DEVICE_TABLET,
+        "web" | "desktop" => icon::GLOBE,
         _ => icon::DEVICES,
     }
-}
-
-/// Round avatar with a glyph.
-pub fn avatar(ui: &mut Ui, bg: Color32, fg: Color32, glyph: &str, size: f32) -> Response {
-    let (rect, resp) = ui.allocate_exact_size(Vec2::splat(size), Sense::hover());
-    ui.painter().circle_filled(rect.center(), size / 2.0, bg);
-    ui.painter().text(rect.center(), Align2::CENTER_CENTER, glyph, FontId::proportional(size * 0.5), fg);
-    resp
 }
 
 /// Thin rounded progress bar that eases toward `frac` (updates arrive every ~200ms).
@@ -271,11 +319,104 @@ pub fn slide_in<R>(ui: &mut Ui, e: f32, dir: f32, add: impl FnOnce(&mut Ui) -> R
     .inner
 }
 
-/// Down-pointing chevron rotated by `openness` (0 = down, 1 = up).
-pub fn chevron(ui: &mut Ui, color: Color32, openness: f32) {
-    let (rect, _) = ui.allocate_exact_size(vec2(16.0, 16.0), Sense::hover());
-    let c = rect.center();
-    let rot = egui::emath::Rot2::from_angle(std::f32::consts::PI * openness);
-    let pts = [vec2(-4.5, -2.0), vec2(0.0, 2.5), vec2(4.5, -2.0)].map(|v| c + rot * v);
-    ui.painter().line(pts.to_vec(), Stroke::new(1.6, color));
+// ---- Telegram-style pieces ------------------------------------------------------
+
+/// Stable avatar colour for a name (same name, same colour).
+pub fn name_color(name: &str) -> Color32 {
+    const COLORS: [u32; 7] = [0xe17076, 0xeda86c, 0xa695e7, 0x7bc862, 0x6ec9cb, 0x65aadd, 0xee7aae];
+    let h = name.bytes().fold(0x811c9dc5u32, |h, b| (h ^ b as u32).wrapping_mul(0x01000193));
+    super::theme::hex(COLORS[h as usize % COLORS.len()])
+}
+
+/// Up to two initials ("Mohammed Muneer" → "MM").
+pub fn initials(name: &str) -> String {
+    let mut words = name.split(|c: char| c.is_whitespace() || c == '-' || c == '_').filter(|w| !w.is_empty());
+    let first = words.next().and_then(|w| w.chars().next());
+    let second = words.next().and_then(|w| w.chars().next());
+    match (first, second) {
+        (Some(a), Some(b)) => format!("{a}{b}").to_uppercase(),
+        (Some(a), None) => a.to_uppercase().to_string(),
+        _ => "?".into(),
+    }
+}
+
+/// Rounded avatar face: a filled shape with initials or a glyph. `squircle` (0..1)
+/// morphs the circle toward a rounded square (used for the selected sidebar item).
+pub fn face(painter: &egui::Painter, rect: Rect, fill: Color32, label: &str, squircle: f32) {
+    let r = rect.width() / 2.0;
+    let radius = (r * (1.0 - 0.42 * squircle)).round() as u8;
+    painter.rect_filled(rect, CornerRadius::same(radius), fill);
+    // A soft top highlight gives the flat colour a little depth.
+    let top = Rect::from_min_max(rect.min, pos2(rect.max.x, rect.center().y));
+    painter.with_clip_rect(top).rect_filled(rect, CornerRadius::same(radius), Color32::from_white_alpha(14));
+    let size = if label.chars().count() > 2 || label.is_ascii() { r * 0.78 } else { r * 0.9 };
+    painter.text(rect.center(), Align2::CENTER_CENTER, label, FontId::new(size, super::theme::semibold()), Color32::WHITE);
+}
+
+/// Arc from 12 o'clock, clockwise, covering `frac` of the circle (offset by `spin` turns).
+pub fn ring(painter: &egui::Painter, center: egui::Pos2, radius: f32, frac: f32, spin: f32, stroke: Stroke) {
+    let frac = frac.clamp(0.0, 1.0);
+    if frac <= 0.0 {
+        return;
+    }
+    let n = ((64.0 * frac).ceil() as usize).max(2);
+    let start = -std::f32::consts::FRAC_PI_2 + spin * std::f32::consts::TAU;
+    let pts: Vec<egui::Pos2> = (0..=n)
+        .map(|i| {
+            let a = start + std::f32::consts::TAU * frac * i as f32 / n as f32;
+            center + vec2(a.cos(), a.sin()) * radius
+        })
+        .collect();
+    painter.add(egui::Shape::line(pts, stroke));
+}
+
+/// Unread-count pill centred on `at`, scaled by `scale` (pops in from 0).
+pub fn count_badge(painter: &egui::Painter, at: egui::Pos2, n: usize, fill: Color32, ring_color: Color32, scale: f32) {
+    if scale <= 0.01 {
+        return;
+    }
+    let text = if n > 999 { "999+".to_string() } else { n.to_string() };
+    let font = FontId::new(11.0 * scale, super::theme::semibold());
+    let galley = painter.layout_no_wrap(text, font, Color32::WHITE);
+    let h = 18.0 * scale;
+    let w = (galley.size().x + 10.0 * scale).max(h);
+    let rect = Rect::from_center_size(at, vec2(w, h));
+    painter.rect_filled(rect.expand(2.0 * scale), CornerRadius::same(((h / 2.0) + 2.0) as u8), ring_color);
+    painter.rect_filled(rect, CornerRadius::same((h / 2.0) as u8), fill);
+    painter.galley(rect.center() - galley.size() / 2.0, galley, Color32::WHITE);
+}
+
+/// Small round badge with a glyph (platform marker on avatars).
+pub fn glyph_badge(painter: &egui::Painter, at: egui::Pos2, glyph: &str, fill: Color32, fg: Color32, ring_color: Color32, scale: f32) {
+    if scale <= 0.01 {
+        return;
+    }
+    painter.circle_filled(at, 9.5 * scale, ring_color);
+    painter.circle_filled(at, 7.5 * scale, fill);
+    painter.text(at, Align2::CENTER_CENTER, glyph, FontId::proportional(10.0 * scale), fg);
+}
+
+/// Delivery state of an outgoing message.
+#[derive(Clone, Copy, PartialEq)]
+pub enum Tick {
+    Waiting,
+    Sent,
+    Delivered,
+    Failed,
+}
+
+pub fn tick_glyph(t: Tick) -> &'static str {
+    match t {
+        Tick::Waiting => icon::CLOCK,
+        Tick::Sent => icon::CHECK,
+        Tick::Delivered => icon::CHECKS,
+        Tick::Failed => icon::WARNING_CIRCLE,
+    }
+}
+
+/// Single-line text cut with an ellipsis to fit `max_w`.
+pub fn fit_text(painter: &egui::Painter, text: &str, font: FontId, color: Color32, max_w: f32) -> std::sync::Arc<egui::Galley> {
+    let mut job = egui::text::LayoutJob::simple_singleline(text.to_string(), font, color);
+    job.wrap = egui::text::TextWrapping { max_width: max_w.max(10.0), max_rows: 1, break_anywhere: true, overflow_character: Some('…') };
+    painter.layout_job(job)
 }

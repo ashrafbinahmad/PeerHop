@@ -160,13 +160,15 @@ impl Hub {
 
     pub fn broadcast_txn(&self, id: u64) {
         let txn = self.txs.lock().get(id).cloned();
-        if let Some(txn) = txn {
-            self.broadcast("transaction_update", txn);
+        match txn {
+            Some(txn) if txn.web => self.emit(HubEvent::Changed),
+            Some(txn) => self.broadcast("transaction_update", txn),
+            None => {}
         }
     }
 
     pub fn broadcast_all_transactions(&self, kind: &'static str) {
-        let all = self.txs.lock().all();
+        let all = self.txs.lock().lan_all();
         self.broadcast(kind, json!({ "transactions": all }));
     }
 
@@ -183,7 +185,7 @@ impl Hub {
             json: json!({ "type": kind, "data": data }).to_string().into(),
         };
         vec![
-            msg("transactions_init", json!({ "transactions": self.txs.lock().all() })),
+            msg("transactions_init", json!({ "transactions": self.txs.lock().lan_all() })),
             msg("devices_init", json!({ "clients": self.clients.lock().active() })),
             msg("desktop_name_init", json!({ "name": s.desktop_name })),
             msg("settings_init", json!({ "textTransferEnabled": s.text_transfer_enabled })),
@@ -215,6 +217,49 @@ impl Hub {
     pub fn send_text(&self, sender_id: &str, client_ip: &str, text: String) -> u64 {
         let id = self.txs.lock().add(Transaction::text(sender_id, client_ip, text));
         self.broadcast_txn(id);
+        id
+    }
+
+    /// Marks an incoming file saved, refreshes listeners and raises the received notice.
+    pub fn file_received(&self, id: u64, name: &str, written: u64) {
+        self.txs.lock().finish_upload(id, written);
+        self.broadcast_txn(id);
+        self.emit(HubEvent::FileReceived { name: name.to_string(), size: written });
+    }
+
+    // ---- web.peerhop.in transfers (desktop-only) ------------------------------
+
+    /// Outgoing file to one or more web peers; progress is tracked per peer key.
+    /// `conv` names the conversation it belongs to (a peer key, or a group key).
+    pub fn web_outgoing(&self, path: &Path, size: u64, peer_keys: &[String], conv: &str) -> u64 {
+        let mut t = Transaction::outgoing_file(path, size);
+        t.web = true;
+        t.client_ip = conv.into();
+        for key in peer_keys {
+            t.client_progress.insert(key.clone(), 0.0);
+            t.client_status.insert(key.clone(), Status::Pending);
+            t.client_bytes.insert(key.clone(), 0);
+        }
+        let id = self.txs.lock().add(t);
+        self.emit(HubEvent::Changed);
+        id
+    }
+
+    pub fn web_incoming(&self, peer_key: &str, filename: &str, size: u64, saved_at: &Path) -> u64 {
+        let mut t = Transaction::incoming_file(peer_key, filename, size, saved_at);
+        t.web = true;
+        t.upload_link.clear();
+        let id = self.txs.lock().add(t);
+        self.emit(HubEvent::Changed);
+        id
+    }
+
+    pub fn web_text(&self, peer_key: &str, text: String, outgoing: bool) -> u64 {
+        let sender = if outgoing { crate::store::SERVER_SENDER } else { peer_key };
+        let mut t = Transaction::text(sender, peer_key, text);
+        t.web = true;
+        let id = self.txs.lock().add(t);
+        self.emit(HubEvent::Changed);
         id
     }
 

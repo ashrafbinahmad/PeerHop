@@ -21,15 +21,11 @@ use peerhop::store::{Client, SERVER_SENDER, Transaction};
 
 use super::i18n::{self, I18n};
 use super::notifier::{self, Note};
+use super::rail::{Conv, Group, Known, RAIL_W, RAIL_WIDE_W, WIDE_FROM};
 use super::theme::{self, Palette};
 use super::thumbs::Thumbs;
 use super::widgets::{self, QrCache};
 
-/// Below this window width the layout collapses to a single tabbed panel.
-const SINGLE_PANEL_BELOW: f32 = 600.0;
-/// Side panel width range; it narrows on small windows so chat keeps room.
-const SIDE_MIN: f32 = 280.0;
-const SIDE_MAX: f32 = 330.0;
 const REVIEW_AT: &[u32] = &[2, 5, 8, 10, 20, 30, 40, 50];
 const SHARE_DEDUPE: Duration = Duration::from_secs(3);
 
@@ -37,14 +33,16 @@ pub enum Msg {
     Share(ShareData),
     ServerStarted { result: Result<Server, String>, wanted: u16 },
     Networks(Vec<NetworkProfile>),
-    Zipped(Result<PathBuf, String>),
+    Zipped { conv: Conv, result: Result<PathBuf, String> },
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
-pub enum Tab {
-    Chat,
-    Connect,
+/// Panel that slides in from the right over the chat.
+pub enum Sheet {
     Settings,
+    /// QR, networks and devices of the public room.
+    Public,
+    Info(Conv),
+    NewGroup { picked: Vec<String> },
 }
 
 pub enum Modal {
@@ -53,6 +51,7 @@ pub enum Modal {
     CancelClient { id: u64, ip: String, device: String, file: String },
     CancelUpload { id: u64, file: String },
     WifiQr { ssid: String, password: String },
+    LinkQr { title: String, url: String },
     Review { stars: u8 },
 }
 
@@ -84,6 +83,10 @@ struct Speed {
 
 pub struct App {
     rt: tokio::runtime::Runtime,
+    /// Discovery of and transfers with browsers on web.peerhop.in.
+    pub(crate) web: peerhop::p2p::WebLink,
+    /// Offers already announced with an OS notification.
+    web_notified: HashSet<(String, u32)>,
     ctx: egui::Context,
     pub(crate) settings: Settings,
     pub(crate) i18n: Arc<I18n>,
@@ -108,11 +111,24 @@ pub struct App {
     pub(crate) networks_loaded: bool,
     pub(crate) selected_ip: Option<Ipv4Addr>,
 
-    pub(crate) wide: bool,
-    pub(crate) tab: Tab,
-    pub(crate) side_tab: usize,
-    pub(crate) text_mode: bool,
+    /// The open conversation and when/which way it was switched to.
+    pub(crate) conv: Conv,
+    pub(crate) conv_switch: Option<(Instant, f32)>,
+    pub(crate) groups: Vec<Group>,
+    pub(crate) next_group: u32,
+    /// Web peers seen this session (names survive them leaving).
+    pub(crate) known: HashMap<String, Known>,
+    /// Highest transaction id looked at, per conversation (unread badges).
+    pub(crate) seen: HashMap<Conv, u64>,
+    /// When each sidebar entry first appeared (pop-in animation).
+    pub(crate) rail_born: HashMap<Conv, Instant>,
+    pub(crate) sheet: Option<Sheet>,
+    pub(crate) sheet_open: bool,
+    /// Sidebar expansion, 0 (icons only) to 1 (names and previews).
+    pub(crate) rail_x: f32,
     pub(crate) draft: String,
+    /// Message field shown in the bottom bar (instead of the share buttons).
+    pub(crate) text_open: bool,
     pub(crate) modal: Option<Modal>,
     toasts: Vec<Toast>,
     /// When each transaction first appeared (drives its entry animation).
@@ -121,28 +137,29 @@ pub struct App {
     pub(crate) leaving: Vec<(Transaction, Instant)>,
     /// Theme cross-fade: from, to, start.
     pal_fade: Option<(Palette, Palette, Instant)>,
-    /// Last tab switch: when, and which way the content should slide (-1 left, 1 right).
-    tab_switch: Option<(Instant, f32)>,
     /// Last time a device connected (pulses the status dot).
     pub(crate) joined_at: Option<Instant>,
     pub(crate) thumbs: Thumbs,
     pub(crate) qr: QrCache,
     pub(crate) logo: egui::TextureHandle,
-    pub(crate) zipping: usize,
+    /// Folders being zipped, by the conversation they go to.
+    pub(crate) zipping: Vec<Conv>,
     last_share: Option<(u64, Instant)>,
     paste_latch: bool,
 
-    pub(crate) mobile_open: bool,
-    pub(crate) desktop_open: bool,
-    pub(crate) show_more_networks: bool,
     pub(crate) revealed: HashSet<String>,
     pub(crate) client_names: HashMap<String, String>,
     pub(crate) name_edit: String,
     pub(crate) port_edit: String,
 }
 
-pub fn load_png(bytes: &[u8]) -> Option<egui::ColorImage> {
-    let img = image::load_from_memory(bytes).ok()?.to_rgba8();
+/// Decodes an image, scaled down to fit `max` px if it is larger.
+pub fn load_png(bytes: &[u8], max: u32) -> Option<egui::ColorImage> {
+    let mut img = image::load_from_memory(bytes).ok()?;
+    if img.width() > max || img.height() > max {
+        img = img.resize(max, max, image::imageops::FilterType::Lanczos3);
+    }
+    let img = img.to_rgba8();
     let (w, h) = img.dimensions();
     Some(egui::ColorImage::from_rgba_unmultiplied([w as usize, h as usize], img.as_raw()))
 }
@@ -159,7 +176,7 @@ impl App {
         let pal = theme::palette(settings.is_dark_mode);
         theme::apply(&ctx, &pal);
 
-        let logo_img = load_png(include_bytes!("../../ui/frontend/src/assets/images/appicon.png")).unwrap_or_else(|| egui::ColorImage::filled([1, 1], Color32::TRANSPARENT));
+        let logo_img = load_png(include_bytes!("../../ui/frontend/src/assets/images/appicon.png"), 256).unwrap_or_else(|| egui::ColorImage::filled([1, 1], Color32::TRANSPARENT));
         let logo = ctx.load_texture("logo", logo_img, egui::TextureOptions::LINEAR);
 
         let rt = tokio::runtime::Builder::new_multi_thread().enable_all().worker_threads(4).build().expect("tokio runtime");
@@ -208,10 +225,16 @@ impl App {
         }
 
         let placeholder = Hub::new(Mode::Desktop, shared_from(&settings));
+        let web = {
+            let ctx = ctx.clone();
+            peerhop::p2p::WebLink::start(&rt, placeholder.clone(), settings.desktop_device_name.clone(), settings.web_visible, move || ctx.request_repaint())
+        };
         let name_edit = settings.desktop_device_name.clone();
         let port_edit = settings.static_port.to_string();
         let mut app = Self {
             rt,
+            web,
+            web_notified: HashSet::new(),
             ctx: ctx.clone(),
             settings,
             i18n,
@@ -232,27 +255,30 @@ impl App {
             networks: Vec::new(),
             networks_loaded: false,
             selected_ip: None,
-            wide: true,
-            tab: Tab::Connect,
-            side_tab: 0,
-            text_mode: false,
+            conv: Conv::Public,
+            conv_switch: None,
+            groups: Vec::new(),
+            next_group: 1,
+            known: HashMap::new(),
+            seen: HashMap::new(),
+            rail_born: HashMap::new(),
+            sheet: None,
+            sheet_open: false,
+            rail_x: 0.0,
             draft: String::new(),
+            text_open: false,
             modal: None,
             toasts: Vec::new(),
             appeared: HashMap::new(),
             leaving: Vec::new(),
             pal_fade: None,
-            tab_switch: None,
             joined_at: None,
             thumbs: Thumbs::new(ctx.clone()),
             qr: QrCache::default(),
             logo,
-            zipping: 0,
+            zipping: Vec::new(),
             last_share: None,
             paste_latch: false,
-            mobile_open: true,
-            desktop_open: false,
-            show_more_networks: false,
             revealed: HashSet::new(),
             client_names: HashMap::new(),
             name_edit,
@@ -289,6 +315,7 @@ impl App {
         let hub = Hub::new(Mode::Desktop, shared_from(&self.settings));
         self.attach_listener(&hub);
         self.hub = hub.clone();
+        self.web.set_hub(hub.clone());
         self.dirty.store(true, Ordering::Relaxed);
         self.restarting = true;
         self.speeds.clear();
@@ -353,27 +380,45 @@ impl App {
 
     // ---- sharing -----------------------------------------------------------
 
+    /// Sends files and folders to the open conversation.
     pub(crate) fn share_paths(&mut self, paths: Vec<PathBuf>) {
+        let conv = self.conv.clone();
         let (dirs, files): (Vec<_>, Vec<_>) = paths.into_iter().partition(|p| p.is_dir());
         let files: Vec<(PathBuf, u64)> = files
             .into_iter()
             .filter_map(|p| std::fs::metadata(&p).ok().filter(|m| m.is_file()).map(|m| (p, m.len())))
             .collect();
         if !files.is_empty() {
-            self.hub.offer_files(&files);
-            self.count_share();
+            self.send_files_to(&conv, files);
         }
         if !dirs.is_empty() {
-            self.zipping += 1;
+            self.zipping.push(conv.clone());
             let tx = self.tx.clone();
             let ctx = self.ctx.clone();
             std::thread::spawn(move || {
-                let r = peerhop::util::zip_paths(&dirs).map_err(|e| e.to_string());
-                let _ = tx.send(Msg::Zipped(r));
+                let result = peerhop::util::zip_paths(&dirs).map_err(|e| e.to_string());
+                let _ = tx.send(Msg::Zipped { conv, result });
                 ctx.request_repaint();
             });
         }
-        self.tab = Tab::Chat;
+    }
+
+    fn send_files_to(&mut self, conv: &Conv, files: Vec<(PathBuf, u64)>) {
+        match conv {
+            Conv::Public => {
+                self.hub.offer_files(&files);
+            }
+            c => {
+                let targets = self.conv_targets(c);
+                if targets.is_empty() {
+                    self.toast(self.t("peer_offline").to_string(), ToastKind::Error);
+                    return;
+                }
+                let key = Self::conv_send_key(c, &targets);
+                self.web.send_files(&targets, &key, files);
+            }
+        }
+        self.count_share();
     }
 
     pub(crate) fn pick_files(&mut self) {
@@ -387,7 +432,23 @@ impl App {
         if text.is_empty() {
             return;
         }
-        self.hub.send_text(SERVER_SENDER, "", text);
+        match self.conv.clone() {
+            Conv::Public => {
+                if !self.settings.text_transfer_enabled {
+                    return;
+                }
+                self.hub.send_text(SERVER_SENDER, "", text);
+            }
+            c => {
+                let targets = self.conv_targets(&c);
+                if targets.is_empty() {
+                    self.toast(self.t("peer_offline").to_string(), ToastKind::Error);
+                    return;
+                }
+                let key = Self::conv_send_key(&c, &targets);
+                self.web.send_text(&targets, &key, text);
+            }
+        }
         self.draft.clear();
     }
 
@@ -414,6 +475,8 @@ impl App {
         }
         self.last_share = Some((hash, Instant::now()));
 
+        // Shares from the OS go to the public room (phones scanning the QR).
+        self.select(Conv::Public);
         let files: Vec<PathBuf> = share.files.iter().map(PathBuf::from).collect();
         if !files.is_empty() {
             self.share_paths(files);
@@ -422,7 +485,6 @@ impl App {
             let text = text.trim().to_string();
             if !text.is_empty() {
                 self.hub.send_text(SERVER_SENDER, "", text);
-                self.tab = Tab::Chat;
             }
         }
     }
@@ -441,13 +503,14 @@ impl App {
                         self.hub.refresh_local_ips();
                     }
                 }
-                Msg::Zipped(r) => {
-                    self.zipping = self.zipping.saturating_sub(1);
-                    match r {
+                Msg::Zipped { conv, result } => {
+                    if let Some(i) = self.zipping.iter().position(|c| *c == conv) {
+                        self.zipping.remove(i);
+                    }
+                    match result {
                         Ok(path) => {
                             let size = std::fs::metadata(&path).map(|m| m.len()).unwrap_or(0);
-                            self.hub.offer_files(&[(path, size)]);
-                            self.count_share();
+                            self.send_files_to(&conv, vec![(path, size)]);
                         }
                         Err(e) => self.toast(format!("{}: {e}", self.t("zip_failed")), ToastKind::Error),
                     }
@@ -493,10 +556,6 @@ impl App {
         }
         for name in joined {
             self.toast(format!("{} · {name}", self.t("device_connected")), ToastKind::Success);
-            // Connection done: get the QR out of the way and show the conversation.
-            self.mobile_open = false;
-            self.desktop_open = false;
-            self.tab = Tab::Chat;
         }
         for name in left {
             self.toast(format!("{} · {name}", self.t("device_disconnected")), ToastKind::Info);
@@ -549,10 +608,10 @@ impl App {
         }
     }
 
-    /// Progress (eased) and direction of the current tab slide.
-    fn tab_slide(&self) -> (f32, f32) {
-        match self.tab_switch {
-            Some((at, dir)) => (egui::emath::easing::cubic_out((at.elapsed().as_secs_f32() / 0.22).min(1.0)), dir),
+    /// Progress (eased) and direction of the current conversation switch.
+    fn conv_slide(&self) -> (f32, f32) {
+        match self.conv_switch {
+            Some((at, dir)) => (egui::emath::easing::cubic_out((at.elapsed().as_secs_f32() / 0.24).min(1.0)), dir),
             None => (1.0, 0.0),
         }
     }
@@ -568,11 +627,33 @@ impl App {
     }
 
     pub(crate) fn client_name(&self, ip: &str) -> String {
+        if let Some(peer) = peerhop::p2p::peer_of(ip) {
+            return self.web.peer_name(peer).unwrap_or_else(|| self.t("web_device").to_string());
+        }
         self.clients.iter().find(|c| c.ip == ip).map(|c| c.name.clone()).unwrap_or_else(|| ip.to_string())
     }
 
-    pub(crate) fn client_platform(&self, ip: &str) -> &str {
-        self.clients.iter().find(|c| c.ip == ip).map(|c| c.platform.as_str()).unwrap_or("")
+    /// Offers show inline in the sender's conversation; announce new ones with an
+    /// OS notification in the background, or a toast when another chat is open.
+    fn web_prompts(&mut self) {
+        let prompts = self.web.prompts();
+        self.web_notified.retain(|k| prompts.iter().any(|p| (p.peer.clone(), p.job) == *k));
+        let here = self.conv_keys(&self.conv);
+        for p in &prompts {
+            if !self.web_notified.insert((p.peer.clone(), p.job)) {
+                continue;
+            }
+            if !self.focused.load(Ordering::Relaxed) {
+                peerhop::platform::notify(self.t("app_name"), self.web_offer_text(p));
+            } else if !here.contains(&peerhop::p2p::peer_key(&p.peer)) {
+                self.toast(self.web_offer_text(p), ToastKind::Info);
+            }
+        }
+    }
+
+    pub(crate) fn web_offer_text(&self, p: &peerhop::p2p::Prompt) -> String {
+        let what = if p.files.len() == 1 { p.files[0].name.clone() } else { self.i18n.tf("web_files", &[("n", &p.files.len().to_string())]) };
+        self.i18n.tf("web_offer", &[("name", &p.name), ("what", &what)])
     }
 
     fn handle_drop_and_paste(&mut self, ctx: &egui::Context) {
@@ -731,6 +812,18 @@ impl App {
                         }
                     });
                 }
+                Modal::LinkQr { title, url } => {
+                    ui.vertical_centered(|ui| {
+                        ui.heading(title.as_str());
+                        ui.label(widgets::sub(&p, self.t("link_qr_hint")));
+                        ui.add_space(8.0);
+                        widgets::qr(ui, &mut self.qr, url, 240.0, None);
+                        ui.add_space(8.0);
+                        if widgets::secondary(ui, &p, self.t("close")).clicked() {
+                            keep = false;
+                        }
+                    });
+                }
                 Modal::Review { stars } => {
                     ui.vertical_centered(|ui| {
                         ui.heading(self.t("rate_app"));
@@ -849,7 +942,7 @@ fn buttons(ui: &mut Ui, p: &Palette, ok: &str, cancel: &str, ok_color: Color32) 
 
 /// Vertical scroll area spanning the full width (scrollbar on the outer edge),
 /// with the content padded inside it.
-fn edge_scroll(ui: &mut Ui, add: impl FnOnce(&mut Ui)) {
+pub(crate) fn edge_scroll(ui: &mut Ui, add: impl FnOnce(&mut Ui)) {
     egui::ScrollArea::vertical().auto_shrink(false).show(ui, |ui| {
         Frame::new().inner_margin(Margin { left: 12, right: 12, top: 0, bottom: 16 }).show(ui, |ui| {
             ui.set_width(ui.available_width());
@@ -897,6 +990,26 @@ fn clipboard_image_to_file() -> Option<PathBuf> {
     Some(path)
 }
 
+impl App {
+    pub(crate) fn open_sheet(&mut self, sheet: Sheet) {
+        self.sheet = Some(sheet);
+        self.sheet_open = true;
+    }
+
+    pub(crate) fn close_sheet(&mut self) {
+        self.sheet_open = false;
+    }
+
+    /// Creates a multi-send to `members`, opens it and returns its id.
+    pub(crate) fn create_group(&mut self, members: Vec<String>) -> u32 {
+        let id = self.next_group;
+        self.next_group += 1;
+        self.groups.push(Group { id, members });
+        self.select(Conv::Group(id));
+        id
+    }
+}
+
 impl eframe::App for App {
     fn ui(&mut self, ui: &mut Ui, _frame: &mut eframe::Frame) {
         let ctx = ui.ctx().clone();
@@ -905,65 +1018,41 @@ impl eframe::App for App {
             self.sync_theme();
         }
         self.animate_theme();
-        let (slide, slide_dir) = self.tab_slide();
+        self.remember_peers();
+        // A conversation that went away (deleted group, a browser that left without
+        // any history) falls back to the public room.
+        if self.conv != Conv::Public && self.conv_item(&self.conv).is_none() {
+            self.select(Conv::Public);
+        }
+        let (slide, slide_dir) = self.conv_slide();
         if slide < 1.0 {
             ctx.request_repaint();
         }
         let p = self.pal;
-        let width = ctx.content_rect().width();
-        self.wide = width >= SINGLE_PANEL_BELOW;
-        let side_width = (width * 0.4).clamp(SIDE_MIN, SIDE_MAX);
 
-        if self.wide {
-            egui::Panel::right("side")
-                .exact_size(side_width)
-                .resizable(false)
-                // No horizontal panel margin: the scrollbar sits on the window edge,
-                // and the padding lives inside the scrolled content instead.
-                .frame(Frame::new().fill(p.panel).inner_margin(Margin { left: 0, right: 0, top: 10, bottom: 0 }))
-                .show(ui, |ui| {
-                    let items = [self.t("connect").to_string(), self.t("settings").to_string()];
-                    let refs: Vec<&str> = items.iter().map(String::as_str).collect();
-                    let before = self.side_tab;
-                    Frame::new().inner_margin(Margin::symmetric(12, 0)).show(ui, |ui| {
-                        if widgets::segmented(ui, &p, &mut self.side_tab, &refs) {
-                            self.tab_switch = Some((Instant::now(), if self.side_tab > before { 1.0 } else { -1.0 }));
-                        }
-                    });
-                    ui.add_space(6.0);
-                    widgets::slide_in(ui, slide, slide_dir, |ui| {
-                        edge_scroll(ui, |ui| if self.side_tab == 0 { self.connect_panel(ui) } else { self.settings_panel(ui) })
-                    });
-                });
-            egui::CentralPanel::default().frame(Frame::new().fill(p.bg)).show(ui, |ui| self.chat_panel(ui));
-        } else {
-            egui::Panel::top("tabs").frame(Frame::new().fill(p.panel).inner_margin(Margin::symmetric(10, 8))).show(ui, |ui| {
-                let items = [self.t("chat").to_string(), self.t("connect").to_string(), self.t("settings").to_string()];
-                let refs: Vec<&str> = items.iter().map(String::as_str).collect();
-                let mut idx = self.tab as usize;
-                if widgets::segmented(ui, &p, &mut idx, &refs) {
-                    self.tab_switch = Some((Instant::now(), if idx > self.tab as usize { 1.0 } else { -1.0 }));
-                    self.tab = [Tab::Chat, Tab::Connect, Tab::Settings][idx];
-                }
-            });
-            match self.tab {
-                Tab::Chat => {
-                    egui::CentralPanel::default().frame(Frame::new().fill(p.bg)).show(ui, |ui| widgets::slide_in(ui, slide, slide_dir, |ui| self.chat_panel(ui)));
-                }
-                tab => {
-                    egui::CentralPanel::default().frame(Frame::new().fill(p.bg).inner_margin(Margin { left: 0, right: 0, top: 6, bottom: 0 })).show(ui, |ui| {
-                        widgets::slide_in(ui, slide, slide_dir, |ui| {
-                            edge_scroll(ui, |ui| if tab == Tab::Connect { self.connect_panel(ui) } else { self.settings_panel(ui) })
-                        });
-                    });
-                }
-            }
+        let wide = ctx.content_rect().width() >= WIDE_FROM;
+        let x = ctx.animate_bool_with_time(Id::new("rail_wide"), wide, 0.26);
+        self.rail_x = egui::emath::easing::cubic_in_out(x);
+        if x > 0.0 && x < 1.0 {
+            ctx.request_repaint();
         }
+        egui::Panel::top("titlebar").exact_size(super::titlebar::TITLE_H).frame(Frame::new()).show_separator_line(false).resizable(false).show(ui, |ui| self.title_bar(ui));
+        egui::Panel::left("rail").exact_size(egui::lerp(RAIL_W..=RAIL_WIDE_W, self.rail_x)).resizable(false).frame(Frame::new().fill(p.panel)).show_separator_line(false).show(ui, |ui| {
+            self.rail(ui);
+            let r = ui.max_rect();
+            ui.painter().vline(r.right() - 0.5, r.y_range(), Stroke::new(1.0, p.border));
+        });
+        egui::CentralPanel::default().frame(Frame::new().fill(p.bg)).show(ui, |ui| {
+            widgets::slide_in(ui, slide, slide_dir, |ui| self.chat_view(ui));
+        });
 
+        self.sheets(&ctx);
+        self.web_prompts();
         self.drop_overlay(&ctx);
         self.modals(&ctx);
         self.toasts(&ctx);
-        if self.restarting || self.zipping > 0 || self.txs.iter().any(|t| !t.status.is_finished()) {
+        self.window_frame(&ctx);
+        if self.restarting || !self.zipping.is_empty() || self.txs.iter().any(|t| !t.status.is_finished()) {
             // Keep spinners and speed readouts moving even between hub events.
             ctx.request_repaint_after(Duration::from_millis(500));
         }

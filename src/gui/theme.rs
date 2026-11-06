@@ -11,6 +11,9 @@ pub struct Palette {
     pub card: Color32,
     pub input: Color32,
     pub bubble_other: Color32,
+    /// Outgoing message bubble, and the time/ticks drawn on it.
+    pub bubble_mine: Color32,
+    pub mine_meta: Color32,
     pub border: Color32,
     pub icon_bg: Color32,
     pub icon_text: Color32,
@@ -33,6 +36,8 @@ impl Palette {
             card: l(self.card, to.card),
             input: l(self.input, to.input),
             bubble_other: l(self.bubble_other, to.bubble_other),
+            bubble_mine: l(self.bubble_mine, to.bubble_mine),
+            mine_meta: l(self.mine_meta, to.mine_meta),
             border: l(self.border, to.border),
             icon_bg: l(self.icon_bg, to.icon_bg),
             icon_text: l(self.icon_text, to.icon_text),
@@ -77,6 +82,8 @@ pub fn palette(dark: bool) -> Palette {
         card: c[2],
         input: c[3],
         bubble_other: c[4],
+        bubble_mine: if dark { hex(0x2b5278) } else { hex(0xdcebff) },
+        mine_meta: if dark { hex(0x8fc1f0) } else { hex(0x3f77c0) },
         border: c[5],
         icon_bg: c[6],
         icon_text: c[7],
@@ -131,6 +138,9 @@ pub fn apply(ctx: &egui::Context, p: &Palette) {
     ctx.set_theme(if p.dark { egui::Theme::Dark } else { egui::Theme::Light });
     ctx.set_visuals(v);
     ctx.all_styles_mut(|s| {
+        s.animation_time = 0.16;
+        s.interaction.tooltip_delay = 0.08;
+        s.interaction.show_tooltips_only_when_still = false;
         s.spacing.item_spacing = egui::vec2(6.0, 6.0);
         s.spacing.button_padding = egui::vec2(10.0, 4.0);
         s.spacing.interact_size.y = 26.0;

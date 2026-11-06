@@ -8,6 +8,7 @@
 
 pub mod hub;
 pub mod net;
+pub mod p2p;
 pub mod platform;
 pub mod server;
 pub mod settings;

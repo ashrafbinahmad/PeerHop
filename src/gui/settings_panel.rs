@@ -33,6 +33,7 @@ impl App {
                 } else if name != self.settings.desktop_device_name {
                     self.settings.desktop_device_name = name.clone();
                     self.hub.set_desktop_name(&name);
+                    self.web.set_name(&name);
                     self.save_settings();
                 }
             }
@@ -86,13 +87,17 @@ impl App {
 
         widgets::section_title(ui, &p, self.t("features"));
         widgets::card(ui, &p, |ui| {
+            let mut v = self.settings.web_visible;
+            if widgets::switch_row(ui, &p, self.t("web_visible"), self.t("web_visible_hint"), &mut v) {
+                self.settings.web_visible = v;
+                self.web.set_visible(v);
+                self.save_settings();
+            }
+            divider(ui, &p);
             let mut v = self.settings.text_transfer_enabled;
             if widgets::switch_row(ui, &p, self.t("text_transfer"), self.t("enable_sending_receiving"), &mut v) {
                 self.settings.text_transfer_enabled = v;
                 self.hub.set_text_transfer(v);
-                if !v {
-                    self.text_mode = false;
-                }
                 self.save_settings();
             }
             divider(ui, &p);
